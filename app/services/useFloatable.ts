@@ -41,7 +41,8 @@ function clampPos(p: { x: number; y: number }): { x: number; y: number } {
 
 export function useFloatable(key: string, initial: { x: number; y: number }): Floatable {
   const [floating, setFloating] = useState<boolean>(() => remembered(`fl:${key}:on`) === '1');
-  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+  // where the user put the panel; a smaller window draws it within itself without moving it for good
+  const [placed, setPlaced] = useState<{ x: number; y: number }>(() => {
     const saved = remembered(`fl:${key}:pos`);
     if (saved) {
       try {
@@ -52,13 +53,15 @@ export function useFloatable(key: string, initial: { x: number; y: number }): Fl
     }
     return clampPos(initial);
   });
+  const [, redraw] = useState(0);
+  const pos = clampPos(placed);
   const [dragging, setDragging] = useState(false);
   const offset = useRef({ x: 0, y: 0 });
 
   useEffect(() => { remember(`fl:${key}:on`, floating ? '1' : '0'); }, [key, floating]);
-  useEffect(() => { remember(`fl:${key}:pos`, JSON.stringify(pos)); }, [key, pos]);
+  useEffect(() => { remember(`fl:${key}:pos`, JSON.stringify(placed)); }, [key, placed]);
   useEffect(() => {
-    const onResize = () => setPos((p) => clampPos(p));
+    const onResize = () => redraw((n) => n + 1);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -75,7 +78,7 @@ export function useFloatable(key: string, initial: { x: number; y: number }): Fl
     const move = (event: PointerEvent) => {
       const x = Math.max(4, Math.min(window.innerWidth - 60, event.clientX - offset.current.x));
       const y = Math.max(4, Math.min(window.innerHeight - 40, event.clientY - offset.current.y));
-      setPos({ x, y });
+      setPlaced({ x, y });
     };
     const up = () => setDragging(false);
     window.addEventListener('pointermove', move);
@@ -90,7 +93,7 @@ export function useFloatable(key: string, initial: { x: number; y: number }): Fl
     floating,
     pos,
     dragging,
-    pop: () => { setPos((p) => clampPos(p)); setFloating(true); },
+    pop: () => { setPlaced(clampPos(placed)); setFloating(true); },
     dock: () => setFloating(false),
     onDragStart,
   };
