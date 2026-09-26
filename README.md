@@ -50,6 +50,11 @@ Code, save [docs/mcp-skill.md](docs/mcp-skill.md) as `~/.claude/skills/yue2-stud
 
 ## What you can do
 
+- **A player of its own** — a ten-band equalizer on Winamp's frequencies with its presets,
+  your own and .EQF files; a MilkDrop visualiser with hundreds of presets or a spectrum in ten
+  looks, over the studio, fullscreen or in its own window; and a Winamp mode that turns the whole
+  window into a skinned Winamp 2 — ten skins included, the Winamp Skin Museum one click away,
+  Ctrl+M to switch. The song, its place and the equalizer carry over both ways.
 - **Full songs from a style and lyrics** — up to six minutes, in the languages the model
   sings. On an RTX 4090 with the Q8_0 set a 3:38 song renders in about 46 seconds.
 - **Read and edit the score** — the model writes its composition in ABC notation first; the
@@ -128,6 +133,8 @@ Code, save [docs/mcp-skill.md](docs/mcp-skill.md) as `~/.claude/skills/yue2-stud
 
 | | |
 |---|---|
+| ![The equalizer and MilkDrop](docs/screenshots/en-13-listen.png) | ![The Winamp mode](docs/screenshots/en-14-winamp.png) |
+| The equalizer with its curve and MilkDrop over the studio, as the song plays | The whole window as Winamp 2: equalizer, playlist and MilkDrop, skinned |
 | ![The score](docs/screenshots/en-02-score.png) | ![A finished track](docs/screenshots/en-03-track.png) |
 | The score as sheet music and as ABC text — melody + chords, melody only, or none | A finished track — its lyrics and the score it was sung from, ready to reuse |
 | ![Cover mode](docs/screenshots/en-04-cover.png) | ![Models](docs/screenshots/en-05-models.png) |
