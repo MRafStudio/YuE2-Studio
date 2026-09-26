@@ -68,10 +68,11 @@ export function useFloatable(key: string, initial: { x: number; y: number }): Fl
 
   const onDragStart = useCallback((event: ReactPointerEvent) => {
     if (event.button !== 0) return;
-    offset.current = { x: event.clientX - pos.x, y: event.clientY - pos.y };
+    const from = clampPos(placed);
+    offset.current = { x: event.clientX - from.x, y: event.clientY - from.y };
     setDragging(true);
     event.preventDefault();
-  }, [pos]);
+  }, [placed]);
 
   useEffect(() => {
     if (!dragging) return;
@@ -93,7 +94,7 @@ export function useFloatable(key: string, initial: { x: number; y: number }): Fl
     floating,
     pos,
     dragging,
-    pop: () => { setPlaced(clampPos(placed)); setFloating(true); },
+    pop: () => setFloating(true),
     dock: () => setFloating(false),
     onDragStart,
   };

@@ -149,7 +149,10 @@ export const WinampMode: React.FC<Props> = ({ queue, startIndex, startSeconds, p
     // leaving always comes last, so nothing lands on the window after it got its shape back
     let windowWork: Promise<void> = Promise.resolve();
     const onWindow = (job: () => Promise<void>) => {
-      windowWork = windowWork.then(job).catch((error) => console.error('Winamp window:', error));
+      windowWork = windowWork.then(job).catch((error) => {
+        console.error('Winamp window:', error);
+        if (!disposed) setProblem(`${t('winampWindowFailed')}: ${error instanceof Error ? error.message : String(error)}`);
+      });
       return windowWork;
     };
     let zoom = 1;
