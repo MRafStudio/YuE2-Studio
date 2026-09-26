@@ -472,4 +472,8 @@ The studio is MIT, and so is yue2.cpp. **The models are not:** YuE2-3B, the YuE2
 SheetSage2 are released under **CC BY-NC 4.0** — songs you make with them are for
 non-commercial use unless you obtain other terms from their authors.
 
+One bundled component is under a different licence: the visualiser's spectrum looks come from
+[audioMotion-analyzer](https://github.com/hvianna/audioMotion-analyzer), which is **AGPL-3.0**;
+its source, like the studio's, is public.
+
 What changed and when is in [CHANGELOG.md](CHANGELOG.md).
