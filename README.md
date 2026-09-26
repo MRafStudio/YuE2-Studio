@@ -56,6 +56,10 @@ Code, save [docs/mcp-skill.md](docs/mcp-skill.md) as `~/.claude/skills/yue2-stud
   window into a skinned Winamp 2 whose windows move apart, dock and resize — the original skin
   and ten more included, sharp at any scale, the Winamp Skin Museum one click away,
   Ctrl+M to switch. The song, its place and the equalizer carry over both ways.
+- **Save as, and a Files panel** — songs, stems, MIDI, lyric sheets, scores and videos are
+  saved where you say, in Windows' own Save dialog, and the Files panel shows each save.
+- **A proxy for the whole studio** — HTTP, HTTPS, SOCKS5 or SOCKS4, with a login: model
+  downloads, Hugging Face, OpenRouter and updates go through it.
 - **Full songs from a style and lyrics** — up to six minutes, in the languages the model
   sings. On an RTX 4090 with the Q8_0 set a 3:38 song renders in about 46 seconds.
 - **Read and edit the score** — the model writes its composition in ABC notation first; the
