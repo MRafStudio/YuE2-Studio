@@ -5,23 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>YuE2 Studio — 編集できる楽譜つきのフルソングを自分の GPU で</title>
 <meta name="description" content="YuE2 ソングモデルのデスクトップスタジオ。スタイルと歌詞から、ボーカル入りのフルソングとその楽譜を生成します。カバー、完全な再現、カラオケ。単一の実行ファイル、Python 不要、NVIDIA の GPU でオフライン動作。" />
-<link rel="icon" type="image/png" href="logo.png" />
-<meta property="og:title" content="YuE2 Studio" />
-<meta property="og:description" content="YuE2 ソングモデルのデスクトップスタジオ。スタイルと歌詞から、ボーカル入りのフルソングとその楽譜を生成します。カバー、完全な再現、カラオケ。単一の実行ファイル、Python 不要、NVIDIA の GPU でオフライン動作。" />
-<meta property="og:type" content="website" />
-<meta property="og:image" content="https://timoncool.github.io/YuE2-Studio/screenshots/ja-01-create.png" />
+<link rel="canonical" href="https://timoncool.github.io/YuE2-Studio/ja.html" />
 <link rel="alternate" hreflang="en" href="https://timoncool.github.io/YuE2-Studio/" />
 <link rel="alternate" hreflang="ru" href="https://timoncool.github.io/YuE2-Studio/ru.html" />
 <link rel="alternate" hreflang="zh" href="https://timoncool.github.io/YuE2-Studio/zh.html" />
 <link rel="alternate" hreflang="ja" href="https://timoncool.github.io/YuE2-Studio/ja.html" />
 <link rel="alternate" hreflang="ko" href="https://timoncool.github.io/YuE2-Studio/ko.html" />
+<link rel="alternate" hreflang="x-default" href="https://timoncool.github.io/YuE2-Studio/" />
+<link rel="icon" type="image/png" href="logo.png" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="YuE2 Studio" />
+<meta property="og:title" content="YuE2 Studio — 編集できる楽譜つきのフルソングを自分の GPU で" />
+<meta property="og:description" content="YuE2 ソングモデルのデスクトップスタジオ。スタイルと歌詞から、ボーカル入りのフルソングとその楽譜を生成します。カバー、完全な再現、カラオケ。単一の実行ファイル、Python 不要、NVIDIA の GPU でオフライン動作。" />
+<meta property="og:url" content="https://timoncool.github.io/YuE2-Studio/ja.html" />
+<meta property="og:locale" content="ja" />
+<meta property="og:image" content="https://timoncool.github.io/YuE2-Studio/og-ja.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="編集できる楽譜つきのフルソングを、自分の GPU で" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://timoncool.github.io/YuE2-Studio/og-ja.jpg" />
+<link rel="preload" as="image" href="screenshots/ja-01-create.webp" fetchpriority="high" />
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"SoftwareApplication","@id":"https://timoncool.github.io/YuE2-Studio/#app","name":"YuE2 Studio","url":"https://timoncool.github.io/YuE2-Studio/ja.html","inLanguage":"ja","description":"YuE2 ソングモデルのデスクトップスタジオ。スタイルと歌詞から、ボーカル入りのフルソングとその楽譜を生成します。カバー、完全な再現、カラオケ。単一の実行ファイル、Python 不要、NVIDIA の GPU でオフライン動作。","applicationCategory":"MultimediaApplication","applicationSubCategory":"AI music generation","operatingSystem":"Windows 10, Windows 11","softwareVersion":"3.0.0","fileSize":"299 MB","downloadUrl":"https://github.com/timoncool/YuE2-Studio/releases/latest","isAccessibleForFree":true,"license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://timoncool.github.io/YuE2-Studio/og-ja.jpg","screenshot":"https://timoncool.github.io/YuE2-Studio/screenshots/ja-01-create.webp","codeRepository":"https://github.com/timoncool/YuE2-Studio","sameAs":["https://github.com/timoncool/YuE2-Studio"],"author":{"@id":"https://github.com/timoncool#person"},"dateModified":"2026-09-27"},{"@type":"Person","@id":"https://github.com/timoncool#person","name":"Nerual Dreming","url":"https://github.com/timoncool","sameAs":["https://github.com/timoncool","https://t.me/nerual_dreming","https://artgeneration.me"]},{"@type":"FAQPage","inLanguage":"ja","mainEntity":[{"@type":"Question","name":"どんなグラフィックカードが必要ですか？","acceptedAnswer":{"@type":"Answer","text":"Windows 10/11 x64 と VRAM 6 GB 以上の GPU：NVIDIA（GTX 900 以降）は CUDA で動作。AMD と Intel の Vulkan は実験的です。モデルはスタジオ内から、あなたが決めたときにダウンロードされます。 動作するセットは YuE2-3B バックボーンと VAE。SheetSage2 は任意で、カバーにのみ必要です。 サイズは SheetSage2 を含みます。スタジオはカードで動くセットを事前に選びますが、ダウンロードは常にあなたの判断です。各ファイルは固定された Hugging Face リビジョンに対して SHA-256 で検証され、中断したダウンロードは再開されます。"}},{"@type":"Question","name":"無料ですか？","acceptedAnswer":{"@type":"Answer","text":"はい。スタジオは無料のオープンソースで、モデルもスタジオ内から無料でダウンロードできます。"}},{"@type":"Question","name":"オフラインで使えますか？ 音楽はどこかに送られますか？","acceptedAnswer":{"@type":"Answer","text":"あなたの音楽はあなたのもので、あなたのディスクに残ります。 アカウント不要: 登録するものは何もありません。 テレメトリなし: スタジオは何を生成したかを送信しません。 クラウドは任意: キーを追加するまで何もマシンの外に出ません。追加後もその機能のためだけです。"}},{"@type":"Question","name":"作った曲は使えますか？","acceptedAnswer":{"@type":"Answer","text":"スタジオと yue2.cpp は MIT ライセンス。YuE2-3B、YuE2 VAE、SheetSage2 の重みは CC BY-NC 4.0 で、作成した曲は非商用利用に限られます。"}},{"@type":"Question","name":"自分のスタイルで学習させられますか？","acceptedAnswer":{"@type":"Answer","text":"同じアーティストやスタイルの曲から、HOT-Step のトレーナーとレシピで LoRA を自分の GPU で学習。設定はすべて変更でき、データセットはこのスタジオと MiniMax Music3 Studio の間で移せます。"}},{"@type":"Question","name":"AI エージェントから操作できますか？","acceptedAnswer":{"@type":"Answer","text":"Claude Code、Claude Desktop、Cursor をつなぐと、エージェントがスタジオでできることをすべて行います。曲を書いて生成し、データセットを整えて学習し、カバーを描き、動画エディタでクリップを作り、曲を再生し、ウィンドウを見てボタンを押します。モデル向けの書き方のルールが付属するので、スタイルと歌詞はエージェント自身が書きます。 作詞アシスタントに選べば、ローカルモデルの代わりにエージェントが書きます。"}},{"@type":"Question","name":"ダウンロードの中身は？","acceptedAnswer":{"@type":"Answer","text":"既定ではすべてローカル。クラウドキーは、選んだ機能のためにあなたが追加します。"}},{"@type":"Question","name":"どのように作られていますか？","acceptedAnswer":{"@type":"Answer","text":"サービスはデスクトップ実行ファイルに組み込まれ、C++ エンジンを管理します。完成した曲はサービス自身が取り込むため、再読み込みやウィンドウを閉じても結果は失われません。"}}]}]}</script>
 <style>
 :root {
-  --bg: #0a0a0c;
-  --panel: #141418;
+  --bg: #0b0b0e;
+  --panel: #141419;
+  --panel-2: #1b1b22;
   --line: rgba(255,255,255,.08);
-  --text: #f4f4f5;
-  --muted: #a1a1aa;
+  --text: #ececef;
+  --muted: #a3a3ad;
   --pink: #ec4899;
   --orange: #f97316;
 }
@@ -35,285 +48,307 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; }
-.wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+img { max-width: 100%; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
 header {
   position: sticky; top: 0; z-index: 10;
-  background: rgba(10,10,12,.82); backdrop-filter: blur(10px);
+  background: rgba(11,11,14,.85); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-.family { border-bottom: 1px solid var(--line); }
-.family-bar { display: flex; gap: 4px; padding: 8px 0 0; overflow-x: auto; }
+.utility { border-bottom: 1px solid var(--line); }
+.utility-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.family { display: flex; gap: 4px; padding-top: 8px; overflow-x: auto; }
 .family a {
   padding: 6px 14px; border: 1px solid transparent; border-bottom: none; border-radius: 9px 9px 0 0;
   color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap;
 }
 .family a:hover { color: var(--text); background: rgba(255,255,255,.04); }
 .family a[aria-current="page"] { color: var(--text); border-color: var(--line); background: rgba(236,72,153,.14); box-shadow: inset 0 2px 0 var(--pink); }
-.bar { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.langs { display: flex; gap: 14px; padding: 0 0 8px; white-space: nowrap; }
+.langs a { font-size: 12px; color: var(--muted); text-decoration: none; }
+.langs a:hover { color: var(--text); }
+.langs a[aria-current="page"] { color: var(--text); font-weight: 700; }
+.bar { display: flex; align-items: center; gap: 12px; padding-block: 10px; }
 .mark { width: 30px; height: 30px; border-radius: 9px; flex: none; }
-.name { font-weight: 800; letter-spacing: -.01em; }
-.langs { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px; }
-.langs button {
-  background: transparent; border: 1px solid var(--line); color: var(--muted);
-  border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+.name { font-weight: 800; letter-spacing: -.01em; white-space: nowrap; }
+.head-github, .head-download {
+  box-sizing: border-box; height: 40px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 0 16px; border-radius: 10px; border: 1px solid transparent;
+  font-size: 14px; font-weight: 700; line-height: 1; white-space: nowrap; text-decoration: none;
+  transition: border-color .15s, background .15s, filter .15s;
 }
-.langs button[aria-pressed="true"] { color: #fff; border-color: var(--pink); background: rgba(236,72,153,.14); }
-/* Each language is its own page, so the switcher is made of links. */
-.langs a {
-  padding: 6px 10px; border-radius: 999px; font-size: 13px; text-decoration: none;
-  color: var(--muted); border: 1px solid var(--line); background: transparent;
-}
-.langs a:hover { color: var(--text); border-color: var(--pink); }
-.langs a[aria-current="page"] { color: #fff; border-color: var(--pink); background: rgba(236,72,153,.14); }
-h1 { font-size: clamp(30px, 6vw, 52px); line-height: 1.08; letter-spacing: -.02em; margin: 40px 0 0; }
-.lead { color: var(--muted); font-size: clamp(16px, 2.4vw, 19px); margin: 16px 0 0; max-width: 46em; }
-.cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0 8px; }
+.head-github { margin-left: auto; padding-right: 10px; color: var(--text); background: #2a2a34; }
+.head-github:hover { background: #34343f; }
+/* its word is mostly lowercase without ascenders: lifted 2px so the letters, not the line box, sit in the middle */
+.head-download { margin-left: 10px; padding-bottom: 4px; color: #fff; background: linear-gradient(90deg, var(--orange), var(--pink)); }
+.head-download:hover { filter: brightness(1.08); }
+
+.hero { padding-top: 56px; text-align: center; }
+h1 { font-size: clamp(34px, 6.4vw, 64px); line-height: 1.05; letter-spacing: -.025em; margin: 0 auto; max-width: 15em; }
+.lead { color: var(--muted); font-size: clamp(17px, 2.2vw, 20px); margin: 18px auto 0; max-width: 38em; }
+.cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0 10px; }
 .btn {
-  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
-  border-radius: 12px; padding: 12px 18px; font-weight: 700; font-size: 15px;
-  border: 1px solid var(--line); color: var(--text);
+  display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+  border-radius: 12px; padding: 13px 20px; font-weight: 700; font-size: 16px;
+  border: 1px solid var(--line); color: var(--text); background: var(--panel);
 }
+.btn:hover { border-color: rgba(255,255,255,.2); }
+.btn small { font-weight: 600; font-size: 12px; opacity: .8; }
+.btn img { display: block; }
 .btn.primary { background: linear-gradient(90deg, var(--orange), var(--pink)); border-color: transparent; color: #fff; }
-.note { color: var(--muted); font-size: 13px; margin-top: 4px; }
-section { padding: 48px 0 0; }
-h2 { font-size: clamp(21px, 3.4vw, 28px); letter-spacing: -.01em; margin: 0 0 6px; }
-.sub { color: var(--muted); margin: 0 0 20px; }
-.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
-.card h3 { margin: 0 0 6px; font-size: 16px; }
-.card p { margin: 0; color: var(--muted); font-size: 14px; }
-.scroll { overflow-x: auto; }
-.hero-shot { margin: 28px 0 0; }
+.note { color: var(--muted); font-size: 13px; margin: 6px auto 0; max-width: 60em; }
+.hero-shot { margin: 36px 0 0; }
 .hero-shot img {
-  width: 100%; height: auto; display: block; border-radius: 16px;
-  border: 1px solid var(--line); box-shadow: 0 24px 60px rgba(0,0,0,.35);
-}
-.grid-shots { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.grid-shots figure { margin: 0; cursor: zoom-in; }
-.grid-shots img {
-  display: block; width: 100%; height: auto; border-radius: 12px;
-  border: 1px solid var(--line); background: var(--panel); transition: transform .15s ease;
-}
-.grid-shots figure:hover img { transform: translateY(-2px); }
-.grid-shots figcaption { color: var(--muted); font-size: 12px; margin-top: 6px; }
-.viewer {
-  position: fixed; inset: 0; z-index: 50; display: none;
-  background: rgba(0,0,0,.92); padding: 24px;
-  align-items: center; justify-content: center;
-}
-.viewer.open { display: flex; }
-.viewer img { max-width: 96vw; max-height: 92vh; border-radius: 10px; }
-.viewer button {
-  position: absolute; top: 16px; right: 20px; background: transparent;
-  border: 0; color: #fff; font-size: 28px; cursor: pointer; line-height: 1;
-}
-.shots { display: grid; gap: 18px; }
-.shots figure { margin: 0; }
-.shots img {
-  display: block; width: 100%; height: auto; border-radius: 14px;
-  border: 1px solid var(--line); background: var(--panel);
-}
-.shots figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
-table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 460px; }
-th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); }
-th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-pre {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-  padding: 16px; overflow-x: auto; font-size: 13px; color: #e4e4e7;
-}
-ol.steps { padding-left: 20px; color: var(--muted); }
-ol.steps li { margin-bottom: 8px; }
-ol.steps b { color: var(--text); }
-footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
-footer a { color: var(--text); }
-.pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.pill { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; text-decoration: none; }
-@media (prefers-color-scheme: light) {
-  :root { --bg: #ffffff; --panel: #f7f7f8; --line: rgba(0,0,0,.10); --text: #18181b; --muted: #52525b; }
-  header { background: rgba(255,255,255,.85); }
-  pre { color: #27272a; }
+  width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--line); cursor: zoom-in;
+  box-shadow: 0 30px 80px rgba(236,72,153,.12), 0 10px 40px rgba(0,0,0,.5);
 }
 
-.samples { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
-.sample { margin: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
-.sample figcaption { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+section { padding: 72px 0 0; }
+h2 { font-size: clamp(26px, 3.6vw, 36px); letter-spacing: -.02em; margin: 0 0 8px; }
+.sub { color: var(--muted); margin: 0 0 24px; max-width: 46em; }
+
+.samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.sample { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.sample figcaption { display: grid; gap: 2px; margin-bottom: 10px; }
 .sample b { font-size: 15px; }
 .sample span { color: var(--muted); font-size: 13px; }
-.sample code { color: var(--muted); font-size: 11px; line-height: 1.4; }
-.sample audio { width: 100%; }
+.sample audio { width: 100%; height: 36px; }
+details.more summary { cursor: pointer; color: var(--muted); font-weight: 600; margin: 16px 0 12px; }
+
+/* each tile is title, picture, text; the three rows line up across tiles side by side */
+.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 14px; row-gap: 0; margin-top: 24px; }
+.tile {
+  display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 14px; margin-bottom: 14px; padding: 22px;
+  border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+.tile h3 { margin: 0; font-size: 19px; letter-spacing: -.01em; align-self: start; }
+.tile p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+.shot { margin: 0; align-self: start; }
+.shot img {
+  display: block; width: 100%; height: auto;
+  border-radius: 10px; border: 1px solid rgba(255,255,255,.1); cursor: zoom-in;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45);
+}
+
+.gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.gallery figure { margin: 0; }
+.gallery img {
+  display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left;
+  border-radius: 10px; border: 1px solid var(--line); cursor: zoom-in;
+}
+.gallery figcaption {
+  margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.stars { display: block; }
+
+.steps { list-style: none; margin: 20px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.steps li { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); display: grid; gap: 6px; align-content: start; }
+.steps b { font-size: 16px; display: flex; align-items: baseline; gap: 10px; }
+.steps .num { color: var(--pink); font-weight: 800; }
+.steps span { color: var(--muted); font-size: 14px; line-height: 1.5; }
+#start .cta { justify-content: flex-start; margin-top: 24px; }
+
+#faq details { border-bottom: 1px solid var(--line); }
+#faq details:first-of-type { border-top: 1px solid var(--line); }
+#faq summary {
+  list-style: none; cursor: pointer; padding: 18px 36px 18px 0; font-weight: 700; font-size: 17px; position: relative;
+}
+#faq summary::-webkit-details-marker { display: none; }
+#faq summary::after { content: '+'; position: absolute; right: 4px; top: 14px; font-size: 24px; color: var(--muted); font-weight: 400; }
+#faq details[open] summary::after { content: '−'; }
+.answer { padding: 0 0 20px; color: var(--muted); max-width: 48em; }
+.answer p { margin: 0 0 10px; }
+.answer b { color: var(--text); }
+.answer ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+
+.scroll { overflow-x: auto; margin: 10px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+td { color: var(--text); }
+pre { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; overflow-x: auto; font-size: 13px; color: var(--text); }
+
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { text-decoration: none; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; }
+.pill:hover { border-color: var(--pink); }
+footer { margin: 72px 0 40px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+footer p { margin: 0 0 8px; }
+
+.viewer { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: none; align-items: center; justify-content: center; z-index: 50; padding: 24px; }
+.viewer.open { display: flex; }
+.viewer img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+.viewer button { position: absolute; top: 14px; right: 18px; background: none; border: 0; color: #fff; font-size: 34px; cursor: pointer; }
+
+@media (max-width: 860px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .hero { padding-top: 36px; }
+  .name { display: none; }
+  .utility-bar { flex-direction: column; align-items: stretch; gap: 0; }
+  .langs { order: -1; justify-content: flex-end; padding: 8px 0 0; }
+  .btn { width: 100%; justify-content: center; }
+}
 </style>
 </head>
 <body>
 <header>
-  <nav class="family" aria-label="Studios"><div class="wrap family-bar">
+  <div class="utility"><div class="wrap utility-bar">
+    <nav class="family" aria-label="Studios">
     <a href="https://timoncool.github.io/YuE2-Studio/ja.html" aria-current="page">YuE2 Studio</a>
     <a href="https://timoncool.github.io/MiniMax-Music3-Studio/ja.html">MiniMax Music3 Studio</a>
     <a href="https://timoncool.github.io/ACE-Step-Studio/ja.html">ACE-Step Studio</a>
-  </div></nav>
-  <div class="wrap bar">
-    <img class="mark" src="logo.png" alt="" />
-    <div class="name">YuE2 Studio</div>
-    <nav class="langs" aria-label="Language">
-      <a href="index.html">English</a>
-      <a href="ru.html">Русский</a>
-      <a href="zh.html">中文</a>
-      <a href="ja.html" aria-current="page">日本語</a>
-      <a href="ko.html">한국어</a>
     </nav>
+    <nav class="langs" aria-label="Language">
+      <a href="index.html" hreflang="en">English</a>
+      <a href="ru.html" hreflang="ru">Русский</a>
+      <a href="zh.html" hreflang="zh">中文</a>
+      <a href="ja.html" hreflang="ja" aria-current="page">日本語</a>
+      <a href="ko.html" hreflang="ko">한국어</a>
+    </nav>
+  </div></div>
+  <div class="wrap bar">
+    <img class="mark" src="logo.png" alt="" width="30" height="30" />
+    <div class="name">YuE2 Studio</div>
+    <a class="head-github" href="https://github.com/timoncool/YuE2-Studio">GitHub<img class="stars" src="https://img.shields.io/github/stars/timoncool/YuE2-Studio?style=flat&amp;label=%E2%98%85&amp;color=3f3f46" alt="GitHub スター" height="20" /></a>
+    <a class="head-download" href="https://github.com/timoncool/YuE2-Studio/releases/latest">ダウンロード</a>
   </div>
 </header>
 
 <main class="wrap">
-  <img src="logo.png" alt="YuE2 Studio" width="96" height="96" style="border-radius:22px;margin-top:36px" />
-  <h1>編集できる楽譜つきのフルソングを、自分の GPU で</h1>
-  <p class="lead">YuE2 のためのデスクトップスタジオです。YuE2 は歌う前に楽譜を書くオープンなソングモデル。スタイルを説明し歌詞を書くと、モデルがコードつきのメロディを楽譜として作曲し、ボーカル入りのフルソングとして演奏します。楽譜を読み、書き換え、同じ曲を別のサウンドでレンダリングできます。単一の実行ファイル — Python もランチャーも不要。</p>
-  <div class="cta">
-    <a class="btn primary" href="https://github.com/timoncool/YuE2-Studio/releases/latest">Windows 版をダウンロード</a>
-    <a class="btn" href="https://github.com/timoncool/YuE2-Studio">GitHub のソース</a>
-    <a class="btn" href="https://github.com/timoncool/YuE2-Studio/blob/main/DONATE.md">プロジェクトを支援</a>
-  </div>
-  <p class="note">Windows 10/11 x64 と VRAM 6 GB 以上の GPU：NVIDIA（GTX 900 以降）は CUDA で動作。AMD と Intel の Vulkan は実験的です。モデルはスタジオ内から、あなたが決めたときにダウンロードされます。</p>
-
-  <figure class="hero-shot">
-    <img src="screenshots/ja-01-create.png" alt="曲を書く：スタイル、歌詞、110 のサンプルのひとつを読み込んだ状態。" loading="eager" />
-  </figure>
-
-  <section>
-    <h2>できること</h2>
-    <p class="sub">クラウドキーを自分で接続しない限り、以下はすべてあなたのマシンで動きます。</p>
-    <div class="grid">
-      <div class="card"><h3>フルソング</h3><p>スタイルと歌詞から最長 6 分。RTX 4090 と Q8_0 セットで 3:38 の曲が約 46 秒でレンダリングされます。</p></div>
-      <div class="card"><h3>編集できる楽譜</h3><p>曲は ABC 記譜で返され、楽譜として表示されます。編集してもう一度作成すると、曲はそのままに演奏が変わります。</p></div>
-      <div class="card"><h3>まず楽譜だけ</h3><p>歌う前に数秒で楽譜だけを作成。読んで直してから作成します。yue2.cpp の yue-plan に相当。</p></div>
-      <div class="card"><h3>カバー</h3><p>SheetSage2 が録音のメロディを楽譜に書き起こし、YuE2 があなたのスタイルで歌います。歌詞はそのメロディに合っている必要があります。元の歌詞か、各行の音節数とアクセントの位置が同じ新しい歌詞でないと、歌がメロディからずれていきます。</p></div>
-      <div class="card"><h3>完全な再現</h3><p>各トラックはリクエストとオーディオコードを保存。ビット単位で再レンダリング、またはステップや音のシード、バリエーションを変えて再生成できます。</p></div>
-      <div class="card"><h3>110 のサンプル</h3><p>yue2.cpp に同梱のスタイル・歌詞・楽譜のセット（カバーを含む）をワンクリックで読み込めます。</p></div>
-      <div class="card"><h3>作詞アシスタント</h3><p>ローカルの Gemma または OpenRouter がアイデアからスタイルと歌詞を書き、依頼に応じて楽譜を編集します。</p></div>
-      <div class="card"><h3>単語単位のカラオケ</h3><p>すべての単語にタイムスタンプを持つ拡張 LRC。Parakeet または Whisper で同期。</p></div>
-      <div class="card"><h3>GPU でステム分離</h3><p>ドラム、ベース、その他、ボーカル、ギター、ピアノを HT-Demucs で分離。</p></div>
-      <div class="card"><h3>LoRA</h3><p>作曲またはサウンドに効く LoRA と LoKr を、それぞれ強さを付けて使えます。既製のカタログと、選んだものをダウンロードする Hugging Face 検索付き。</p></div>
-      <div class="card"><h3>自分だけの LoRA</h3><p>同じアーティストやスタイルの曲から、HOT-Step のトレーナーとレシピで LoRA を自分の GPU で学習。設定はすべて変更でき、データセットはこのスタジオと MiniMax Music3 Studio の間で移せます。</p></div>
-      <div class="card"><h3>フォルダを落とすだけでデータセット</h3><p>フォルダを落とすと、歌詞はプレーヤーが使う歌詞データベース（LRCLIB、QQ Music、Kugou）から一字一句取り込み、どこにもない曲だけ Whisper が聞き取ります。MOSS-Music が各曲を聴き、アシスタントがスタイルを書きます。曲ごとに進行が見え、再起動しても止まったところから続きます。</p></div>
-      <div class="card"><h3>音声処理</h3><p>ノイズ除去、Spectral Lifter、ボーカルの自然化、自分の VST3 プラグイン、リファレンスマスタリング。処理前後を聴き比べ、バージョンとして残すか破棄します。</p></div>
-      <div class="card"><h3>エージェントで操作（MCP）</h3><p>Claude Code、Claude Desktop、Cursor をつなぐと、エージェントがスタジオでできることをすべて行います。曲を書いて生成し、データセットを整えて学習し、カバーを描き、動画エディタでクリップを作り、曲を再生し、ウィンドウを見てボタンを押します。モデル向けの書き方のルールが付属するので、スタイルと歌詞はエージェント自身が書きます。 作詞アシスタントに選べば、ローカルモデルの代わりにエージェントが書きます。</p></div>
-      <div class="card"><h3>どのトラックも MIDI に</h3><p>曲、ステム、処理済みテイクを、GPU 上の MuScriptor がマルチ楽器の MIDI（34 の楽器グループとドラム）に変換します。ピアノロールは聴き取りに合わせて埋まり、原曲と重ねて再生、楽器のミュートやソロ、.mid の保存ができます。初回使用時にダウンロードされます。</p></div>
-      <div class="card"><h3>結果はすべてトラックに</h3><p>ステム、処理済みテイク、再レンダー、カバーは、それぞれ独立したトラックとしてライブラリに入り、元の曲へのリンクと作成時の設定を保持します。</p></div>
-      <div class="card"><h3>専用プレーヤー</h3><p>Winamp の周波数による 10 バンドイコライザー（プリセットと .EQF ファイル）、数百のプリセットを持つ MilkDrop または 10 種類のスペクトラム、そして各ウィンドウを切り離し・ドッキング・リサイズできる Winamp モード。オリジナルスキンでも、Winamp スキン博物館のどのスキンでも。</p></div>
-      <div class="card"><h3>名前を付けて保存とファイルパネル</h3><p>曲、ステム、MIDI、歌詞、楽譜、動画を Windows 標準の保存ダイアログで好きな場所に保存し、ファイルパネルがすべての保存を表示します。</p></div>
-      <div class="card"><h3>スタジオ全体のプロキシ</h3><p>HTTP、HTTPS、SOCKS5、SOCKS4、ログイン対応。モデルのダウンロード、Hugging Face、OpenRouter、更新がすべて経由します。</p></div>
+  <section class="hero">
+    <h1>編集できる楽譜つきのフルソングを、自分の GPU で</h1>
+    <p class="lead">YuE2 のためのデスクトップスタジオです。</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/timoncool/YuE2-Studio/releases/latest">Windows 版をダウンロード<small data-release>v3.0.0 · 299 MB</small></a>
+      <a class="btn" href="https://github.com/timoncool/YuE2-Studio">GitHub でスター<img class="stars" src="https://img.shields.io/github/stars/timoncool/YuE2-Studio?style=flat&amp;label=%E2%98%85&amp;color=3f3f46" alt="GitHub スター" height="20" /></a>
     </div>
+    <p class="note">Windows 10/11 x64 と VRAM 6 GB 以上の GPU：NVIDIA（GTX 900 以降）は CUDA で動作。AMD と Intel の Vulkan は実験的です。モデルはスタジオ内から、あなたが決めたときにダウンロードされます。</p>
+    <figure class="hero-shot"><img src="screenshots/ja-01-create.webp" alt="曲を書く：スタイル、歌詞、110 のサンプルのひとつを読み込んだ状態。" width="1600" height="1000" fetchpriority="high" /></figure>
   </section>
 
-  <section id="samples">
+  <section id="listen">
     <h2>サンプル</h2>
     <p class="sub">クリーンインストールと推奨セットで作成し、スタジオが保存したままの音です。英語、スペイン語、中国語、日本語、ロシア語。</p>
     <div class="samples">
-      <figure class="sample"><figcaption><b>Houseplant Party</b><span>英語のファンク・ディスコ。</span><code>English, funk disco, groovy male voice, slap bass, wah guitar, brass stabs, four on the floor drums, playful, 118 BPM</code></figcaption><audio controls preload="none" src="samples/houseplant-party.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>My Truck Talks Back</b><span>ペダルスチールとフィドルのカントリー。</span><code>English, country, warm male baritone, acoustic guitar, pedal steel, fiddle, brushed drums, easygoing, 96 BPM</code></figcaption><audio controls preload="none" src="samples/my-truck-talks-back.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>La Siesta</b><span>スペイン語のラテン・ポップ。</span><code>Spanish, latin pop, bright female voice, nylon guitar, congas, piano montuno, bass, sunny danceable, 102 BPM</code></figcaption><audio controls preload="none" src="samples/la-siesta.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>外卖小哥</b><span>中国語のシティ・ポップ。</span><code>Mandarin, city pop, smooth male voice, electric piano, funky bass, clean guitar, drum machine, warm night mood, 108 BPM</code></figcaption><audio controls preload="none" src="samples/delivery-rider.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>月曜日のサムライ</b><span>アニメのオープニング風 J-ROCK。</span><code>Japanese, j-rock, energetic female voice, distorted electric guitars, driving bass, fast drums, anime opening, 168 BPM</code></figcaption><audio controls preload="none" src="samples/monday-samurai.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>Дача, лето, комары</b><span>スタイルと歌詞から作ったフルソング。</span><code>Russian, folk pop, warm male voice, accordion, acoustic guitar, upright bass, 104 BPM</code></figcaption><audio controls preload="none" src="samples/dacha-leto-komary.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>Дача, лето, комары — джаз</b><span>カバー：SheetSage2 が上の曲のメロディを書き起こし、YuE2 がジャズで歌いました。</span><code>Russian, vintage jazz swing, sultry female crooner, upright bass, brushed drums, muted trumpet, 104 BPM</code></figcaption><audio controls preload="none" src="samples/dacha-jazz-cover.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>Понедельник</b><span>ブルースロック、しゃがれ声。</span><code>Russian, blues rock, raspy male voice, overdriven electric guitar, hammond organ, shuffle drums, 96 BPM</code></figcaption><audio controls preload="none" src="samples/ponedelnik.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>Бабушка на дискотеке</b><span>保存したオーディオコードから 64 ステップで再レンダリング。</span><code>Russian, disco pop, sassy female voice, funky bass, string section, four on the floor drums, 120 BPM</code></figcaption><audio controls preload="none" src="samples/babushka-na-diskoteke.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>Борщ на орбите</b><span>150 BPM のスカパンク。</span><code>Russian, ska punk, energetic male voice, brass section, offbeat guitar, fast drums, 150 BPM</code></figcaption><audio controls preload="none" src="samples/borshch-na-orbite.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>Кот-программист</b><span>シンセウェイヴ・ポップ、2 テイク目。</span><code>Russian, synthwave pop, clear expressive female voice, analog synths, punchy drum machine, 112 BPM</code></figcaption><audio controls preload="none" src="samples/kot-programmist.mp3"></audio></figure>
-      <figure class="sample"><figcaption><b>Ночной вор Барсик</b><span>スタイルと歌詞は内蔵アシスタントが一行のアイデアから書いたもの。</span><code>Russian, upbeat pop-punk, energetic male vocals, driving distorted electric guitars, fast bass lines, crashing drums, rebellious and fun, 185 BPM</code></figcaption><audio controls preload="none" src="samples/barsik.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>Houseplant Party</b><span>英語のファンク・ディスコ。</span></figcaption><audio controls preload="none" src="samples/houseplant-party.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>My Truck Talks Back</b><span>ペダルスチールとフィドルのカントリー。</span></figcaption><audio controls preload="none" src="samples/my-truck-talks-back.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>La Siesta</b><span>スペイン語のラテン・ポップ。</span></figcaption><audio controls preload="none" src="samples/la-siesta.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>外卖小哥</b><span>中国語のシティ・ポップ。</span></figcaption><audio controls preload="none" src="samples/delivery-rider.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>月曜日のサムライ</b><span>アニメのオープニング風 J-ROCK。</span></figcaption><audio controls preload="none" src="samples/monday-samurai.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>Дача, лето, комары</b><span>スタイルと歌詞から作ったフルソング。</span></figcaption><audio controls preload="none" src="samples/dacha-leto-komary.mp3"></audio></figure>
+    </div>
+    <details class="more"><summary>その他のサンプル (6)</summary><div class="samples">
+      <figure class="sample"><figcaption><b>Дача, лето, комары — джаз</b><span>カバー：SheetSage2 が上の曲のメロディを書き起こし、YuE2 がジャズで歌いました。</span></figcaption><audio controls preload="none" src="samples/dacha-jazz-cover.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>Понедельник</b><span>ブルースロック、しゃがれ声。</span></figcaption><audio controls preload="none" src="samples/ponedelnik.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>Бабушка на дискотеке</b><span>保存したオーディオコードから 64 ステップで再レンダリング。</span></figcaption><audio controls preload="none" src="samples/babushka-na-diskoteke.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>Борщ на орбите</b><span>150 BPM のスカパンク。</span></figcaption><audio controls preload="none" src="samples/borshch-na-orbite.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>Кот-программист</b><span>シンセウェイヴ・ポップ、2 テイク目。</span></figcaption><audio controls preload="none" src="samples/kot-programmist.mp3"></audio></figure>
+      <figure class="sample"><figcaption><b>Ночной вор Барсик</b><span>スタイルと歌詞は内蔵アシスタントが一行のアイデアから書いたもの。</span></figcaption><audio controls preload="none" src="samples/barsik.mp3"></audio></figure>
+    </div></details>
+  </section>
+  <section id="features">
+    <h2>できること</h2>
+    <div class="bento">
+      <article class="tile">
+        <h3>編集できる楽譜</h3>
+        <figure class="shot"><img src="screenshots/ja-02-score.webp" alt="楽譜と ABC テキスト：メロディ＋コード、メロディのみ、楽譜なし。" loading="lazy" width="1440" height="960" /></figure>
+        <p>曲は ABC 記譜で返され、楽譜として表示されます。</p>
+      </article>
+      <article class="tile">
+        <h3>カバー</h3>
+        <figure class="shot"><img src="screenshots/ja-04-cover.webp" alt="カバーモード：録音を選ぶと SheetSage2 がメロディを書き起こします。" loading="lazy" width="1440" height="960" /></figure>
+        <p>SheetSage2 が録音のメロディを楽譜に書き起こし、YuE2 があなたのスタイルで歌います。</p>
+      </article>
+      <article class="tile">
+        <h3>どのトラックも MIDI に</h3>
+        <figure class="shot"><img src="screenshots/ja-09-midi.webp" alt="どのトラックも MIDI に：楽器ごとのピアノロール、原曲と重ねて再生、ミュートとソロ。" loading="lazy" width="1440" height="960" /></figure>
+        <p>曲、ステム、処理済みテイクを、GPU 上の MuScriptor がマルチ楽器の MIDI（34 の楽器グループとドラム）に変換します。</p>
+      </article>
+      <article class="tile">
+        <h3>自分だけの LoRA</h3>
+        <figure class="shot"><img src="screenshots/ja-08-training.webp" alt="自分の LoRA を GPU で学習：学習中の損失とドリフト、50 ステップごとのチェックポイント、ワンクリックでライブラリへ。" loading="lazy" width="1440" height="960" /></figure>
+        <p>同じアーティストやスタイルの曲から、HOT-Step のトレーナーとレシピで LoRA を自分の GPU で学習。</p>
+      </article>
+      <article class="tile">
+        <h3>専用プレーヤー</h3>
+        <figure class="shot"><img src="screenshots/ja-14-winamp.webp" alt="ウィンドウ全体が Winamp 2 に：イコライザー、プレイリスト、MilkDrop をスキン付きで。" loading="lazy" width="1088" height="696" /></figure>
+        <p>Winamp の周波数による 10 バンドイコライザー（プリセットと .EQF ファイル）、数百のプリセットを持つ MilkDrop または 10 種類のスペクトラム、そして各ウィンドウを切り離し・ドッキング・リサイズできる Winamp モード。</p>
+      </article>
+      <article class="tile">
+        <h3>エージェントで操作（MCP）</h3>
+        <figure class="shot"><img src="screenshots/ja-11-agent.webp" alt="MCP でエージェントを接続：アドレスと、Claude Code などのクライアントに貼り付ける設定。" loading="lazy" width="1440" height="960" /></figure>
+        <p>Claude Code、Claude Desktop、Cursor をつなぐと、エージェントがスタジオでできることをすべて行います。</p>
+      </article>
     </div>
   </section>
 
-  <section>
+  <section id="screenshots">
     <h2>スクリーンショット</h2>
-    <p class="sub">この言語で表示したスタジオそのもの。</p>
-    <div class="grid-shots">
-      <figure><img src="screenshots/ja-01-create.png" alt="曲を書く：スタイル、歌詞、110 のサンプルのひとつを読み込んだ状態。" loading="lazy" /><figcaption>曲を書く：スタイル、歌詞、110 のサンプルのひとつを読み込んだ状態。</figcaption></figure>
-      <figure><img src="screenshots/ja-02-score.png" alt="楽譜と ABC テキスト：メロディ＋コード、メロディのみ、楽譜なし。" loading="lazy" /><figcaption>楽譜と ABC テキスト：メロディ＋コード、メロディのみ、楽譜なし。</figcaption></figure>
-      <figure><img src="screenshots/ja-03-track.png" alt="完成したトラックと、その歌詞と歌のもとになった楽譜。そのまま再利用できます。" loading="lazy" /><figcaption>完成したトラックと、その歌詞と歌のもとになった楽譜。そのまま再利用できます。</figcaption></figure>
-      <figure><img src="screenshots/ja-04-cover.png" alt="カバーモード：録音を選ぶと SheetSage2 がメロディを書き起こします。" loading="lazy" /><figcaption>カバーモード：録音を選ぶと SheetSage2 がメロディを書き起こします。</figcaption></figure>
-      <figure><img src="screenshots/ja-05-models.png" alt="モデルセット：役割ごとの量子化、ディスク上のファイル、ワンクリックで切り替え。" loading="lazy" /><figcaption>モデルセット：役割ごとの量子化、ディスク上のファイル、ワンクリックで切り替え。</figcaption></figure>
-      <figure><img src="screenshots/ja-06-lora.png" alt="LoRA カタログ：スタイル、アーティスト、サウンド。作者を明記し、まとめてダウンロード。" loading="lazy" /><figcaption>LoRA カタログ：スタイル、アーティスト、サウンド。作者を明記し、まとめてダウンロード。</figcaption></figure>
-      <figure><img src="screenshots/ja-07-dataset.png" alt="61 曲のデータセット：歌詞とスタイルはスタジオが自動で見つけて書きました。" loading="lazy" /><figcaption>61 曲のデータセット：歌詞とスタイルはスタジオが自動で見つけて書きました。</figcaption></figure>
-      <figure><img src="screenshots/ja-08-training.png" alt="自分の LoRA を GPU で学習：学習中の損失とドリフト、50 ステップごとのチェックポイント、ワンクリックでライブラリへ。" loading="lazy" /><figcaption>自分の LoRA を GPU で学習：学習中の損失とドリフト、50 ステップごとのチェックポイント、ワンクリックでライブラリへ。</figcaption></figure>
-      <figure><img src="screenshots/ja-09-midi.png" alt="どのトラックも MIDI に：楽器ごとのピアノロール、原曲と重ねて再生、ミュートとソロ。" loading="lazy" /><figcaption>どのトラックも MIDI に：楽器ごとのピアノロール、原曲と重ねて再生、ミュートとソロ。</figcaption></figure>
-      <figure><img src="screenshots/ja-10-processing.png" alt="オーディオ処理：ノイズ除去、Spectral Lifter、ボーカルの自然化、VST3 プラグイン、リファレンスへのマスタリング。" loading="lazy" /><figcaption>オーディオ処理：ノイズ除去、Spectral Lifter、ボーカルの自然化、VST3 プラグイン、リファレンスへのマスタリング。</figcaption></figure>
-      <figure><img src="screenshots/ja-11-agent.png" alt="MCP でエージェントを接続：アドレスと、Claude Code などのクライアントに貼り付ける設定。" loading="lazy" /><figcaption>MCP でエージェントを接続：アドレスと、Claude Code などのクライアントに貼り付ける設定。</figcaption></figure>
-      <figure><img src="screenshots/ja-12-derived.png" alt="ツールで作ったトラックはライブラリに残り、元の曲にリンクします。" loading="lazy" /><figcaption>ツールで作ったトラックはライブラリに残り、元の曲にリンクします。</figcaption></figure>
-      <figure><img src="screenshots/ja-13-listen.png" alt="再生中、スタジオの上に浮かぶカーブ付きイコライザーと MilkDrop。" loading="lazy" /><figcaption>再生中、スタジオの上に浮かぶカーブ付きイコライザーと MilkDrop。</figcaption></figure>
-      <figure><img src="screenshots/ja-14-winamp.png" alt="ウィンドウ全体が Winamp 2 に：イコライザー、プレイリスト、MilkDrop をスキン付きで。" loading="lazy" /><figcaption>ウィンドウ全体が Winamp 2 に：イコライザー、プレイリスト、MilkDrop をスキン付きで。</figcaption></figure>
+    <p class="sub">スタジオそのものを、あなたの言語で。</p>
+    <div class="gallery">
+      <figure><img src="screenshots/ja-03-track.webp" alt="完成したトラックと、その歌詞と歌のもとになった楽譜。そのまま再利用できます。" loading="lazy" width="1600" height="1000" /><figcaption>完成したトラックと、その歌詞と歌のもとになった楽譜。そのまま再利用できます。</figcaption></figure>
+      <figure><img src="screenshots/ja-05-models.webp" alt="モデルセット：役割ごとの量子化、ディスク上のファイル、ワンクリックで切り替え。" loading="lazy" width="1600" height="1000" /><figcaption>モデルセット：役割ごとの量子化、ディスク上のファイル、ワンクリックで切り替え。</figcaption></figure>
+      <figure><img src="screenshots/ja-06-lora.webp" alt="LoRA カタログ：スタイル、アーティスト、サウンド。作者を明記し、まとめてダウンロード。" loading="lazy" width="1600" height="1000" /><figcaption>LoRA カタログ：スタイル、アーティスト、サウンド。作者を明記し、まとめてダウンロード。</figcaption></figure>
+      <figure><img src="screenshots/ja-07-dataset.webp" alt="61 曲のデータセット：歌詞とスタイルはスタジオが自動で見つけて書きました。" loading="lazy" width="1600" height="1000" /><figcaption>61 曲のデータセット：歌詞とスタイルはスタジオが自動で見つけて書きました。</figcaption></figure>
+      <figure><img src="screenshots/ja-10-processing.webp" alt="オーディオ処理：ノイズ除去、Spectral Lifter、ボーカルの自然化、VST3 プラグイン、リファレンスへのマスタリング。" loading="lazy" width="1600" height="1000" /><figcaption>オーディオ処理：ノイズ除去、Spectral Lifter、ボーカルの自然化、VST3 プラグイン、リファレンスへのマスタリング。</figcaption></figure>
+      <figure><img src="screenshots/ja-12-derived.webp" alt="ツールで作ったトラックはライブラリに残り、元の曲にリンクします。" loading="lazy" width="1600" height="1000" /><figcaption>ツールで作ったトラックはライブラリに残り、元の曲にリンクします。</figcaption></figure>
+      <figure><img src="screenshots/ja-13-listen.webp" alt="再生中、スタジオの上に浮かぶカーブ付きイコライザーと MilkDrop。" loading="lazy" width="1600" height="1000" /><figcaption>再生中、スタジオの上に浮かぶカーブ付きイコライザーと MilkDrop。</figcaption></figure>
     </div>
   </section>
 
-  <section>
-    <h2>モデル</h2>
-    <p class="sub">動作するセットは YuE2-3B バックボーンと VAE。SheetSage2 は任意で、カバーにのみ必要です。</p>
-    <div class="scroll">
-      <table>
-        <thead><tr><th>あなたの GPU</th><th>セット</th><th>ダウンロード</th></tr></thead>
-        <tbody>
-          <tr><td>12 GB+</td><td>フルネイティブ — BF16、オリジナル重み</td><td>9.7 GB</td></tr>
-          <tr><td>8 GB+</td><td>高品質 — Q8_0、ほぼロスレス</td><td>4.9 GB</td></tr>
-          <tr><td>7 GB+</td><td>バランス — Q6_K</td><td>4.0 GB</td></tr>
-          <tr><td>5.5 GB+</td><td>ライト — Q5_K_M</td><td>3.6 GB</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="note">サイズは SheetSage2 を含みます。スタジオはカードで動くセットを事前に選びますが、ダウンロードは常にあなたの判断です。各ファイルは固定された Hugging Face リビジョンに対して SHA-256 で検証され、中断したダウンロードは再開されます。</p>
-  </section>
-
-  <section>
+  <section id="start">
     <h2>はじめかた</h2>
     <ol class="steps">
-      <li><b>インストール —</b> <span>インストーラーを実行するか、ポータブル版を任意の場所に展開します。</span></li>
-      <li><b>セットを選ぶ —</b> <span>最初の画面がカードで動くセットを選び、不足分だけをダウンロードします。</span></li>
-      <li><b>書く —</b> <span>スタイルと歌詞を書くか、サンプルを読み込みます。インストゥルメンタルはスイッチひとつ。</span></li>
-      <li><b>作成 —</b> <span>エンジンが自動で起動し、曲は楽譜とともにライブラリに入ります。</span></li>
+      <li><b><span class="num">1</span>インストール</b><span>インストーラーを実行するか、ポータブル版を任意の場所に展開します。</span></li>
+      <li><b><span class="num">2</span>セットを選ぶ</b><span>最初の画面がカードで動くセットを選び、不足分だけをダウンロードします。</span></li>
+      <li><b><span class="num">3</span>書く</b><span>スタイルと歌詞を書くか、サンプルを読み込みます。インストゥルメンタルはスイッチひとつ。</span></li>
+      <li><b><span class="num">4</span>作成</b><span>エンジンが自動で起動し、曲は楽譜とともにライブラリに入ります。</span></li>
     </ol>
+    <div class="cta"><a class="btn primary" href="https://github.com/timoncool/YuE2-Studio/releases/latest">Windows 版をダウンロード<small data-release>v3.0.0 · 299 MB</small></a></div>
   </section>
 
-  <section>
-    <h2>何がどこで動くか</h2>
-    <p class="sub">既定ではすべてローカル。クラウドキーは、選んだ機能のためにあなたが追加します。</p>
-    <div class="scroll">
-      <table>
-        <thead><tr><th>構成要素</th><th>実行場所</th><th>サイズ</th></tr></thead>
-        <tbody>
-          <tr><td>YuE2 エンジン（yue2.cpp）</td><td>GPU：CUDA、Vulkan またはプロセッサ</td><td>同梱</td></tr>
-          <tr><td>YuE2 モデルセット</td><td>あなたの GPU</td><td>3.6–9.7 GB</td></tr>
-          <tr><td>NVIDIA cuBLAS</td><td>NVIDIA カードのみ</td><td>391 MB、初回のみ</td></tr>
-          <tr><td>カラオケのタイミング — Parakeet または Whisper</td><td>あなたのマシン</td><td>任意</td></tr>
-          <tr><td>ステム分離 — HT-Demucs</td><td>GPU または CPU</td><td>任意</td></tr>
-          <tr><td>作詞アシスタント</td><td>ローカル Gemma または OpenRouter</td><td>任意</td></tr>
-          <tr><td>LoRA 学習 — HOT-Step ace-train</td><td>NVIDIA RTX 30 以降、VRAM 11 GB</td><td>8 GB、任意</td></tr>
-          <tr><td>曲を聴いて説明 — MOSS-Music-8B</td><td>VRAM 約 12 GB</td><td>10 GB、任意</td></tr>
-          <tr><td>VST3 ホスト — HOT-Step</td><td>あなたのマシン、独立したプロセス</td><td>同梱</td></tr>
-          <tr><td>オーディオから MIDI — MuScriptor（HOT-Step ace-midi）</td><td>NVIDIA GTX 16 / RTX 20 以降</td><td>0.5–5.6 GB、任意</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section>
-    <h2>しくみ</h2>
-    <p class="sub">サービスはデスクトップ実行ファイルに組み込まれ、C++ エンジンを管理します。完成した曲はサービス自身が取り込むため、再読み込みやウィンドウを閉じても結果は失われません。</p>
-<pre>React UI ─┐
+  <section id="faq">
+    <h2>よくある質問</h2>
+    <details><summary>どんなグラフィックカードが必要ですか？</summary><div class="answer"><p>Windows 10/11 x64 と VRAM 6 GB 以上の GPU：NVIDIA（GTX 900 以降）は CUDA で動作。AMD と Intel の Vulkan は実験的です。モデルはスタジオ内から、あなたが決めたときにダウンロードされます。</p><p>動作するセットは YuE2-3B バックボーンと VAE。SheetSage2 は任意で、カバーにのみ必要です。</p><div class="scroll"><table>
+          <thead><tr><th>あなたの GPU</th><th>セット</th><th>ダウンロード</th></tr></thead>
+          <tbody>
+            <tr><td>12 GB+</td><td>フルネイティブ — BF16、オリジナル重み</td><td>9.7 GB</td></tr>
+            <tr><td>8 GB+</td><td>高品質 — Q8_0、ほぼロスレス</td><td>4.9 GB</td></tr>
+            <tr><td>7 GB+</td><td>バランス — Q6_K</td><td>4.0 GB</td></tr>
+            <tr><td>5.5 GB+</td><td>ライト — Q5_K_M</td><td>3.6 GB</td></tr>
+          </tbody>
+        </table></div><p class="note">サイズは SheetSage2 を含みます。スタジオはカードで動くセットを事前に選びますが、ダウンロードは常にあなたの判断です。各ファイルは固定された Hugging Face リビジョンに対して SHA-256 で検証され、中断したダウンロードは再開されます。</p></div></details>
+    <details><summary>無料ですか？</summary><div class="answer"><p>はい。スタジオは無料のオープンソースで、モデルもスタジオ内から無料でダウンロードできます。</p></div></details>
+    <details><summary>オフラインで使えますか？ 音楽はどこかに送られますか？</summary><div class="answer"><p>あなたの音楽はあなたのもので、あなたのディスクに残ります。</p><ul><li><b>アカウント不要</b> — 登録するものは何もありません。</li><li><b>テレメトリなし</b> — スタジオは何を生成したかを送信しません。</li><li><b>クラウドは任意</b> — キーを追加するまで何もマシンの外に出ません。追加後もその機能のためだけです。</li></ul></div></details>
+    <details><summary>作った曲は使えますか？</summary><div class="answer"><p>スタジオと yue2.cpp は MIT ライセンス。YuE2-3B、YuE2 VAE、SheetSage2 の重みは CC BY-NC 4.0 で、作成した曲は非商用利用に限られます。</p></div></details>
+    <details><summary>自分のスタイルで学習させられますか？</summary><div class="answer"><p>同じアーティストやスタイルの曲から、HOT-Step のトレーナーとレシピで LoRA を自分の GPU で学習。設定はすべて変更でき、データセットはこのスタジオと MiniMax Music3 Studio の間で移せます。</p></div></details>
+    <details><summary>AI エージェントから操作できますか？</summary><div class="answer"><p>Claude Code、Claude Desktop、Cursor をつなぐと、エージェントがスタジオでできることをすべて行います。曲を書いて生成し、データセットを整えて学習し、カバーを描き、動画エディタでクリップを作り、曲を再生し、ウィンドウを見てボタンを押します。モデル向けの書き方のルールが付属するので、スタイルと歌詞はエージェント自身が書きます。 作詞アシスタントに選べば、ローカルモデルの代わりにエージェントが書きます。</p></div></details>
+    <details><summary>ダウンロードの中身は？</summary><div class="answer"><p>既定ではすべてローカル。クラウドキーは、選んだ機能のためにあなたが追加します。</p><div class="scroll"><table>
+          <thead><tr><th>構成要素</th><th>実行場所</th><th>サイズ</th></tr></thead>
+          <tbody>
+            <tr><td>YuE2 エンジン（yue2.cpp）</td><td>GPU：CUDA、Vulkan またはプロセッサ</td><td>同梱</td></tr>
+            <tr><td>YuE2 モデルセット</td><td>あなたの GPU</td><td>3.6–9.7 GB</td></tr>
+            <tr><td>NVIDIA cuBLAS</td><td>NVIDIA カードのみ</td><td>391 MB、初回のみ</td></tr>
+            <tr><td>カラオケのタイミング — Parakeet または Whisper</td><td>あなたのマシン</td><td>任意</td></tr>
+            <tr><td>ステム分離 — HT-Demucs</td><td>GPU または CPU</td><td>任意</td></tr>
+            <tr><td>作詞アシスタント</td><td>ローカル Gemma または OpenRouter</td><td>任意</td></tr>
+            <tr><td>LoRA 学習 — HOT-Step ace-train</td><td>NVIDIA RTX 30 以降、VRAM 11 GB</td><td>8 GB、任意</td></tr>
+            <tr><td>曲を聴いて説明 — MOSS-Music-8B</td><td>VRAM 約 12 GB</td><td>10 GB、任意</td></tr>
+            <tr><td>VST3 ホスト — HOT-Step</td><td>あなたのマシン、独立したプロセス</td><td>同梱</td></tr>
+            <tr><td>オーディオから MIDI — MuScriptor（HOT-Step ace-midi）</td><td>NVIDIA GTX 16 / RTX 20 以降</td><td>0.5–5.6 GB、任意</td></tr>
+          </tbody>
+        </table></div></div></details>
+    <details><summary>どのように作られていますか？</summary><div class="answer"><p>サービスはデスクトップ実行ファイルに組み込まれ、C++ エンジンを管理します。完成した曲はサービス自身が取り込むため、再読み込みやウィンドウを閉じても結果は失われません。</p><pre>React UI ─┐
           ├─ YuE2-Studio.exe   (Tauri window + Rust/Axum service)
 Rust axum ┘        │
-                   └─ yue2.cpp `yue-server`   (C++/CUDA, GGUF)</pre>
+                   └─ yue2.cpp `yue-server`   (C++/CUDA, GGUF)</pre></div></details>
   </section>
 
-  <section>
-    <h2>プライバシー</h2>
-    <p class="sub">あなたの音楽はあなたのもので、あなたのディスクに残ります。</p>
-    <div class="grid">
-      <div class="card"><h3>アカウント不要</h3><p>登録するものは何もありません。</p></div>
-      <div class="card"><h3>テレメトリなし</h3><p>スタジオは何を生成したかを送信しません。</p></div>
-      <div class="card"><h3>クラウドは任意</h3><p>キーを追加するまで何もマシンの外に出ません。追加後もその機能のためだけです。</p></div>
-    </div>
-  </section>
-
-  <section>
+  <section id="author">
     <h2>作者</h2>
     <p class="sub">Nerual Dreming — アーティスト、ArtGeneration.me と Neuro-Cartel コミュニティの創設者。このスタジオの前身である ACE-Step Studio と MiniMax Music3 Studio の作者。</p>
     <div class="pills">
@@ -321,15 +356,13 @@ Rust axum ┘        │
       <a class="pill" href="https://t.me/nerual_dreming">Telegram · @nerual_dreming</a>
       <a class="pill" href="https://t.me/neuroport">Telegram · @neuroport</a>
       <a class="pill" href="https://artgeneration.me">ArtGeneration.me</a>
-      <a class="pill" href="https://boosty.to/neuro_art">Boosty</a>
-      <a class="pill" href="https://dalink.to/nerual_dreming">Card / PayPal</a>
+      <a class="pill" href="https://github.com/timoncool/YuE2-Studio/blob/main/DONATE.md">プロジェクトを支援</a>
     </div>
   </section>
 
   <footer>
     <p>スタジオと yue2.cpp は MIT ライセンス。YuE2-3B、YuE2 VAE、SheetSage2 の重みは CC BY-NC 4.0 で、作成した曲は非商用利用に限られます。</p>
-    <p><a href="https://github.com/timoncool/YuE2-Studio/blob/main/CHANGELOG.md">変更履歴</a> ·
-       <a href="https://github.com/timoncool/YuE2-Studio/issues">問題を報告</a></p>
+    <p><a href="https://github.com/timoncool/YuE2-Studio/blob/main/CHANGELOG.md">変更履歴</a> · <a href="https://github.com/timoncool/YuE2-Studio/issues">問題を報告</a> · 更新日 <time datetime="2026-09-27">2026-09-27</time></p>
   </footer>
 </main>
 
@@ -342,7 +375,7 @@ const viewer = document.getElementById('viewer');
 const viewerImage = document.getElementById('viewer-image');
 const closeViewer = () => { viewer.classList.remove('open'); viewer.setAttribute('aria-hidden', 'true'); };
 document.addEventListener('click', (event) => {
-  const image = event.target.closest('.grid-shots img, .hero-shot img');
+  const image = event.target.closest('.hero-shot img, .tile img, .gallery img');
   if (image) {
     viewerImage.src = image.src;
     viewerImage.alt = image.alt;
@@ -353,6 +386,16 @@ document.addEventListener('click', (event) => {
   if (event.target.closest('#viewer')) closeViewer();
 });
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeViewer(); });
+// the download buttons name the latest release as GitHub has it, so a new release needs no new page
+fetch('https://api.github.com/repos/timoncool/YuE2-Studio/releases/latest')
+  .then((response) => (response.ok ? response.json() : Promise.reject(new Error('GitHub answered ' + response.status))))
+  .then((release) => {
+    const installer = release.assets.find((asset) => asset.name.endsWith('-setup.exe'));
+    if (!installer) throw new Error('the latest release has no installer');
+    const label = release.tag_name + ' · ' + Math.round(installer.size / 1048576) + ' MB';
+    document.querySelectorAll('[data-release]').forEach((element) => { element.textContent = label; });
+  })
+  .catch((error) => console.warn('Latest release not read; the page shows the one it was built with:', error));
 </script>
 </body>
 </html>

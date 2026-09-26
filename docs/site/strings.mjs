@@ -76,7 +76,7 @@ export const STRINGS = {
     samplesTitle: 'Songs made with it',
     samplesSub: 'Rendered on a clean install with the recommended set, as the studio saved them. In English, Spanish, Mandarin, Japanese and Russian.',
     shotsTitle: 'Screenshots',
-    shotsSub: 'The studio itself, in this language.',
+    shotsSub: 'The studio itself, in your language.',
     shots: [
       ['01-create', 'Writing a song: style, lyrics, one of the 110 examples loaded.'],
       ['02-score', 'The score as sheet music and ABC text: melody with chords, melody only, or none.'],
@@ -179,7 +179,7 @@ export const STRINGS = {
     samplesTitle: 'Примеры',
     samplesSub: 'Сделаны на чистой установке с рекомендованным набором, как их сохранила студия. На английском, испанском, китайском, японском и русском.',
     shotsTitle: 'Скриншоты',
-    shotsSub: 'Сама студия — на этом языке.',
+    shotsSub: 'Сама студия — на вашем языке.',
     shots: [
       ['01-create', 'Пишем песню: стиль, текст, загружен один из 110 примеров.'],
       ['02-score', 'Партитура нотами и текстом ABC: мелодия с аккордами, только мелодия или без партитуры.'],
@@ -282,7 +282,7 @@ export const STRINGS = {
     samplesTitle: '示例',
     samplesSub: '在全新安装、推荐模型组下生成，按工作室保存的原样呈现，包括英语、西班牙语、中文、日语和俄语。',
     shotsTitle: '截图',
-    shotsSub: '工作室本身，使用此语言。',
+    shotsSub: '工作室本身，使用你的语言。',
     shots: [
       ['01-create', '创作歌曲：风格、歌词，已载入 110 个示例之一。'],
       ['02-score', '乐谱的五线谱和 ABC 文本：旋律加和弦、仅旋律或不使用乐谱。'],
@@ -385,7 +385,7 @@ export const STRINGS = {
     samplesTitle: 'サンプル',
     samplesSub: 'クリーンインストールと推奨セットで作成し、スタジオが保存したままの音です。英語、スペイン語、中国語、日本語、ロシア語。',
     shotsTitle: 'スクリーンショット',
-    shotsSub: 'この言語で表示したスタジオそのもの。',
+    shotsSub: 'スタジオそのものを、あなたの言語で。',
     shots: [
       ['01-create', '曲を書く：スタイル、歌詞、110 のサンプルのひとつを読み込んだ状態。'],
       ['02-score', '楽譜と ABC テキスト：メロディ＋コード、メロディのみ、楽譜なし。'],
@@ -488,7 +488,7 @@ export const STRINGS = {
     samplesTitle: '샘플',
     samplesSub: '새로 설치한 스튜디오와 권장 세트로 만들었고, 스튜디오가 저장한 그대로입니다. 영어, 스페인어, 중국어, 일본어, 러시아어.',
     shotsTitle: '스크린샷',
-    shotsSub: '이 언어로 본 스튜디오 그대로.',
+    shotsSub: '스튜디오 그대로, 여러분의 언어로.',
     shots: [
       ['01-create', '곡 쓰기: 스타일, 가사, 예제 110개 중 하나를 불러온 상태.'],
       ['02-score', '악보와 ABC 텍스트: 멜로디 + 코드, 멜로디만, 또는 악보 없음.'],
