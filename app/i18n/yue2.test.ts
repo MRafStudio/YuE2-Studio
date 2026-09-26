@@ -21,12 +21,16 @@ describe('YuE2 strings', () => {
   });
 });
 
+/** The About page names the sibling studios on purpose: the MiniMax one is one of them. */
+const SIBLING_STUDIOS = new Set(['studioMiniMax']);
+
 describe('merged interface strings', () => {
   it('nothing the interface shows names the forked-from model', async () => {
     const { translations } = await import('./translations');
     const leaks: string[] = [];
     for (const [language, strings] of Object.entries(translations)) {
       for (const [key, value] of Object.entries(strings)) {
+        if (SIBLING_STUDIOS.has(key)) continue;
         if (typeof value === 'string' && /music ?3|minimax/i.test(value)) leaks.push(`${language}.${key}`);
       }
     }
