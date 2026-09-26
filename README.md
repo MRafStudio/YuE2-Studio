@@ -53,7 +53,8 @@ Code, save [docs/mcp-skill.md](docs/mcp-skill.md) as `~/.claude/skills/yue2-stud
 - **A player of its own** — a ten-band equalizer on Winamp's frequencies with its presets,
   your own and .EQF files; a MilkDrop visualiser with hundreds of presets or a spectrum in ten
   looks, over the studio, fullscreen or in its own window; and a Winamp mode that turns the whole
-  window into a skinned Winamp 2 — ten skins included, the Winamp Skin Museum one click away,
+  window into a skinned Winamp 2 whose windows move apart, dock and resize — the original skin
+  and ten more included, sharp at any scale, the Winamp Skin Museum one click away,
   Ctrl+M to switch. The song, its place and the equalizer carry over both ways.
 - **Full songs from a style and lyrics** — up to six minutes, in the languages the model
   sings. On an RTX 4090 with the Q8_0 set a 3:38 song renders in about 46 seconds.
