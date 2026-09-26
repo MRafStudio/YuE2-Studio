@@ -1,4 +1,5 @@
 import { ensureAudioGraph, onAudioGraph, type AudioGraph } from './audioGraph';
+import { onVisualizer } from './visualizerState';
 
 /**
  * The sound a visualiser in its own window hears. The studio window taps the
@@ -50,6 +51,12 @@ export function serveVisualizerFeed(): () => void {
     graph = ready;
     if (listening) void start();
   });
+  // a window closed by its frame says no bye: the shared state says it is gone
+  const unwatch = onVisualizer((state) => {
+    if (state.place === 'window' || !listening) return;
+    listening = false;
+    stop();
+  });
   channel.onmessage = (event: MessageEvent<Message>) => {
     if (event.data.kind === 'hello') {
       listening = true;
@@ -63,6 +70,7 @@ export function serveVisualizerFeed(): () => void {
   };
   return () => {
     unsubscribe();
+    unwatch();
     stop();
     channel.close();
   };
