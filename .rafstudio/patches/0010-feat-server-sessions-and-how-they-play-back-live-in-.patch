@@ -1,0 +1,177 @@
+From 3fc4bcf42b0cbb9604917e32be3b6a20564c73d0 Mon Sep 17 00:00:00 2001
+From: batya <batya@github.com>
+Date: Sun, 27 Sep 2026 19:31:04 +0600
+Subject: [PATCH 10/12] feat(server): sessions and how they play back live in
+ the library
+
+A workspace is the studio's session of work: the songs made in it, and whether
+it is still open. One is open at a time. Sessions used to live in the window, so
+the window and an agent each had their own set; they live in the database now,
+with workspace_songs linking tracks the way playlist_songs already does, and the
+schema is added with CREATE TABLE IF NOT EXISTS so an existing library picks it
+up without a migration.
+
+The repeat mode and shuffle are stored per context - a session, a playlist, the
+library, a search - so a choice made in one queue does not follow the user into
+another. REST routes follow the playlists': list, create, get, rename, delete,
+open, close, and reading or writing a context's playback mode.
+
+A session that was only created is closed: open means an empty closed_at, and
+creating one used to look like opening it.
+---
+ crates/music-server/src/lib.rs     | 22 ++++++++
+ crates/music-server/src/library.rs | 80 +++++++++++++++++++++---------
+ 2 files changed, 79 insertions(+), 23 deletions(-)
+
+diff --git a/crates/music-server/src/lib.rs b/crates/music-server/src/lib.rs
+index 69d0abf..3a4d5b9 100644
+--- a/crates/music-server/src/lib.rs
++++ b/crates/music-server/src/lib.rs
+@@ -813,6 +813,12 @@ pub async fn serve() -> anyhow::Result<()> {
+         .route("/v1/library/songs/{id}/cover", get(library_cover).put(store_library_cover))
+         .route("/v1/library/playlists", get(library_playlists).post(create_library_playlist))
+         .route("/v1/library/playlists/{id}", get(library_playlist).put(update_library_playlist).delete(delete_library_playlist))
++        .route("/v1/workspaces", get(library_workspaces).post(create_library_workspace))
++        .route("/v1/workspaces/active", get(active_library_workspace))
++        .route("/v1/workspaces/{id}", get(library_workspace).put(update_library_workspace).delete(delete_library_workspace))
++        .route("/v1/workspaces/{id}/open", post(open_library_workspace))
++        .route("/v1/workspaces/{id}/close", post(close_library_workspace))
++        .route("/v1/playback-modes/{context}", get(read_playback_mode).put(write_playback_mode))
+         .route("/setup/status", get(setup_status))
+         .route("/setup/catalog", get(setup_catalog))
+         .route("/setup/download", post(setup_download))
+@@ -3089,6 +3095,22 @@ async fn create_library_playlist(State(state):State<AppState>,Json(input):Json<l
+ async fn library_playlist(State(state):State<AppState>,Path(id):Path<String>)->Result<Json<library::Playlist>,(StatusCode,Json<ApiError>)>{state.library.get_playlist(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Playlist not found".into()))}
+ async fn update_library_playlist(State(state):State<AppState>,Path(id):Path<String>,Json(input):Json<library::PlaylistInput>)->Result<Json<library::Playlist>,(StatusCode,Json<ApiError>)>{state.library.update_playlist(&id,input).map_err(|e|api_error(StatusCode::BAD_REQUEST,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Playlist not found".into()))}
+ async fn delete_library_playlist(State(state):State<AppState>,Path(id):Path<String>)->Result<StatusCode,(StatusCode,Json<ApiError>)>{if state.library.delete_playlist(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?{Ok(StatusCode::NO_CONTENT)}else{Err(api_error(StatusCode::NOT_FOUND,"Playlist not found".into()))}}
++/// A workspace is the studio's session of work: the songs made in it, and which
++/// one is open right now. Opening one closes the previous, so `active` answers
++/// the session on screen - or nothing when the studio is between sessions.
++async fn library_workspaces(State(state):State<AppState>)->Result<Json<Vec<library::Workspace>>,(StatusCode,Json<ApiError>)>{state.library.list_workspaces().map(Json).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))}
++async fn active_library_workspace(State(state):State<AppState>)->Result<Json<Option<library::Workspace>>,(StatusCode,Json<ApiError>)>{state.library.active_workspace().map(Json).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))}
++async fn library_workspace(State(state):State<AppState>,Path(id):Path<String>)->Result<Json<library::Workspace>,(StatusCode,Json<ApiError>)>{state.library.get_workspace(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Workspace not found".into()))}
++async fn create_library_workspace(State(state):State<AppState>,Json(input):Json<library::WorkspaceInput>)->Result<(StatusCode,Json<library::Workspace>),(StatusCode,Json<ApiError>)>{state.library.create_workspace(input).map(|w|(StatusCode::CREATED,Json(w))).map_err(|e|api_error(StatusCode::BAD_REQUEST,e.to_string()))}
++async fn update_library_workspace(State(state):State<AppState>,Path(id):Path<String>,Json(input):Json<library::WorkspaceInput>)->Result<Json<library::Workspace>,(StatusCode,Json<ApiError>)>{state.library.update_workspace(&id,input).map_err(|e|api_error(StatusCode::BAD_REQUEST,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Workspace not found".into()))}
++async fn delete_library_workspace(State(state):State<AppState>,Path(id):Path<String>)->Result<StatusCode,(StatusCode,Json<ApiError>)>{if state.library.delete_workspace(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?{Ok(StatusCode::NO_CONTENT)}else{Err(api_error(StatusCode::NOT_FOUND,"Workspace not found".into()))}}
++async fn open_library_workspace(State(state):State<AppState>,Path(id):Path<String>)->Result<Json<library::Workspace>,(StatusCode,Json<ApiError>)>{state.library.open_workspace(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Workspace not found".into()))}
++async fn close_library_workspace(State(state):State<AppState>,Path(id):Path<String>)->Result<Json<library::Workspace>,(StatusCode,Json<ApiError>)>{state.library.close_workspace(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Workspace not found".into()))}
++/// How a context plays back. `context` is the queue's own name: `session:<id>`,
++/// `playlist:<id>`, `library:all`, `library:liked`, `search`, `single`. Nothing
++/// stored means the context was never touched - the UI decides its default.
++async fn read_playback_mode(State(state):State<AppState>,Path(context):Path<String>)->Result<Json<Option<library::PlaybackMode>>,(StatusCode,Json<ApiError>)>{state.library.playback_mode(&context).map(Json).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))}
++async fn write_playback_mode(State(state):State<AppState>,Path(context):Path<String>,Json(input):Json<library::PlaybackModeInput>)->Result<Json<library::PlaybackMode>,(StatusCode,Json<ApiError>)>{state.library.set_playback_mode(&context,input).map(Json).map_err(|e|api_error(StatusCode::BAD_REQUEST,e.to_string()))}
+ 
+ /// The proxy settings, and why the saved address cannot be used when it cannot:
+ /// requests then go straight out, and Settings says so.
+diff --git a/crates/music-server/src/library.rs b/crates/music-server/src/library.rs
+index 63229e2..79c0d37 100644
+--- a/crates/music-server/src/library.rs
++++ b/crates/music-server/src/library.rs
+@@ -104,7 +104,7 @@ impl Library {
+     /// service was started outside the desktop shell, so the same install
+     /// showed two different libraries depending on how it was launched.
+     pub fn open_default()->Result<Self>{let root=crate::studio_data_root().unwrap_or_else(||env::current_dir().unwrap_or_else(|_|PathBuf::from(".")).join("data"));Self::open_at(root.join("library.sqlite"),root.join("media"))}
+- pub fn open_at(db_path:PathBuf,media_dir:PathBuf)->Result<Self>{if let Some(p)=db_path.parent(){fs::create_dir_all(p)?};let c=Connection::open(db_path)?;c.execute_batch("PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS songs(id TEXT PRIMARY KEY,title TEXT NOT NULL,audio_path TEXT,caption TEXT NOT NULL,lyrics TEXT NOT NULL,metadata_json TEXT NOT NULL,generation_settings_json TEXT NOT NULL,engine_id TEXT NOT NULL,profile_id TEXT,replay_request_json TEXT,audio_codes_json TEXT,source TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS playlists(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS playlist_songs(playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,song_id TEXT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,position INTEGER NOT NULL,PRIMARY KEY(playlist_id,song_id));")?;Ok(Self{connection:Arc::new(Mutex::new(c)),media_dir})}
++ pub fn open_at(db_path:PathBuf,media_dir:PathBuf)->Result<Self>{if let Some(p)=db_path.parent(){fs::create_dir_all(p)?};let c=Connection::open(db_path)?;c.execute_batch("PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS songs(id TEXT PRIMARY KEY,title TEXT NOT NULL,audio_path TEXT,caption TEXT NOT NULL,lyrics TEXT NOT NULL,metadata_json TEXT NOT NULL,generation_settings_json TEXT NOT NULL,engine_id TEXT NOT NULL,profile_id TEXT,replay_request_json TEXT,audio_codes_json TEXT,source TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS playlists(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS playlist_songs(playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,song_id TEXT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,position INTEGER NOT NULL,PRIMARY KEY(playlist_id,song_id)); CREATE TABLE IF NOT EXISTS workspaces(id TEXT PRIMARY KEY,name TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,opened_at TEXT,closed_at TEXT); CREATE TABLE IF NOT EXISTS workspace_songs(workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,song_id TEXT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,position INTEGER NOT NULL,PRIMARY KEY(workspace_id,song_id)); CREATE TABLE IF NOT EXISTS playback_modes(context_key TEXT PRIMARY KEY,repeat_mode TEXT NOT NULL,shuffle INTEGER NOT NULL,updated_at TEXT NOT NULL);")?;Ok(Self{connection:Arc::new(Mutex::new(c)),media_dir})}
+  pub fn list_songs(&self)->Result<Vec<Song>>{let c=self.connection.lock().unwrap();let mut s=c.prepare("SELECT id,title,audio_path,caption,lyrics,metadata_json,generation_settings_json,engine_id,profile_id,replay_request_json,audio_codes_json,source,created_at,updated_at FROM songs ORDER BY created_at DESC")?;Ok(s.query_map([],row_song)?.collect::<rusqlite::Result<_>>()?)}
+  pub fn get_song(&self,id:&str)->Result<Option<Song>>{let c=self.connection.lock().unwrap();Ok(c.query_row("SELECT id,title,audio_path,caption,lyrics,metadata_json,generation_settings_json,engine_id,profile_id,replay_request_json,audio_codes_json,source,created_at,updated_at FROM songs WHERE id=?",[id],row_song).optional()?)}
+  pub fn create_song(&self,input:SongInput)->Result<Song>{let now=now();let song=Song{id:uuid::Uuid::now_v7().to_string(),title:input.title,audio_path:input.audio_path,caption:input.caption,lyrics:input.lyrics,metadata:input.metadata,generation_settings:input.generation_settings,engine_id:input.engine_id,profile_id:input.profile_id,replay_request:input.replay_request,audio_codes:input.audio_codes,source:input.source,created_at:now.clone(),updated_at:now};self.save_song(&song)?;Ok(song)}
+@@ -251,6 +251,26 @@ impl Library {
+  pub fn update_playlist(&self,id:&str,input:PlaylistInput)->Result<Option<Playlist>>{let Some(mut playlist)=self.get_playlist(id)? else{return Ok(None)};playlist.name=input.name;playlist.description=input.description;playlist.song_ids=input.song_ids;playlist.updated_at=now();self.save_playlist(&playlist)?;Ok(Some(playlist))}
+  pub fn delete_playlist(&self,id:&str)->Result<bool>{Ok(self.connection.lock().unwrap().execute("DELETE FROM playlists WHERE id=?",[id])?>0)}
+  fn save_playlist(&self,p:&Playlist)->Result<()> {let mut c=self.connection.lock().unwrap();let tx=c.transaction()?;tx.execute("INSERT INTO playlists VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,updated_at=excluded.updated_at",params![p.id,p.name,p.description,p.created_at,p.updated_at])?;tx.execute("DELETE FROM playlist_songs WHERE playlist_id=?",[&p.id])?;for(pos,id)in p.song_ids.iter().enumerate(){tx.execute("INSERT INTO playlist_songs VALUES(?,?,?)",params![p.id,id,pos as i64])?;}tx.commit()?;Ok(())}
++ pub fn list_workspaces(&self)->Result<Vec<Workspace>>{let c=self.connection.lock().unwrap();let mut s=c.prepare("SELECT id,name,opened_at,closed_at,created_at,updated_at FROM workspaces ORDER BY created_at DESC")?;Ok(s.query_map([],|r|workspace(&c,r))?.collect::<rusqlite::Result<_>>()?)}
++ pub fn get_workspace(&self,id:&str)->Result<Option<Workspace>>{let c=self.connection.lock().unwrap();c.query_row("SELECT id,name,opened_at,closed_at,created_at,updated_at FROM workspaces WHERE id=?",[id],|r|workspace(&c,r)).optional().map_err(Into::into)}
++ /// The workspace the studio works in right now, if any. Only one is ever open:
++ /// the session on screen is the one a new song lands in.
++ pub fn active_workspace(&self)->Result<Option<Workspace>>{let c=self.connection.lock().unwrap();c.query_row("SELECT id,name,opened_at,closed_at,created_at,updated_at FROM workspaces WHERE closed_at IS NULL ORDER BY opened_at DESC LIMIT 1",[],|r|workspace(&c,r)).optional().map_err(Into::into)}
++ /// A new workspace is created closed: it becomes the current session only when
++ /// it is opened. Leaving `closed_at` empty made the first session to arrive
++ /// look like the open one, and the studio then thought it was already working.
++ pub fn create_workspace(&self,input:WorkspaceInput)->Result<Workspace>{let now=now();let w=Workspace{id:uuid::Uuid::now_v7().to_string(),name:input.name,song_ids:input.song_ids,opened_at:None,closed_at:Some(now.clone()),created_at:now.clone(),updated_at:now};self.save_workspace(&w)?;Ok(w)}
++ pub fn update_workspace(&self,id:&str,input:WorkspaceInput)->Result<Option<Workspace>>{let Some(mut w)=self.get_workspace(id)? else{return Ok(None)};w.name=input.name;w.song_ids=input.song_ids;w.updated_at=now();self.save_workspace(&w)?;Ok(Some(w))}
++ pub fn delete_workspace(&self,id:&str)->Result<bool>{Ok(self.connection.lock().unwrap().execute("DELETE FROM workspaces WHERE id=?",[id])?>0)}
++ /// Opening a workspace closes the one that was open before it - the studio
++ /// keeps a single session at a time, and the closed one keeps its songs.
++ pub fn open_workspace(&self,id:&str)->Result<Option<Workspace>>{let now=now();{let mut c=self.connection.lock().unwrap();let tx=c.transaction()?;tx.execute("UPDATE workspaces SET closed_at=?,updated_at=? WHERE closed_at IS NULL",params![now,now])?;tx.execute("UPDATE workspaces SET opened_at=?,closed_at=NULL,updated_at=? WHERE id=?",params![now,now,id])?;tx.commit()?;}self.get_workspace(id)}
++ pub fn close_workspace(&self,id:&str)->Result<Option<Workspace>>{let now=now();{let c=self.connection.lock().unwrap();c.execute("UPDATE workspaces SET closed_at=?,updated_at=? WHERE id=?",params![now,now,id])?;}self.get_workspace(id)}
++ fn save_workspace(&self,w:&Workspace)->Result<()> {let mut c=self.connection.lock().unwrap();let tx=c.transaction()?;tx.execute("INSERT INTO workspaces VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,opened_at=excluded.opened_at,closed_at=excluded.closed_at,updated_at=excluded.updated_at",params![w.id,w.name,w.created_at,w.updated_at,w.opened_at,w.closed_at])?;tx.execute("DELETE FROM workspace_songs WHERE workspace_id=?",[&w.id])?;for(pos,id)in w.song_ids.iter().enumerate(){tx.execute("INSERT INTO workspace_songs VALUES(?,?,?)",params![w.id,id,pos as i64])?;}tx.commit()?;Ok(())}
++ /// How a context plays back, or nothing when it was never touched. What a
++ /// fresh context defaults to is the caller's business; this only remembers.
++ pub fn playback_mode(&self,context_key:&str)->Result<Option<PlaybackMode>>{let c=self.connection.lock().unwrap();c.query_row("SELECT repeat_mode,shuffle,updated_at FROM playback_modes WHERE context_key=?",[context_key],|r|Ok(PlaybackMode{repeat_mode:r.get(0)?,shuffle:r.get(1)?,updated_at:r.get(2)?})).optional().map_err(Into::into)}
++ pub fn set_playback_mode(&self,context_key:&str,input:PlaybackModeInput)->Result<PlaybackMode>{let updated_at=now();let c=self.connection.lock().unwrap();c.execute("INSERT INTO playback_modes VALUES(?,?,?,?) ON CONFLICT(context_key) DO UPDATE SET repeat_mode=excluded.repeat_mode,shuffle=excluded.shuffle,updated_at=excluded.updated_at",params![context_key,input.repeat_mode,input.shuffle,updated_at])?;Ok(PlaybackMode{repeat_mode:input.repeat_mode,shuffle:input.shuffle,updated_at})}
+ }
+ /// An edit's metadata over the stored one: what the studio keeps there itself
+ /// (processed versions, the original audio, karaoke, the cover) is not the
+@@ -260,8 +280,22 @@ fn merged_metadata(stored:&serde_json::Value,edit:serde_json::Value)->serde_json
+  for(key,value)in stored{edit.entry(key.clone()).or_insert_with(||value.clone());}
+  serde_json::Value::Object(edit)
+ }
+-fn row_song(r:&rusqlite::Row)->rusqlite::Result<Song>{Ok(Song{id:r.get(0)?,title:r.get(1)?,audio_path:r.get(2)?,caption:r.get(3)?,lyrics:r.get(4)?,metadata:json(r.get::<_,String>(5)?),generation_settings:json(r.get::<_,String>(6)?),engine_id:r.get(7)?,profile_id:r.get(8)?,replay_request:r.get::<_,Option<String>>(9)?.map(json),audio_codes:r.get::<_,Option<String>>(10)?.map(json),source:r.get(11)?,created_at:r.get(12)?,updated_at:r.get(13)?})}fn json(s:String)->serde_json::Value{serde_json::from_str(&s).unwrap_or(serde_json::Value::Null)}fn playlist(c:&Connection,r:&rusqlite::Row)->rusqlite::Result<Playlist>{let id:String=r.get(0)?;let mut q=c.prepare("SELECT song_id FROM playlist_songs WHERE playlist_id=? ORDER BY position")?;let song_ids=q.query_map([&id],|x|x.get(0))?.collect::<rusqlite::Result<_>>()?;Ok(Playlist{id,name:r.get(1)?,description:r.get(2)?,song_ids,created_at:r.get(3)?,updated_at:r.get(4)?})}fn now()->String{std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string()}
+-#[cfg(test)]mod tests{use super::*;#[test]fn a_structured_caption_does_not_become_a_title_of_headings(){
++fn row_song(r:&rusqlite::Row)->rusqlite::Result<Song>{Ok(Song{id:r.get(0)?,title:r.get(1)?,audio_path:r.get(2)?,caption:r.get(3)?,lyrics:r.get(4)?,metadata:json(r.get::<_,String>(5)?),generation_settings:json(r.get::<_,String>(6)?),engine_id:r.get(7)?,profile_id:r.get(8)?,replay_request:r.get::<_,Option<String>>(9)?.map(json),audio_codes:r.get::<_,Option<String>>(10)?.map(json),source:r.get(11)?,created_at:r.get(12)?,updated_at:r.get(13)?})}fn json(s:String)->serde_json::Value{serde_json::from_str(&s).unwrap_or(serde_json::Value::Null)}fn playlist(c:&Connection,r:&rusqlite::Row)->rusqlite::Result<Playlist>{let id:String=r.get(0)?;let mut q=c.prepare("SELECT song_id FROM playlist_songs WHERE playlist_id=? ORDER BY position")?;let song_ids=q.query_map([&id],|x|x.get(0))?.collect::<rusqlite::Result<_>>()?;Ok(Playlist{id,name:r.get(1)?,description:r.get(2)?,song_ids,created_at:r.get(3)?,updated_at:r.get(4)?})}/// A workspace is one session of work: the songs made in it and whether it is
++/// still open. A single workspace is open at a time - what the studio calls the
++/// current session - so opening one closes whichever was open before it.
++#[derive(Debug, Clone, Serialize, Deserialize)] pub struct Workspace { pub id:String, pub name:String, pub song_ids:Vec<String>, pub opened_at:Option<String>, pub closed_at:Option<String>, pub created_at:String, pub updated_at:String }
++#[derive(Debug, Clone, Deserialize)] pub struct WorkspaceInput { pub name:String, #[serde(default)] pub song_ids:Vec<String> }
++/// How one queue plays back. The repeat mode and shuffle belong to the context
++/// they were chosen in - a workspace, a playlist, the library, a search - and
++/// are kept apart from the others, so each one comes back the way it was left.
++#[derive(Debug, Clone, Serialize, Deserialize)] pub struct PlaybackMode { pub repeat_mode:String, pub shuffle:bool, pub updated_at:String }
++#[derive(Debug, Clone, Deserialize)] pub struct PlaybackModeInput { pub repeat_mode:String, #[serde(default)] pub shuffle:bool }
++fn workspace(c:&Connection,r:&rusqlite::Row)->rusqlite::Result<Workspace>{let id:String=r.get(0)?;let mut q=c.prepare("SELECT song_id FROM workspace_songs WHERE workspace_id=? ORDER BY position")?;let song_ids=q.query_map([&id],|x|x.get(0))?.collect::<rusqlite::Result<_>>()?;Ok(Workspace{id,name:r.get(1)?,song_ids,opened_at:r.get(2)?,closed_at:r.get(3)?,created_at:r.get(4)?,updated_at:r.get(5)?})}
++fn now()->String{std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string()}
++#[cfg(test)]mod tests{use super::*;
++#[test]fn a_workspace_keeps_its_songs_and_only_one_stays_open(){let root=std::env::temp_dir().join(format!("yue2-workspace-test-{}",uuid::Uuid::now_v7()));let db=Library::open_at(root.join("library.sqlite"),root.join("media")).unwrap();let song=db.create_song(SongInput{title:"A".into(),audio_path:None,caption:String::new(),lyrics:String::new(),metadata:serde_json::Value::Null,generation_settings:serde_json::Value::Null,engine_id:"manual".into(),profile_id:None,replay_request:None,audio_codes:None,source:"manual".into()}).unwrap().id;let first=db.create_workspace(WorkspaceInput{name:"Night".into(),song_ids:vec![song.clone()]}).unwrap();let second=db.create_workspace(WorkspaceInput{name:"Rock".into(),song_ids:vec![]}).unwrap();assert!(db.active_workspace().unwrap().is_none(),"a session that was only created is not open");assert_eq!(db.get_workspace(&first.id).unwrap().unwrap().song_ids,vec![song.clone()]);db.open_workspace(&first.id).unwrap();assert_eq!(db.active_workspace().unwrap().unwrap().id,first.id);db.open_workspace(&second.id).unwrap();assert!(db.get_workspace(&first.id).unwrap().unwrap().closed_at.is_some());assert_eq!(db.active_workspace().unwrap().unwrap().id,second.id);db.close_workspace(&second.id).unwrap();assert!(db.active_workspace().unwrap().is_none());assert!(db.delete_workspace(&second.id).unwrap());drop(db);fs::remove_dir_all(&root).unwrap();}
++#[test]fn a_playback_mode_is_kept_per_context(){let root=std::env::temp_dir().join(format!("yue2-mode-test-{}",uuid::Uuid::now_v7()));let db=Library::open_at(root.join("library.sqlite"),root.join("media")).unwrap();db.set_playback_mode("library:all",PlaybackModeInput{repeat_mode:"none".into(),shuffle:false}).unwrap();db.set_playback_mode("session:1",PlaybackModeInput{repeat_mode:"all".into(),shuffle:true}).unwrap();let library=db.playback_mode("library:all").unwrap().unwrap();assert_eq!(library.repeat_mode,"none");assert!(!library.shuffle);let session=db.playback_mode("session:1").unwrap().unwrap();assert_eq!(session.repeat_mode,"all");assert!(session.shuffle);db.set_playback_mode("library:all",PlaybackModeInput{repeat_mode:"one".into(),shuffle:false}).unwrap();assert_eq!(db.playback_mode("library:all").unwrap().unwrap().repeat_mode,"one");assert!(db.playback_mode("nothing").unwrap().is_none());drop(db);fs::remove_dir_all(&root).unwrap();}
++#[test]fn a_structured_caption_does_not_become_a_title_of_headings(){
+   let caption="Global Metadata
+ Basic Attributes: bpm is 118. key is F# minor, and scale is minor. Darkwave, Synth-pop. Global Emotional Progression: haunting.";
+   assert_eq!(generated_title(caption),"Darkwave, Synth-pop");
+@@ -304,23 +338,23 @@ mod edit_tests {
+         assert_eq!(merged["original_audio_path"], "song.mp3");
+     }
+ }
+-
+-#[cfg(test)]
+-mod media_tests {
+-    use super::*;
+-
+-    #[test]
+-    fn a_library_whose_folder_moved_still_finds_its_songs() {
+-        let root = std::env::temp_dir().join(format!("library-moved-{}", uuid::Uuid::now_v7().simple()));
+-        let db = Library::open_at(root.join("library.sqlite"), root.join("media")).unwrap();
+-        fs::create_dir_all(root.join("media")).unwrap();
+-        fs::write(root.join("media").join("song.mp3"), b"ID3").unwrap();
+-        // stored while the portable folder sat on another drive
+-        let found = db.resolve_media(r"Z:\old place\data\media\song.mp3").unwrap();
+-        assert_eq!(found, root.join("media").join("song.mp3").canonicalize().unwrap());
+-        assert!(db.resolve_media(r"Z:\old place\data\media\gone.mp3").is_none());
+-        fs::write(root.join("outside.mp3"), b"ID3").unwrap();
+-        assert!(db.resolve_media(&root.join("outside.mp3").to_string_lossy()).is_none());
+-        let _ = fs::remove_dir_all(root);
+-    }
+-}
++
++#[cfg(test)]
++mod media_tests {
++    use super::*;
++
++    #[test]
++    fn a_library_whose_folder_moved_still_finds_its_songs() {
++        let root = std::env::temp_dir().join(format!("library-moved-{}", uuid::Uuid::now_v7().simple()));
++        let db = Library::open_at(root.join("library.sqlite"), root.join("media")).unwrap();
++        fs::create_dir_all(root.join("media")).unwrap();
++        fs::write(root.join("media").join("song.mp3"), b"ID3").unwrap();
++        // stored while the portable folder sat on another drive
++        let found = db.resolve_media(r"Z:\old place\data\media\song.mp3").unwrap();
++        assert_eq!(found, root.join("media").join("song.mp3").canonicalize().unwrap());
++        assert!(db.resolve_media(r"Z:\old place\data\media\gone.mp3").is_none());
++        fs::write(root.join("outside.mp3"), b"ID3").unwrap();
++        assert!(db.resolve_media(&root.join("outside.mp3").to_string_lossy()).is_none());
++        let _ = fs::remove_dir_all(root);
++    }
++}
+-- 
+2.54.0.windows.1
+

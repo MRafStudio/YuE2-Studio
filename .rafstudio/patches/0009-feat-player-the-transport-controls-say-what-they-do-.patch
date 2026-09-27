@@ -1,0 +1,198 @@
+From 6962cfd767f7f86ba5c601c80fd0ccb90e53fa53 Mon Sep 17 00:00:00 2001
+From: batya <batya@github.com>
+Date: Sun, 27 Sep 2026 19:02:37 +0600
+Subject: [PATCH 09/12] feat(player): the transport controls say what they do,
+ in every layout
+
+The player's shuffle and repeat buttons changed colour without ever saying what
+they meant, and repeat has three states that look alike. Each control now carries
+a hint that follows its state: shuffle on or off, repeat off, all, or this song.
+The player is the only place in the UI that gets hints. Strings live in all five
+languages; play, pause, next and previous are the author's own keys. Added to all
+three layouts of the player, since the library shows the compact one.
+---
+ app/components/Player.tsx | 17 +++++++++++++++++
+ app/i18n/yue2.ts          | 25 +++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+
+diff --git a/app/components/Player.tsx b/app/components/Player.tsx
+index b78c8d9..2b1e644 100644
+--- a/app/components/Player.tsx
++++ b/app/components/Player.tsx
+@@ -227,30 +227,37 @@ export const Player: React.FC<PlayerProps> = ({
+                     <div className="flex items-center justify-center gap-8 py-4">
+                         <button
+                             onClick={onToggleShuffle}
++                            /* Hints live here and nowhere else in the UI: the player is the one
++                               row of controls whose state is not obvious from the icon alone. */
++                            title={isShuffle ? t('playerShuffleOn') : t('playerShuffleOff')}
+                             className={`p-2 tap-highlight-none ${isShuffle ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 dark:text-white/50'}`}
+                         >
+                             <Shuffle size={22} />
+                         </button>
+                         <button
+                             onClick={onPrevious}
++                            title={t('previous')}
+                             className="p-2 text-zinc-800 dark:text-white tap-highlight-none"
+                         >
+                             <SkipBack size={32} fill="currentColor" />
+                         </button>
+                         <button
+                             onClick={onTogglePlay}
++                            title={isPlaying ? t('pause') : t('play')}
+                             className="w-16 h-16 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black flex items-center justify-center shadow-lg tap-highlight-none"
+                         >
+                             {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+                         </button>
+                         <button
+                             onClick={onNext}
++                            title={t('next')}
+                             className="p-2 text-zinc-800 dark:text-white tap-highlight-none"
+                         >
+                             <SkipForward size={32} fill="currentColor" />
+                         </button>
+                         <button
+                             onClick={onToggleRepeat}
++                            title={repeatMode === 'none' ? t('playerRepeatNone') : repeatMode === 'all' ? t('playerRepeatAll') : t('playerRepeatOne')}
+                             className={`p-2 tap-highlight-none relative ${repeatMode !== 'none' ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 dark:text-white/50'}`}
+                         >
+                             {repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
+@@ -462,30 +469,35 @@ export const Player: React.FC<PlayerProps> = ({
+                             <div className="flex items-center justify-center gap-8 py-2 w-full">
+                                 <button
+                                     onClick={onToggleShuffle}
++                                    title={isShuffle ? t('playerShuffleOn') : t('playerShuffleOff')}
+                                     className={`p-2 transition-colors ${isShuffle ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                                 >
+                                     <Shuffle size={22} />
+                                 </button>
+                                 <button
+                                     onClick={onPrevious}
++                                    title={t('previous')}
+                                     className="p-2 text-zinc-800 dark:text-white hover:scale-110 transition-transform"
+                                 >
+                                     <SkipBack size={36} fill="currentColor" />
+                                 </button>
+                                 <button
+                                     onClick={onTogglePlay}
++                                    title={isPlaying ? t('pause') : t('play')}
+                                     className="w-18 h-18 p-5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+                                 >
+                                     {isPlaying ? <Pause size={36} fill="currentColor" /> : <Play size={36} fill="currentColor" className="ml-1" />}
+                                 </button>
+                                 <button
+                                     onClick={onNext}
++                                    title={t('next')}
+                                     className="p-2 text-zinc-800 dark:text-white hover:scale-110 transition-transform"
+                                 >
+                                     <SkipForward size={36} fill="currentColor" />
+                                 </button>
+                                 <button
+                                     onClick={onToggleRepeat}
++                                    title={repeatMode === 'none' ? t('playerRepeatNone') : repeatMode === 'all' ? t('playerRepeatAll') : t('playerRepeatOne')}
+                                     className={`p-2 transition-colors relative ${repeatMode !== 'none' ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                                 >
+                                     {repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
+@@ -642,30 +654,35 @@ export const Player: React.FC<PlayerProps> = ({
+                     <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
+                         <button
+                             onClick={onToggleShuffle}
++                            title={isShuffle ? t('playerShuffleOn') : t('playerShuffleOff')}
+                             className={`transition-colors hidden sm:block ${isShuffle ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                         >
+                             <Shuffle size={16} />
+                         </button>
+                         <button
+                             onClick={onPrevious}
++                            title={t('previous')}
+                             className="text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white transition-colors"
+                         >
+                             <SkipBack size={18} className="sm:w-[22px] sm:h-[22px]" fill="currentColor" />
+                         </button>
+                         <button
+                             onClick={onTogglePlay}
++                            title={isPlaying ? t('pause') : t('play')}
+                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
+                         >
+                             {isPlaying ? <Pause size={18} className="sm:w-5 sm:h-5" fill="currentColor" /> : <Play size={18} className="sm:w-5 sm:h-5 ml-0.5" fill="currentColor" />}
+                         </button>
+                         <button
+                             onClick={onNext}
++                            title={t('next')}
+                             className="text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white transition-colors"
+                         >
+                             <SkipForward size={18} className="sm:w-[22px] sm:h-[22px]" fill="currentColor" />
+                         </button>
+                         <button
+                             onClick={onToggleRepeat}
++                            title={repeatMode === 'none' ? t('playerRepeatNone') : repeatMode === 'all' ? t('playerRepeatAll') : t('playerRepeatOne')}
+                             className={`transition-colors hidden sm:block ${repeatMode !== 'none' ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'} relative`}
+                         >
+                             {repeatMode === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
+diff --git a/app/i18n/yue2.ts b/app/i18n/yue2.ts
+index d1677e7..dd74901 100644
+--- a/app/i18n/yue2.ts
++++ b/app/i18n/yue2.ts
+@@ -177,6 +177,11 @@ const en = {
+   sessionConfirmOther: "Choose another session",
+   sessionConfirmPick: "Which session should it go to?",
+   sessionConfirmDecline: "Decline",
++  playerShuffleOn: "Shuffle: on",
++  playerShuffleOff: "Shuffle: off",
++  playerRepeatNone: "Repeat: off",
++  playerRepeatAll: "Repeat: all",
++  playerRepeatOne: "Repeat: this song",
+ } as const;
+ 
+ export type Yue2Strings = { readonly [K in keyof typeof en]: string };
+@@ -354,6 +359,11 @@ const ru: Yue2Strings = {
+   sessionConfirmOther: "Выбрать другую сессию",
+   sessionConfirmPick: "В какую сессию создавать?",
+   sessionConfirmDecline: "Отклонить",
++  playerShuffleOn: "Перемешать: включено",
++  playerShuffleOff: "Перемешать: выключено",
++  playerRepeatNone: "Повтор: выключен",
++  playerRepeatAll: "Повтор: все треки",
++  playerRepeatOne: "Повтор: эта песня",
+ };
+ 
+ const zh: Yue2Strings = {
+@@ -529,6 +539,11 @@ const zh: Yue2Strings = {
+   sessionConfirmOther: "选择其他会话",
+   sessionConfirmPick: "生成到哪个会话？",
+   sessionConfirmDecline: "拒绝",
++  playerShuffleOn: "随机播放: 开",
++  playerShuffleOff: "随机播放: 关",
++  playerRepeatNone: "循环: 关",
++  playerRepeatAll: "循环: 全部",
++  playerRepeatOne: "循环: 单曲",
+ };
+ 
+ const ja: Yue2Strings = {
+@@ -704,6 +719,11 @@ const ja: Yue2Strings = {
+   sessionConfirmOther: "別のセッションを選ぶ",
+   sessionConfirmPick: "どのセッションに作成しますか？",
+   sessionConfirmDecline: "拒否",
++  playerShuffleOn: "シャッフル: オン",
++  playerShuffleOff: "シャッフル: オフ",
++  playerRepeatNone: "リピート: オフ",
++  playerRepeatAll: "リピート: すべて",
++  playerRepeatOne: "リピート: この曲",
+ };
+ 
+ const ko: Yue2Strings = {
+@@ -879,6 +899,11 @@ const ko: Yue2Strings = {
+   sessionConfirmOther: "다른 세션 선택",
+   sessionConfirmPick: "어느 세션에 만들까요?",
+   sessionConfirmDecline: "거부",
++  playerShuffleOn: "셔플: 켜짐",
++  playerShuffleOff: "셔플: 꺼짐",
++  playerRepeatNone: "반복: 꺼짐",
++  playerRepeatAll: "반복: 전체",
++  playerRepeatOne: "반복: 이 곡",
+ };
+ 
+ export const yue2 = { en, ru, zh, ja, ko };
+-- 
+2.54.0.windows.1
+

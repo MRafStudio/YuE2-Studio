@@ -1,8 +1,8 @@
 From 1d6ef9f7faf28ce61f566f07ea5fb40c3aac2be6 Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 17:56:27 +0600
-Subject: [PATCH 6/7] fix(ui): a closed session stays closed, and our own lines
- use a plain hyphen
+Subject: [PATCH 06/12] fix(ui): a closed session stays closed, and our own
+ lines use a plain hyphen
 
 Sessions live in the window until the service owns them (stage 2), and that
 state is now remembered the way the message log is: closing a session and

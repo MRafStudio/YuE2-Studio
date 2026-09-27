@@ -1,0 +1,83 @@
+From a7f16f87513c27d509198eb137609d20e950dfbe Mon Sep 17 00:00:00 2001
+From: batya <batya@github.com>
+Date: Sun, 27 Sep 2026 19:02:37 +0600
+Subject: [PATCH 08/12] fix(player): playing from the library is one track, not
+ the whole shelf
+
+The whole library used to become the queue whenever a track was played outside a
+playlist, so a song ran on through every part that followed it. The library is a
+place to listen to a track, not a playlist: the queue is now exactly what the
+caller passes - one track from the library, the session's own list from the song
+list, a playlist's tracks from a playlist.
+---
+ app/App.tsx                    | 17 +++++++++++++----
+ app/components/LibraryView.tsx |  5 ++++-
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/app/App.tsx b/app/App.tsx
+index dfe80b2..b5d137f 100644
+--- a/app/App.tsx
++++ b/app/App.tsx
+@@ -748,10 +748,13 @@ function AppContent() {
+ 
+ 
+   // Player Logic
++  /// The queue the user actually built: a playlist, or the one track they
++  /// clicked. The whole library is NOT a queue - treating it as one turned
++  /// "play this track" into a shadow playlist that ran on through every stem
++  /// of the same song, and it went on even when the player was stopped.
+   const getActiveQueue = (song?: Song) => {
+     if (playQueue.length > 0) return playQueue;
+-    if (song && songs.some(s => s.id === song.id)) return songs;
+-    return songs;
++    return song ? [song] : [];
+   };
+ 
+   const playNext = useCallback(() => {
+@@ -1325,11 +1328,14 @@ function AppContent() {
+   };
+ 
+   const playSong = (song: Song, list?: Song[]) => {
++    // A list is a queue only when it is one the user built - a playlist, or a
++    // selection they chose. Falling back to the whole library made "play this
++    // track" behave like a playlist of every song (and every stem) there is.
+     const nextQueue = list && list.length > 0
+       ? list
+       : (playQueue.length > 0 && playQueue.some(s => s.id === song.id))
+           ? playQueue
+-          : (songs.some(s => s.id === song.id) ? songs : [song]);
++          : [song];
+     const nextIndex = nextQueue.findIndex(s => s.id === song.id);
+     setPlayQueue(nextQueue);
+     setQueueIndex(nextIndex);
+@@ -1785,7 +1791,10 @@ function AppContent() {
+                 selectedSong={selectedSong}
+                 likedSongIds={likedSongIds}
+                 isPlaying={isPlaying}
+-                onPlay={playSong}
++                /* The list on this page is a queue: the next track follows the
++                   previous one, as it always did here. The library's "All songs"
++                   tab is not - there "play" means this one track only. */
++                onPlay={(song) => playSong(song, visibleSongs)}
+                 onSelect={(s) => {
+                   setSelectedSong(s);
+                   setShowRightSidebar(true);
+diff --git a/app/components/LibraryView.tsx b/app/components/LibraryView.tsx
+index 90838b2..beea399 100644
+--- a/app/components/LibraryView.tsx
++++ b/app/components/LibraryView.tsx
+@@ -53,7 +53,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
+             <div
+                 data-mcp-context={`song ${song.id}: ${song.title}`}
+                 className="group flex min-w-0 items-center gap-2 rounded p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 sm:gap-4"
+-                onClick={() => onPlaySong(song, allSongs)}
++                /* Playing from the library is a one-track affair: the queue is
++                   exactly this song, never the library and never a queue left
++                   over from another page - hence [song] and not just song. */
++                onClick={() => onPlaySong(song, [song])}
+             >
+                 {index === null ? (
+                     <span className="w-6" />
+-- 
+2.54.0.windows.1
+
