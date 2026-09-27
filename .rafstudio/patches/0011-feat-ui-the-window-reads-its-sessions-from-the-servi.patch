@@ -1,7 +1,7 @@
 From 6833080127e0c68859bce310c08555439a5a63fd Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 19:31:05 +0600
-Subject: [PATCH 11/13] feat(ui): the window reads its sessions from the
+Subject: [PATCH 11/16] feat(ui): the window reads its sessions from the
  service, and each queue remembers its mode
 
 Sessions moved to the database, so the window asks for them: the session list,

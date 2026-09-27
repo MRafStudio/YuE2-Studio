@@ -1,7 +1,7 @@
 From 0384514ca71e57ed45d63260dfb7c3d049273dfa Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 20:20:02 +0600
-Subject: [PATCH 13/13] fix(ui): a session counts and shows its own tracks
+Subject: [PATCH 13/16] fix(ui): a session counts and shows its own tracks
 
 The count and the list came from one shared map of "which session a track is in",
 where the last session in the array won: a track kept in two sessions was counted

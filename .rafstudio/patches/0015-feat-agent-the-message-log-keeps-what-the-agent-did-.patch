@@ -1,0 +1,164 @@
+From d196718adea2636fb280c7dd224ba6ae3e0bcf43 Mon Sep 17 00:00:00 2001
+From: batya <batya@github.com>
+Date: Sun, 27 Sep 2026 21:16:18 +0600
+Subject: [PATCH 15/16] feat(agent): the message log keeps what the agent did,
+ not only what it asked
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Every call that makes, changes, removes or starts something now lands in the
+window's message log, quietly - the tool and the name of what it acted on
+("library_song_like: Провода и дождь"), with a robot's mark, and without a toast
+in the middle of the screen. Reading the library, looking at statuses and moving
+the window's mouse stay out: the log is what the agent did TO the studio.
+
+The server decides by the tool's own wording (is_noteworthy) and takes the name of
+the thing from what the tool was given or what the studio answered with
+(acted_on) - an id never travels to the log and neither does anything a tool was
+told in confidence. The window writes the line itself through the journal_note
+bridge command, so both strings are on the five languages the studio speaks.
+---
+ app/App.tsx                    | 11 ++++++++
+ app/i18n/yue2.ts               | 10 ++++++++
+ crates/music-server/src/mcp.rs | 46 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 67 insertions(+)
+
+diff --git a/app/App.tsx b/app/App.tsx
+index e269ab9..c293c72 100644
+--- a/app/App.tsx
++++ b/app/App.tsx
+@@ -1524,6 +1524,17 @@ function AppContent() {
+       },
+     });
+   }));
++  // The agent's own work lands in the message log quietly: no toast in the middle of
++  // the screen, just the record of what was done - the tool and what it acted on.
++  useBridgeCommand('journal_note', ({ tool, target }) => {
++    const ran = String(tool ?? '');
++    const acted = String(target ?? '');
++    if (!ran) return 'Nothing to note.';
++    noteJournal(acted
++      ? t('agentActionRanOn').replace('{tool}', ran).replace('{target}', acted)
++      : t('agentActionRan').replace('{tool}', ran), 'agent');
++    return 'Noted.';
++  });
+   useBridgeCommand('library_song_like', ({ song_id, liked }) => {
+     const song = songById(song_id);
+     if (likedSongIds.has(song.id) !== (liked !== false)) toggleLike(song.id);
+diff --git a/app/i18n/yue2.ts b/app/i18n/yue2.ts
+index b6f4b83..617c5d7 100644
+--- a/app/i18n/yue2.ts
++++ b/app/i18n/yue2.ts
+@@ -190,6 +190,8 @@ const en = {
+   agentPermissionsForget: "Forget",
+   agentJournalAsk: "The agent asks to run {action}",
+   agentJournalAnswer: "Answer: {answer}",
++  agentActionRan: "The agent ran {tool}",
++  agentActionRanOn: "The agent ran {tool}: {target}",
+   sessionParts: "Parts",
+   sessionConfirmTitle: "The agent asks to make a track",
+   sessionConfirmBody: "An agent working the studio over MCP wants to make a track in the session \"{session}\". Allow it?",
+@@ -393,6 +395,8 @@ const ru: Yue2Strings = {
+   agentPermissionsForget: "Забыть",
+   agentJournalAsk: "Агент просит выполнить {action}",
+   agentJournalAnswer: "Ответ: {answer}",
++  agentActionRan: "Агент выполнил {tool}",
++  agentActionRanOn: "Агент выполнил {tool}: {target}",
+   sessionParts: "Партии",
+   sessionConfirmTitle: "Агент просит создать трек",
+   sessionConfirmBody: "Агент, работающий в студии через MCP, хочет создать трек в сессии «{session}». Разрешить?",
+@@ -594,6 +598,8 @@ const zh: Yue2Strings = {
+   agentPermissionsForget: "忘记",
+   agentJournalAsk: "代理请求执行 {action}",
+   agentJournalAnswer: "答复:{answer}",
++  agentActionRan: "代理执行了 {tool}",
++  agentActionRanOn: "代理执行了 {tool}:{target}",
+   sessionParts: "分轨",
+   sessionConfirmTitle: "代理请求生成曲目",
+   sessionConfirmBody: "通过 MCP 工作的代理想在会话「{session}」中生成曲目。允许吗？",
+@@ -795,6 +801,8 @@ const ja: Yue2Strings = {
+   agentPermissionsForget: "忘れる",
+   agentJournalAsk: "エージェントが {action} を要求",
+   agentJournalAnswer: "回答: {answer}",
++  agentActionRan: "エージェントが {tool} を実行",
++  agentActionRanOn: "エージェントが {tool} を実行: {target}",
+   sessionParts: "パート",
+   sessionConfirmTitle: "エージェントが曲の生成を要求",
+   sessionConfirmBody: "MCP 経由でスタジオを操作するエージェントが、セッション「{session}」で曲を作ろうとしています。許可しますか？",
+@@ -996,6 +1004,8 @@ const ko: Yue2Strings = {
+   agentPermissionsForget: "잊기",
+   agentJournalAsk: "에이전트가 {action} 요청",
+   agentJournalAnswer: "답변: {answer}",
++  agentActionRan: "에이전트가 {tool} 실행",
++  agentActionRanOn: "에이전트가 {tool} 실행: {target}",
+   sessionParts: "파트",
+   sessionConfirmTitle: "에이전트가 곡 생성을 요청합니다",
+   sessionConfirmBody: "MCP로 스튜디오를 조작하는 에이전트가 세션 \"{session}\"에 곡을 만들려고 합니다. 허용할까요?",
+diff --git a/crates/music-server/src/mcp.rs b/crates/music-server/src/mcp.rs
+index ed7ea3d..b286f1c 100644
+--- a/crates/music-server/src/mcp.rs
++++ b/crates/music-server/src/mcp.rs
+@@ -479,6 +479,46 @@ pub fn tell_windows(event: Value) {
+     let _ = bridge().commands.send(event.to_string());
+ }
+ 
++/// A tool whose work belongs in the user's message log: it makes something,
++/// changes something, removes it or starts it. Reading the library, looking at
++/// statuses and moving the window's mouse do not go there - the log is what the
++/// agent did TO the studio, not how it found its way around.
++fn is_noteworthy(name: &str) -> bool {
++    const ACTIONS: [&str; 24] = [
++        "_create", "_update", "_delete", "_set", "_like", "_add", "_remove", "_import", "_install",
++        "_download", "_adopt", "_start", "_cancel", "_split", "_make", "_transcribe", "_render",
++        "_replay", "_open", "_close", "_prepare", "_keep", "_discard", "_rename",
++    ];
++    if name.starts_with("ui_") || name.starts_with("agent_") {
++        return false;
++    }
++    ACTIONS.iter().any(|action| name.contains(action))
++}
++
++/// What a tool acted on, in a person's words: the title or name it was given, or
++/// the one the studio answered with. Only the name of a thing travels to the log -
++/// never an id, and never anything a tool was told in confidence.
++fn acted_on(args: &Value, reply: &str) -> String {
++    let shorten = |text: &str| text.trim().chars().take(80).collect::<String>();
++    for field in ["title", "name"] {
++        if let Some(value) = args.get(field).and_then(Value::as_str) {
++            if !value.trim().is_empty() {
++                return shorten(value);
++            }
++        }
++    }
++    serde_json::from_str::<Value>(reply)
++        .ok()
++        .and_then(|value| {
++            value
++                .get("title")
++                .or_else(|| value.get("name"))
++                .and_then(Value::as_str)
++                .map(shorten)
++        })
++        .unwrap_or_default()
++}
++
+ /// An agent's call that changes something reaches the windows. The window
+ /// never calls the MCP server itself, so each such notice is an agent's doing.
+ fn announce_change(tool: &str) {
+@@ -2443,6 +2483,12 @@ pub async fn handle(headers: HeaderMap, body: axum::body::Bytes) -> Response {
+                 Ok(call) => match call_route(call).await {
+                     Ok((status, text)) if status.is_success() => {
+                         announce_change(name);
++                        if is_noteworthy(name) {
++                            // The log keeps what the agent did to the studio - quietly,
++                            // so the work never flashes a toast at the person.
++                            let target = acted_on(&args, &text);
++                            let _ = ask_window("journal_note", json!({ "tool": name, "target": target }), 3).await;
++                        }
+                         match serde_json::from_str::<Value>(&text) {
+                             Ok(value) => tool_json(id, shape(name, &args, value)),
+                             Err(_) => answer(text, false),
+-- 
+2.54.0.windows.1
+
