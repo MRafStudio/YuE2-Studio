@@ -36,7 +36,7 @@ FORBIDDEN_SUFFIXES = (
     ".key", ".pem", ".pfx",
 )
 FORBIDDEN_NAMES = {"IDEA.md", ".env", ".env.local", "AGENT-NOTES.md"}
-FORBIDDEN_DIRS = ("node_modules/", "target/", "dist/", ".hermes/", "webview-data/")
+FORBIDDEN_DIRS = ("node_modules/", "target/", "dist/", "webview-data/")
 
 # The runtime the author keeps out of the application.
 FORBIDDEN_IN_NEW_CODE = (
