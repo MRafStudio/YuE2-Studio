@@ -1,0 +1,393 @@
+From da55f24173d7d67823ae7ceca638f4e6fb581c8a Mon Sep 17 00:00:00 2001
+From: Hermes Agent <agent@localhost>
+Date: Sun, 27 Sep 2026 12:59:44 +0600
+Subject: [PATCH 1/5] feat(ui): control strip above the song list, with a
+ message log
+
+The song list column gains a ToolStrip-style bar across its whole width, flush
+with the top edge: a shade lighter than the list behind it, with a bottom border
+and a hover highlight on every item.
+
+- TopControlPanel: the strip itself. It carries the bell that toggles the log,
+  and keeps the room where further items will go.
+- AgentJournalPanel: the log, opened by the bell on the right side of the list,
+  closed by its own button or Escape. Both themes are honoured. Every entry
+  carries its own cross, so a single message can be dropped from the list.
+- App.tsx: every message the toast shows is kept as history and handed to the
+  log, so a message that flashed past is still readable. Each entry records who
+  reported it - the studio itself, or an agent working the window over MCP
+  through the `notify` bridge - and the log shows the difference: a robot for the
+  agent, a speaker for the studio, with the tone carried by the icon's colour.
+  The history is kept in local storage under `messages`, the way the theme and
+  the language are, so it outlives a reload; the newest 200 entries are kept.
+- i18n: controlPanel, controlPanelMessages, controlPanelMessagesEmpty,
+  controlPanelSourceAgent and controlPanelSourceStudio in all five languages.
+  The crosses reuse the studio's own `delete` label.
+
+No new runtime dependency, nothing read from disk beyond local storage, and the
+desktop build stays self-contained.
+---
+ app/App.tsx                          |  53 ++++++++++-
+ app/components/AgentJournalPanel.tsx | 135 +++++++++++++++++++++++++++
+ app/components/TopControlPanel.tsx   |  48 ++++++++++
+ app/i18n/yue2.ts                     |  25 +++++
+ 4 files changed, 258 insertions(+), 3 deletions(-)
+ create mode 100644 app/components/AgentJournalPanel.tsx
+ create mode 100644 app/components/TopControlPanel.tsx
+
+diff --git a/app/App.tsx b/app/App.tsx
+index 332ae32..67d18ae 100644
+--- a/app/App.tsx
++++ b/app/App.tsx
+@@ -2,6 +2,8 @@ import React, { Activity, useState, useEffect, useRef, useCallback, useMemo } fr
+ import { Sidebar } from './components/Sidebar';
+ import { CreatePanel, type CreateRequest } from './components/CreatePanel';
+ import { SongList } from './components/SongList';
++import { TopControlPanel } from './components/TopControlPanel';
++import { AgentJournalPanel, type AgentNotice } from './components/AgentJournalPanel';
+ import { RightSidebar } from './components/RightSidebar';
+ import { Player } from './components/Player';
+ import { LibraryView } from './components/LibraryView';
+@@ -407,8 +409,47 @@ function AppContent() {
+   } | null>(null);
+ 
+ 
+-  const showToast = (message: string, type: ToastType = 'success') => {
++  // Every message the studio or an agent reports, newest last. The control
++  // strip's bell reads them back once the toast itself has gone.
++  // The log outlives a reload: what the window reported is kept in local storage,
++  // the way the theme and the language are. Only the newest 200 are kept.
++  const [agentNotices, setAgentNotices] = useState<AgentNotice[]>(() => {
++    try {
++      const saved: unknown = JSON.parse(localStorage.getItem('messages') ?? '[]');
++      return Array.isArray(saved) ? (saved as AgentNotice[]).slice(-200) : [];
++    } catch {
++      return [];
++    }
++  });
++  // Ids continue after the restored ones, so the list keys stay unique.
++  const nextNoticeId = useRef(agentNotices.reduce((top, notice) => Math.max(top, notice.id), 0));
++
++  // Everything the window reports goes through here: the studio's own messages
++  // and, over the MCP bridge below, the ones an agent sends. Each is also kept
++  // for the message log, which tells the two apart by their source.
++  const showToast = (message: string, type: ToastType = 'success', source: AgentNotice['source'] = 'studio') => {
+     setToast({ message, type, isVisible: true });
++    nextNoticeId.current += 1;
++    setAgentNotices(prev => [...prev.slice(-199), {
++      id: nextNoticeId.current,
++      text: message,
++      tone: type,
++      source,
++      at: Date.now(),
++    }]);
++  };
++
++  useEffect(() => {
++    try {
++      localStorage.setItem('messages', JSON.stringify(agentNotices));
++    } catch {
++      // Storage can be full or unavailable; the log simply stops outliving a reload.
++    }
++  }, [agentNotices]);
++
++  // Each entry carries its own cross: this drops that one from the log.
++  const removeNotice = (id: number) => {
++    setAgentNotices(prev => prev.filter(notice => notice.id !== id));
+   };
+ 
+   const closeToast = () => {
+@@ -1166,7 +1207,7 @@ function AppContent() {
+   });
+   useBridgeCommand('notify', ({ text, tone }) => {
+     const kind: ToastType = tone === 'error' || tone === 'success' ? tone : 'info';
+-    showToast(String(text ?? ''), kind);
++    showToast(String(text ?? ''), kind, 'agent');
+     return { text: 'Shown.' };
+   });
+   useBridgeCommand('open_settings', ({ section }) => {
+@@ -1560,8 +1601,11 @@ function AppContent() {
+             {/* Song List */}
+             <div className={`
+               ${!mobileShowList ? 'hidden md:flex' : 'flex'}
+-              min-h-0 min-w-0 flex-1 flex-col h-full overflow-hidden bg-white dark:bg-suno transition-colors duration-300
++              relative min-h-0 min-w-0 flex-1 flex-col h-full overflow-hidden bg-white dark:bg-suno transition-colors duration-300
+             `}>
++              {/* The control strip sits flush with the top of the list column */}
++              <TopControlPanel />
++
+               <SongList
+                 songs={songs}
+                 currentSong={currentSong}
+@@ -1585,6 +1629,9 @@ function AppContent() {
+                 onResetAll={resetGeneration}
+                 activeJobCount={activeJobCount}
+               />
++
++              {/* The agent's message log, opened by the strip's bell */}
++              <AgentJournalPanel entries={agentNotices} onRemove={removeNotice} />
+             </div>
+ 
+             {/* Right Sidebar */}
+diff --git a/app/components/AgentJournalPanel.tsx b/app/components/AgentJournalPanel.tsx
+new file mode 100644
+index 0000000..66823a2
+--- /dev/null
++++ b/app/components/AgentJournalPanel.tsx
+@@ -0,0 +1,135 @@
++import React, { useEffect, useState } from 'react';
++import { Bot, MonitorSpeaker, X } from 'lucide-react';
++import { useI18n } from '../context/I18nContext';
++import type { ToastType } from './Toast';
++
++/**
++ * The message log, opened by the bell in the control strip.
++ *
++ * The strip dispatches `yue:journal-toggle`; this panel listens for it and shows
++ * everything the window reported, newest first. Every message the toast shows
++ * lands here too, so one that flashed past is still readable — whichever way it
++ * arrives: an action inside the window, or an agent working the window over MCP
++ * through the `notify` bridge. Each entry keeps its source, so the two are told
++ * apart at a glance: a robot for the agent, a speaker for the studio.
++ *
++ * The history lives in the window's own state, as everything the studio shows
++ * does; nothing is read from disk and the desktop build stays self-contained.
++ *
++ * Styled like the studio's side panels (`RightSidebar`): suno-panel background,
++ * a left border, a scrolling list, and both themes honoured.
++ */
++export type NoticeSource = 'studio' | 'agent';
++
++export interface AgentNotice {
++    /** Stable key for the list. */
++    id: number;
++    text: string;
++    tone: ToastType;
++    /** Who reported it: the studio itself, or an agent working the window. */
++    source: NoticeSource;
++    /** When it was reported, in milliseconds. */
++    at: number;
++}
++
++/** The tone colours the entry; the source gives the icon its shape. */
++const TONE_CLASS: Record<ToastType, string> = {
++    info: 'text-violet-500',
++    success: 'text-emerald-500',
++    error: 'text-rose-500',
++};
++
++const SOURCE_ICON: Record<NoticeSource, React.ReactNode> = {
++    studio: <MonitorSpeaker size={15} />,
++    agent: <Bot size={15} />,
++};
++
++interface AgentJournalPanelProps {
++    entries: AgentNotice[];
++    /** Called with the id of the entry whose own cross was clicked. */
++    onRemove: (id: number) => void;
++}
++
++export const AgentJournalPanel: React.FC<AgentJournalPanelProps> = ({ entries, onRemove }) => {
++    const { t } = useI18n();
++    const [isOpen, setIsOpen] = useState(false);
++
++    // The bell toggles the log; Escape closes it.
++    useEffect(() => {
++        const onToggle = () => setIsOpen((open) => !open);
++        const onKey = (event: KeyboardEvent) => {
++            if (event.key === 'Escape') setIsOpen(false);
++        };
++        window.addEventListener('yue:journal-toggle', onToggle);
++        window.addEventListener('keydown', onKey);
++        return () => {
++            window.removeEventListener('yue:journal-toggle', onToggle);
++            window.removeEventListener('keydown', onKey);
++        };
++    }, []);
++
++    if (!isOpen) return null;
++
++    // Newest first: what was just reported is what the user is looking for.
++    const newestFirst = [...entries].reverse();
++
++    return (
++        <div
++            className="absolute inset-y-0 right-0 z-40 flex w-[min(26rem,100%)] min-w-0 flex-col border-l border-zinc-200 bg-zinc-50 transition-colors duration-300 dark:border-white/10 dark:bg-suno-panel"
++            data-slot="agent-journal-panel"
++        >
++            <div className="flex shrink-0 items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-white/10">
++                <span className="min-w-0 truncate text-sm font-semibold text-zinc-900 dark:text-white">
++                    {t('controlPanelMessages')}
++                </span>
++                <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{entries.length}</span>
++                <button
++                    type="button"
++                    onClick={() => setIsOpen(false)}
++                    title={t('close')}
++                    className="tap-highlight-none ml-auto shrink-0 rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-black dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
++                >
++                    <X size={16} />
++                </button>
++            </div>
++
++            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-2">
++                {entries.length === 0 && (
++                    <p className="py-2 text-xs text-zinc-500 dark:text-zinc-400">
++                        {t('controlPanelMessagesEmpty')}
++                    </p>
++                )}
++                <ul className="space-y-2">
++                    {newestFirst.map((entry) => (
++                        <li key={entry.id} className="group flex items-start gap-2">
++                            <span
++                                className={`mt-0.5 shrink-0 ${TONE_CLASS[entry.tone] ?? TONE_CLASS.info}`}
++                                title={entry.source === 'agent'
++                                    ? t('controlPanelSourceAgent')
++                                    : t('controlPanelSourceStudio')}
++                            >
++                                {SOURCE_ICON[entry.source] ?? SOURCE_ICON.studio}
++                            </span>
++                            <span className="min-w-0 flex-1">
++                                <span className="block text-sm leading-snug text-zinc-800 dark:text-zinc-100">
++                                    {entry.text}
++                                </span>
++                                <span className="block text-[11px] text-zinc-500 dark:text-zinc-500">
++                                    {new Date(entry.at).toLocaleTimeString()}
++                                </span>
++                            </span>
++                            <button
++                                type="button"
++                                onClick={() => onRemove(entry.id)}
++                                title={t('delete')}
++                                className="tap-highlight-none -mr-1 mt-0.5 shrink-0 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-rose-600 focus-visible:bg-zinc-200 focus-visible:text-rose-600 dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-rose-400 dark:focus-visible:bg-white/10 dark:focus-visible:text-rose-400"
++                            >
++                                <X size={13} />
++                            </button>
++                        </li>
++                    ))}
++                </ul>
++            </div>
++        </div>
++    );
++};
+diff --git a/app/components/TopControlPanel.tsx b/app/components/TopControlPanel.tsx
+new file mode 100644
+index 0000000..d1d4a65
+--- /dev/null
++++ b/app/components/TopControlPanel.tsx
+@@ -0,0 +1,48 @@
++import React from 'react';
++import { Bell } from 'lucide-react';
++import { useI18n } from '../context/I18nContext';
++
++/**
++ * The control strip above the song list.
++ *
++ * It spans the whole SongList column, flush with its top edge, and is styled
++ * like a ToolStrip: a bar a shade lighter than the window behind it (the list
++ * is pure black, the bar is suno-card #18181b), with a bottom border and a
++ * hover highlight on every item.
++ *
++ * One item for now — the bell, which toggles the agent message log on the right.
++ * The divider after it keeps the room where further items will go.
++ */
++export const TopControlPanel: React.FC = () => {
++    const { t } = useI18n();
++
++    // The bell toggles the log; AgentJournalPanel listens for this same event.
++    const toggleJournal = () => {
++        window.dispatchEvent(new CustomEvent('yue:journal-toggle'));
++    };
++
++    // A ToolStrip item: flat, highlighted on hover.
++    const itemClass =
++        'tap-highlight-none flex items-center justify-center rounded-[3px] p-1.5 text-zinc-600 transition-colors hover:bg-zinc-200 hover:text-black dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white';
++
++    return (
++        <div
++            className="flex w-full items-center gap-0.5 border-b border-zinc-300 bg-zinc-100 px-2 py-1 transition-colors duration-300 dark:border-[#2f2f33] dark:bg-[#18181b]"
++            data-slot="top-control-panel"
++            role="toolbar"
++            aria-label={t('controlPanel')}
++        >
++            <button
++                type="button"
++                onClick={toggleJournal}
++                title={t('controlPanelJournal')}
++                className={itemClass}
++            >
++                <Bell size={19} />
++            </button>
++
++            {/* Keeps the bell apart from the items that will follow it */}
++            <span className="mx-1 h-5 w-px shrink-0 bg-zinc-300 dark:bg-white/10" aria-hidden="true" />
++        </div>
++    );
++};
+diff --git a/app/i18n/yue2.ts b/app/i18n/yue2.ts
+index 7ef33e3..1190211 100644
+--- a/app/i18n/yue2.ts
++++ b/app/i18n/yue2.ts
+@@ -149,6 +149,11 @@ const en = {
+   computeBackendHint_cpu: "Works everywhere, but a song takes many times longer than on a GPU.",
+   karaokeNoWords: "No sung words could be heard in this track, so there is nothing to time. The vocal may be too buried or unclear, or the track may be instrumental.",
+   engineWaitsForModels: "YuE2 engine waits for a model set",
++  controlPanel: "Control panel",
++  controlPanelMessages: "Messages",
++  controlPanelMessagesEmpty: "Nothing reported yet",
++  controlPanelSourceAgent: "From the agent",
++  controlPanelSourceStudio: "From the studio",
+ } as const;
+ 
+ export type Yue2Strings = { readonly [K in keyof typeof en]: string };
+@@ -298,6 +303,11 @@ const ru: Yue2Strings = {
+   computeBackendHint_cpu: "Работает везде, но песня считается во много раз дольше, чем на видеокарте.",
+   karaokeNoWords: "В треке не удалось расслышать спетых слов, поэтому таймингов нет. Вокал может быть слишком утоплен или неразборчив, либо трек инструментальный.",
+   engineWaitsForModels: "Движок YuE2 ждёт модели",
++  controlPanel: "Панель управления",
++  controlPanelMessages: "Сообщения",
++  controlPanelMessagesEmpty: "Пока сообщений нет",
++  controlPanelSourceAgent: "Сообщение агента",
++  controlPanelSourceStudio: "Сообщение студии",
+ };
+ 
+ const zh: Yue2Strings = {
+@@ -445,6 +455,11 @@ const zh: Yue2Strings = {
+   computeBackendHint_cpu: "任何机器都能运行，但一首歌比在显卡上慢很多倍。",
+   karaokeNoWords: "这首曲目中听不出唱出的歌词，因此无法生成时间轴。人声可能过于模糊或被伴奏掩盖，也可能是纯音乐。",
+   engineWaitsForModels: "YuE2 引擎等待模型组",
++  controlPanel: "控制面板",
++  controlPanelMessages: "消息",
++  controlPanelMessagesEmpty: "暂无消息",
++  controlPanelSourceAgent: "来自代理",
++  controlPanelSourceStudio: "来自工作室",
+ };
+ 
+ const ja: Yue2Strings = {
+@@ -592,6 +607,11 @@ const ja: Yue2Strings = {
+   computeBackendHint_cpu: "どこでも動きますが、GPU より何倍も時間がかかります。",
+   karaokeNoWords: "このトラックでは歌われた言葉が聞き取れないため、タイミングを付けられません。ボーカルが埋もれているか不明瞭か、インストゥルメンタルの可能性があります。",
+   engineWaitsForModels: "YuE2 エンジンはモデルセット待ち",
++  controlPanel: "コントロールパネル",
++  controlPanelMessages: "メッセージ",
++  controlPanelMessagesEmpty: "まだメッセージはありません",
++  controlPanelSourceAgent: "エージェントから",
++  controlPanelSourceStudio: "スタジオから",
+ };
+ 
+ const ko: Yue2Strings = {
+@@ -739,6 +759,11 @@ const ko: Yue2Strings = {
+   computeBackendHint_cpu: "어디서나 동작하지만 그래픽카드보다 몇 배 오래 걸립니다.",
+   karaokeNoWords: "이 트랙에서 불린 가사를 알아들을 수 없어 타이밍을 만들 수 없습니다. 보컬이 묻혔거나 불분명하거나 연주곡일 수 있습니다.",
+   engineWaitsForModels: "YuE2 엔진이 모델 세트를 기다립니다",
++  controlPanel: "컨트롤 패널",
++  controlPanelMessages: "메시지",
++  controlPanelMessagesEmpty: "아직 메시지가 없습니다",
++  controlPanelSourceAgent: "에이전트에서",
++  controlPanelSourceStudio: "스튜디오에서",
+ };
+ 
+ export const yue2 = { en, ru, zh, ja, ko };
+-- 
+2.54.0.windows.1
+

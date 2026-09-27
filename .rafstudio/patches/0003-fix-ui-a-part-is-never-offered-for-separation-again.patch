@@ -1,0 +1,190 @@
+From 732a39764ace82b646ddf4e38c440cf12ea456be Mon Sep 17 00:00:00 2001
+From: batya <batya@github.com>
+Date: Sun, 27 Sep 2026 17:10:42 +0600
+Subject: [PATCH 3/5] fix(ui): a part is never offered for separation again
+
+A stem is itself the result of a separation, so splitting it again only makes
+copies of copies. The track menu no longer shows "Split into stems" for a part,
+and the tools panel states why instead of offering the button. The raw record
+the tools panel loads carries no derived mark, so the check goes through the
+app's one mapper, the same way every other screen reads it.
+---
+ app/components/SongDropdownMenu.tsx | 18 +++++++++++------
+ app/components/StudioToolsPanel.tsx | 31 ++++++++++++++++++++---------
+ app/components/songParts.tsx        |  3 +++
+ app/i18n/en.ts                      |  1 +
+ app/i18n/ja.ts                      |  1 +
+ app/i18n/ko.ts                      |  1 +
+ app/i18n/ru.ts                      |  1 +
+ app/i18n/zh.ts                      |  1 +
+ 8 files changed, 42 insertions(+), 15 deletions(-)
+
+diff --git a/app/components/SongDropdownMenu.tsx b/app/components/SongDropdownMenu.tsx
+index cfe13f9..1f77ca5 100644
+--- a/app/components/SongDropdownMenu.tsx
++++ b/app/components/SongDropdownMenu.tsx
+@@ -6,6 +6,7 @@ import { openExternal } from '../services/externalLinks';
+ import { apiUrl } from '../services/apiBase';
+ import { downloadSongAudio } from '../services/songDownload';
+ import { openMidi, openStems } from '../services/openStems';
++import { isPart } from './songParts';
+ import { useAuth } from '../context/AuthContext';
+ import { ownsSong, useSongActions } from '../context/SongActionsContext';
+ import {
+@@ -240,12 +241,17 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
+                     disabled={!song.audioUrl}
+                 />
+             )}
+-            <MenuItem
+-                icon={<Scissors size={14} />}
+-                label={t('stemsTitle')}
+-                onClick={() => handleAction(() => openStems(song))}
+-                disabled={!song.audioUrl}
+-            />
++            {/* A part is already the result of a separation: offering to split
++                it again only ever makes copies of copies, so the item is not
++                there at all for a part. */}
++            {!isPart(song) && (
++                <MenuItem
++                    icon={<Scissors size={14} />}
++                    label={t('stemsTitle')}
++                    onClick={() => handleAction(() => openStems(song))}
++                    disabled={!song.audioUrl}
++                />
++            )}
+             {song.audioUrl && (
+                 <>
+                     <MenuItem
+diff --git a/app/components/StudioToolsPanel.tsx b/app/components/StudioToolsPanel.tsx
+index 4ca6de2..66a0dee 100644
+--- a/app/components/StudioToolsPanel.tsx
++++ b/app/components/StudioToolsPanel.tsx
+@@ -9,6 +9,7 @@ import { openExternal } from '../services/externalLinks';
+ import { StemPlayer } from './StemPlayer';
+ import { mapNativeLibrarySong } from '../services/nativeLibrary';
+ import { MidiTool } from './midi/MidiTool';
++import { isPart } from './songParts';
+ 
+ /**
+  * Studio tools.
+@@ -185,6 +186,12 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
+   const running = Boolean(run && !run.done);
+   const percent = Math.round((run?.progress ?? 0) * 100);
+   const download = status?.download;
++  const selectedSong = songs.find(song => song.id === songId);
++  // This list comes from the service as it is stored there, so the "is a part"
++  // mark is read through the app's one mapper instead of a field that the raw
++  // record does not carry. A part is itself a separation result: the tool says
++  // so rather than offering to separate it again and make copies of copies.
++  const selectedIsPart = Boolean(selectedSong && isPart(mapNativeLibrarySong(selectedSong)));
+ 
+   return (
+     <div className="flex-1 overflow-y-auto bg-white px-5 py-6 dark:bg-suno md:px-8">
+@@ -319,15 +326,21 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
+               <p className="mt-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{t('separationQualityHint')}</p>
+             </div>
+ 
+-            <button
+-              type="button"
+-              onClick={() => void separate()}
+-              disabled={!status?.ready || !songId || settings.stems.length === 0 || running || busy}
+-              className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+-            >
+-              {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+-              {stems.length > 0 ? t('stemsAgain') : t('stemsStart')}
+-            </button>
++            {selectedIsPart ? (
++              <p className="mt-3 rounded-lg border border-zinc-200 px-3 py-2 text-xs leading-5 text-zinc-500 dark:border-white/10 dark:text-zinc-400">
++                {t('stemsPartCannot')}
++              </p>
++            ) : (
++              <button
++                type="button"
++                onClick={() => void separate()}
++                disabled={!status?.ready || !songId || settings.stems.length === 0 || running || busy}
++                className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
++              >
++                {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
++                {stems.length > 0 ? t('stemsAgain') : t('stemsStart')}
++              </button>
++            )}
+           </div>
+ 
+           {status && !status.model.installed && (
+diff --git a/app/components/songParts.tsx b/app/components/songParts.tsx
+index 6f3119a..a7667fc 100644
+--- a/app/components/songParts.tsx
++++ b/app/components/songParts.tsx
+@@ -35,6 +35,9 @@ export const partIcon = (song: Song): React.ReactNode => {
+     return (name ? PART_ICONS[name] : null) || <Music size={15} />;
+ };
+ 
++/** True when the track is itself a separation result, not a song to separate. */
++export const isPart = (song: Song): boolean => partName(song) !== null;
++
+ /** A part only counts as one when the song it came from is in the same list. */
+ export interface SongGroups {
+     /** Songs that stand on their own, oldest order kept by the caller. */
+diff --git a/app/i18n/en.ts b/app/i18n/en.ts
+index a9f8b94..4392cdb 100644
+--- a/app/i18n/en.ts
++++ b/app/i18n/en.ts
+@@ -1191,6 +1191,7 @@ export const en = {
+     stemsInstallModel: 'Download the model',
+     stemsStart: 'Separate',
+     stemsAgain: 'Separate again',
++    stemsPartCannot: 'This is a part: it is itself the result of a separation. Separating it again would only make copies of copies — pick the original track above.',
+     stemsRunning: 'Separating',
+     stem_drums: 'Drums',
+     stem_bass: 'Bass',
+diff --git a/app/i18n/ja.ts b/app/i18n/ja.ts
+index da517e0..4fe43b2 100644
+--- a/app/i18n/ja.ts
++++ b/app/i18n/ja.ts
+@@ -1186,6 +1186,7 @@ export const ja = {
+     stemsInstallModel: 'モデルをダウンロード',
+     stemsStart: '分離する',
+     stemsAgain: 'もう一度分離',
++    stemsPartCannot: 'これはパートで、それ自体が分離の結果です。もう一度分離するとコピーのコピーができるだけです — 上の一覧から元の曲を選んでください。',
+     stemsRunning: '分離中',
+     stem_drums: 'ドラム',
+     stem_bass: 'ベース',
+diff --git a/app/i18n/ko.ts b/app/i18n/ko.ts
+index c827af6..b195206 100644
+--- a/app/i18n/ko.ts
++++ b/app/i18n/ko.ts
+@@ -1186,6 +1186,7 @@ export const ko = {
+     stemsInstallModel: '모델 내려받기',
+     stemsStart: '분리하기',
+     stemsAgain: '다시 분리',
++    stemsPartCannot: '이것은 파트이며 그 자체가 분리의 결과입니다. 다시 분리하면 복사의 복사만 생깁니다 — 위에서 원본 곡을 선택하세요.',
+     stemsRunning: '분리 중',
+     stem_drums: '드럼',
+     stem_bass: '베이스',
+diff --git a/app/i18n/ru.ts b/app/i18n/ru.ts
+index 7a51eaf..0321213 100644
+--- a/app/i18n/ru.ts
++++ b/app/i18n/ru.ts
+@@ -1190,6 +1190,7 @@ export const ru = {
+     stemsInstallModel: 'Скачать модель',
+     stemsStart: 'Разделить',
+     stemsAgain: 'Разделить заново',
++    stemsPartCannot: 'Это партия: она сама — результат разделения. Разделять её повторно нельзя, иначе получатся копии копий. Выберите исходный трек выше.',
+     stemsRunning: 'Разделяю',
+     stem_drums: 'Ударные',
+     stem_bass: 'Бас',
+diff --git a/app/i18n/zh.ts b/app/i18n/zh.ts
+index 0bf102a..8f98d50 100644
+--- a/app/i18n/zh.ts
++++ b/app/i18n/zh.ts
+@@ -1186,6 +1186,7 @@ export const zh = {
+     stemsInstallModel: '下载模型',
+     stemsStart: '开始分轨',
+     stemsAgain: '重新分轨',
++    stemsPartCannot: '这是一条分轨，本身就是分离的结果。再次分离只会产生副本的副本——请在上方选择原始曲目。',
+     stemsRunning: '正在分轨',
+     stem_drums: '鼓',
+     stem_bass: '贝斯',
+-- 
+2.54.0.windows.1
+
