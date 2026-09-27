@@ -116,6 +116,9 @@ export const SessionList: React.FC<SessionListProps> = ({
                             return (
                                 <div
                                     key={session.id}
+                                    /* Same mark songs carry, so an agent reading the window
+                                       sees the session by name and id, not by its place. */
+                                    data-mcp-context={`session ${session.id}: ${session.name}`}
                                     className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                                         isCurrent
                                             ? 'border-emerald-500/40 bg-emerald-500/5 dark:border-emerald-500/30'

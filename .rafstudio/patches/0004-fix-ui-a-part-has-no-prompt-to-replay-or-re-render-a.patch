@@ -1,7 +1,7 @@
 From 9baf44ede9d4960279038923d53643f2b5e41fac Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 17:16:10 +0600
-Subject: [PATCH 4/6] fix(ui): a part has no prompt to replay or re-render, and
+Subject: [PATCH 4/7] fix(ui): a part has no prompt to replay or re-render, and
  is not separated twice
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

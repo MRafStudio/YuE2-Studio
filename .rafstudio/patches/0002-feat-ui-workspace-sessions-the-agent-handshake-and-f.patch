@@ -1,7 +1,7 @@
 From ad4b67cf7cec92bb6b128701d051d88009b7b8fa Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 16:58:21 +0600
-Subject: [PATCH 2/6] feat(ui): workspace sessions, the agent handshake and
+Subject: [PATCH 2/7] feat(ui): workspace sessions, the agent handshake and
  folded song parts
 
 - the control strip learns the session browser, the session/library switch
