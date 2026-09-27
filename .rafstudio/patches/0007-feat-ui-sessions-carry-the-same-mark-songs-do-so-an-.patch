@@ -1,7 +1,7 @@
 From 467e634be0c1825333dfd975bad5d81b0f33a041 Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 18:14:32 +0600
-Subject: [PATCH 07/12] feat(ui): sessions carry the same mark songs do, so an
+Subject: [PATCH 07/13] feat(ui): sessions carry the same mark songs do, so an
  agent sees their names
 
 Reading the window gave an agent only the buttons of a session row - "Open

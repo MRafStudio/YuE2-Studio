@@ -1,7 +1,7 @@
 From 9b361e6bc814cdaaa48397ee96a0f18cb9d69be6 Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 20:14:00 +0600
-Subject: [PATCH 12/12] fix(ui): the session dialogs open from Libraries, and a
+Subject: [PATCH 12/13] fix(ui): the session dialogs open from Libraries, and a
  session keeps its own tracks
 
 The two session dialogs sat inside the "Create" page's render branch, which React

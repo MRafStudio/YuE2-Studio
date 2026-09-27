@@ -1,7 +1,7 @@
 From 88d02ac409391722f47c8520ee5b8a88bf9faa53 Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 17:25:44 +0600
-Subject: [PATCH 05/12] docs(ui): say in the code why a part has no prompt, no
+Subject: [PATCH 05/13] docs(ui): say in the code why a part has no prompt, no
  re-render and no second separation
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

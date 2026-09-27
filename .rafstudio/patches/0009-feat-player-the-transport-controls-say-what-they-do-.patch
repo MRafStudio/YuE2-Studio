@@ -1,7 +1,7 @@
 From 6962cfd767f7f86ba5c601c80fd0ccb90e53fa53 Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 19:02:37 +0600
-Subject: [PATCH 09/12] feat(player): the transport controls say what they do,
+Subject: [PATCH 09/13] feat(player): the transport controls say what they do,
  in every layout
 
 The player's shuffle and repeat buttons changed colour without ever saying what

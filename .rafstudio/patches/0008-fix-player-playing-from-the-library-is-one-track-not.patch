@@ -1,7 +1,7 @@
 From a7f16f87513c27d509198eb137609d20e950dfbe Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 19:02:37 +0600
-Subject: [PATCH 08/12] fix(player): playing from the library is one track, not
+Subject: [PATCH 08/13] fix(player): playing from the library is one track, not
  the whole shelf
 
 The whole library used to become the queue whenever a track was played outside a

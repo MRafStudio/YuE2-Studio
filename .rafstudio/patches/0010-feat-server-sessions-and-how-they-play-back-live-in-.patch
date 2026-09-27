@@ -1,7 +1,7 @@
 From 3fc4bcf42b0cbb9604917e32be3b6a20564c73d0 Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 19:31:04 +0600
-Subject: [PATCH 10/12] feat(server): sessions and how they play back live in
+Subject: [PATCH 10/13] feat(server): sessions and how they play back live in
  the library
 
 A workspace is the studio's session of work: the songs made in it, and whether
