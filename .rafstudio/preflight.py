@@ -3,7 +3,7 @@
 """Preflight for a pull request to YuE2-Studio: the author's rules, checked.
 
 Run this BEFORE opening a PR to timoncool/YuE2-Studio. It reads the branch we are
-about to offer and reports every rule the author keeps — so nothing depends on
+about to offer and reports every rule the author keeps - so nothing depends on
 remembering them.
 
     python preflight.py                 # check the branch against upstream/main
@@ -90,7 +90,7 @@ def check_branch(root: pathlib.Path, base: str, report: Report) -> list[str]:
     """One commit on a fresh base, a conventional subject, only source files."""
     code, ahead = run(root, ["rev-list", "--count", f"{base}..HEAD"])
     if code != 0:
-        report.line("FAIL", f"no such base '{base}' — fetch the remotes first")
+        report.line("FAIL", f"no such base '{base}' - fetch the remotes first")
         return []
     count = int(ahead or 0)
     if count == 1:
@@ -98,7 +98,7 @@ def check_branch(root: pathlib.Path, base: str, report: Report) -> list[str]:
     elif count == 0:
         report.line("FAIL", f"nothing to offer: HEAD equals {base}")
     else:
-        report.line("WARN", f"{count} commits on top of {base} — consider squashing into one")
+        report.line("WARN", f"{count} commits on top of {base} - consider squashing into one")
 
     code, subject = run(root, ["log", "-1", "--pretty=%s"])
     if CONVENTIONAL.match(subject):
@@ -108,7 +108,7 @@ def check_branch(root: pathlib.Path, base: str, report: Report) -> list[str]:
 
     code, behind = run(root, ["rev-list", "--count", f"HEAD..{base}"])
     if code == 0 and int(behind or 0) > 0:
-        report.line("WARN", f"{behind} commits behind {base} — merge it before asking for review")
+        report.line("WARN", f"{behind} commits behind {base} - merge it before asking for review")
     else:
         report.line("PASS", f"branch is up to date with {base}")
 
@@ -144,7 +144,7 @@ def check_added_code(added: dict[str, list[tuple[int, str]]], report: Report) ->
             if not translated:
                 for token, why in FORBIDDEN_IN_NEW_CODE:
                     if token in text:
-                        banned.append(f"{name}:{number} — {why}")
+                        banned.append(f"{name}:{number} - {why}")
 
     if comment_leaks:
         report.line("FAIL", "Russian comments in the lines we add: " + ", ".join(comment_leaks[:6]))
@@ -161,7 +161,7 @@ def check_checks(root: pathlib.Path, report: Report) -> None:
     """The two gates the repository already has: types and tests."""
     app = root / "app"
     if not (app / "node_modules").is_dir():
-        report.line("WARN", "app/node_modules is missing — run `npm --prefix app install`, then tsc and vitest")
+        report.line("WARN", "app/node_modules is missing - run `npm --prefix app install`, then tsc and vitest")
         return
     for label, args in (
         ("tsc --noEmit", ["npx", "tsc", "--noEmit", "-p", "tsconfig.json"]),

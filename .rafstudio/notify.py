@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Уведомления агента для YuE2 Studio: тост в окне + вечный журнал.
 
-Зачем: тост студии живёт ~2-3 секунды и исчезает сам, истории в UI нет — можно пропустить.
+Зачем: тост студии живёт ~2-3 секунды и исчезает сам, истории в UI нет - можно пропустить.
 Этот хелпер делает то же самое, но дополнительно пишет журнал и рисует HTML-страницу,
 которую можно открыть в любой момент и увидеть все сообщения агента с временем.
 
@@ -11,13 +11,13 @@
     python notify.py --render          # только перерисовать страницу из журнала
 
 Файлы:
-    <studio>/data/agent-notifications.jsonl   — журнал (одно сообщение на строку)
-    <studio>/data/agent-notifications.html    — читаемая страница журнала
+    <studio>/data/agent-notifications.jsonl   - журнал (одно сообщение на строку)
+    <studio>/data/agent-notifications.html    - читаемая страница журнала
 
 ВАЖНО про цвета: страница открывается и в предпросмотре внутри приложения, и в обычном браузере.
 Переменные темы (--foreground и прочие) приходят НЕ всегда, поэтому каждый цвет берётся как
 var(--переменная, <фолбэк>), а фолбэк выбирается по prefers-color-scheme. Без этого текст
-получается чёрным на чёрном — проверено на практике.
+получается чёрным на чёрном - проверено на практике.
 """
 import json
 import os
@@ -126,7 +126,7 @@ def render_html(items):
     html = (
         '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="color-scheme" content="dark light">'
-        "<title>Уведомления агента — YuE2 Studio</title>"
+        "<title>Уведомления агента - YuE2 Studio</title>"
         f"<style>{PAGE_CSS}</style></head><body>"
         '<div class="ad-head"><b>Уведомления агента</b>'
         f'<span class="ad-count">{len(items)} всего · студия YuE2</span></div>'
@@ -149,7 +149,7 @@ def notify(text, tone="info", toast=True):
     if toast:
         try:
             shown = call("ui_notify", {"text": text, "tone": tone})
-        except Exception as e:  # студия может быть закрыта — журнал всё равно пишем
+        except Exception as e:  # студия может быть закрыта - журнал всё равно пишем
             shown = "no toast: %s" % e
     return entry, shown, HTML
 

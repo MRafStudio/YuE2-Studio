@@ -4,7 +4,7 @@ import { useI18n } from '../context/I18nContext';
 import type { Song } from '../types';
 
 /**
- * Parts of a song — the stems a separation tool made from a base track.
+ * Parts of a song - the stems a separation tool made from a base track.
  *
  * The service records the link on every part: `metadata.derived.from` names the
  * base song, `tool` says what made it and `settings.stem` says which part it is.
@@ -74,7 +74,7 @@ interface PartsToggleProps {
 
 /**
  * The row that folds a song's parts away: the count says how many there are, and
- * the icons say which — bass, guitar, vocals — without opening anything.
+ * the icons say which - bass, guitar, vocals - without opening anything.
  */
 export const PartsToggle: React.FC<PartsToggleProps> = ({ parts, open, onToggle }) => {
     const { t } = useI18n();

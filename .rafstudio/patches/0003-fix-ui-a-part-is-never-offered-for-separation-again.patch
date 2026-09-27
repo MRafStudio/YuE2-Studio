@@ -1,7 +1,7 @@
 From 732a39764ace82b646ddf4e38c440cf12ea456be Mon Sep 17 00:00:00 2001
 From: batya <batya@github.com>
 Date: Sun, 27 Sep 2026 17:10:42 +0600
-Subject: [PATCH 3/5] fix(ui): a part is never offered for separation again
+Subject: [PATCH 3/6] fix(ui): a part is never offered for separation again
 
 A stem is itself the result of a separation, so splitting it again only makes
 copies of copies. The track menu no longer shows "Split into stems" for a part,

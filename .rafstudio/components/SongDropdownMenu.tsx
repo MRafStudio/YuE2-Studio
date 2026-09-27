@@ -247,7 +247,7 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
             )}
             {/* A part is already the result of a separation, and it never had a
                 prompt of its own: splitting it again, repeating its prompt or
-                re-rendering it only ever make copies of copies — junk in the
+                re-rendering it only ever make copies of copies - junk in the
                 library, extra files on disk, minutes of GPU time. The items are
                 hidden rather than disabled: that is how this app treats an
                 action that does not apply (see the karaoke item), so the menu
@@ -286,7 +286,7 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
             )}
             {/* A part came out of a separation, not out of a prompt, so reusing
                 its prompt or re-rendering it would either borrow the base
-                song's prompt or rebuild something else entirely — misleading
+                song's prompt or rebuild something else entirely - misleading
                 rather than merely useless. */}
             {!songIsPart && actions.reusePrompt && (
                 <MenuItem

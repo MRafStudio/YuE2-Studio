@@ -1,7 +1,7 @@
 From da55f24173d7d67823ae7ceca638f4e6fb581c8a Mon Sep 17 00:00:00 2001
 From: Hermes Agent <agent@localhost>
 Date: Sun, 27 Sep 2026 12:59:44 +0600
-Subject: [PATCH 1/5] feat(ui): control strip above the song list, with a
+Subject: [PATCH 1/6] feat(ui): control strip above the song list, with a
  message log
 
 The song list column gains a ToolStrip-style bar across its whole width, flush

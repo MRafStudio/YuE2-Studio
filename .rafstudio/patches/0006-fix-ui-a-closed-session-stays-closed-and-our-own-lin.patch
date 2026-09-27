@@ -1,0 +1,432 @@
+From 1d6ef9f7faf28ce61f566f07ea5fb40c3aac2be6 Mon Sep 17 00:00:00 2001
+From: batya <batya@github.com>
+Date: Sun, 27 Sep 2026 17:56:27 +0600
+Subject: [PATCH 6/6] fix(ui): a closed session stays closed, and our own lines
+ use a plain hyphen
+
+Sessions live in the window until the service owns them (stage 2), and that
+state is now remembered the way the message log is: closing a session and
+reloading came back with it open, which is simply wrong. The starting sessions
+also get real dates instead of 1970.
+
+Our own lines - code comments, interface strings and notes - now use a plain
+hyphen. Author lines we never touched are left exactly as they are, and the two
+author comments we had rewritten keep their original wording.
+---
+ app/App.tsx                           | 69 ++++++++++++++++++++++++---
+ app/components/AgentJournalPanel.tsx  |  2 +-
+ app/components/LibraryView.tsx        |  2 +-
+ app/components/RightSidebar.tsx       |  2 +-
+ app/components/SessionCreateModal.tsx |  2 +-
+ app/components/SessionList.tsx        |  4 +-
+ app/components/SongDropdownMenu.tsx   |  4 +-
+ app/components/SongList.tsx           |  8 ++--
+ app/components/TopControlPanel.tsx    |  2 +-
+ app/components/songParts.tsx          |  4 +-
+ app/i18n/en.ts                        |  2 +-
+ app/i18n/ja.ts                        |  2 +-
+ app/i18n/ko.ts                        |  2 +-
+ app/i18n/ru.ts                        |  2 +-
+ app/i18n/yue2.ts                      | 30 ++++++------
+ app/i18n/zh.ts                        |  2 +-
+ 16 files changed, 98 insertions(+), 41 deletions(-)
+
+diff --git a/app/App.tsx b/app/App.tsx
+index f47f531..dfe80b2 100644
+--- a/app/App.tsx
++++ b/app/App.tsx
+@@ -135,6 +135,46 @@ function loadNativeLikedSongIds(): Set<string> {
+ }
+ 
+ /// A session name is unique, as a file name is: a repeat becomes "Rock (2)",
++/// Sessions, and which one is open, are remembered by the window itself until the
++/// service owns them (stage 2). The author stores theme, language and volume the
++/// same way, so a reload must not undo what the user did - a session closed in the
++/// library came back open, which is simply wrong.
++const SESSIONS_KEY = 'sessions';
++
++interface StoredSessions {
++  sessions: WorkspaceSession[];
++  activeSessionId: string | null;
++  sessionOfTrack: Record<string, string>;
++}
++
++const readStoredSessions = (): StoredSessions | null => {
++  try {
++    const raw = window.localStorage.getItem(SESSIONS_KEY);
++    if (!raw) return null;
++    const parsed = JSON.parse(raw) as Partial<StoredSessions>;
++    if (!Array.isArray(parsed.sessions) || parsed.sessions.length === 0) return null;
++    return {
++      sessions: parsed.sessions,
++      activeSessionId: typeof parsed.activeSessionId === 'string' ? parsed.activeSessionId : null,
++      sessionOfTrack: parsed.sessionOfTrack && typeof parsed.sessionOfTrack === 'object'
++        ? parsed.sessionOfTrack
++        : {},
++    };
++  } catch {
++    // unreadable storage counts as empty: the starting sessions come back
++    return null;
++  }
++};
++
++/// What a machine that has never made a session starts with. The dates are read
++/// once, when the window opens: from then on the stored copy is what counts.
++const SESSION_EPOCH = Date.now();
++const NEW_SESSIONS: WorkspaceSession[] = [
++  { id: 'demo-1', name: 'Ночная смена', createdAt: SESSION_EPOCH, closedAt: null },
++  { id: 'demo-2', name: 'Рок-эксперимент', createdAt: SESSION_EPOCH - 86400000, closedAt: SESSION_EPOCH - 3600000 },
++  { id: 'demo-3', name: 'Импорт', createdAt: SESSION_EPOCH - 172800000, closedAt: SESSION_EPOCH - 7200000 },
++];
++
+ /// "Rock (3)". Two sessions that read the same would be painful to tell apart.
+ function uniqueSessionName(name: string, sessions: WorkspaceSession[]): string {
+   const taken = new Set(sessions.map((session) => session.name));
+@@ -469,12 +509,14 @@ function AppContent() {
+   // PROTOTYPE (stage 1): sessions live in the window for now, so the layout and
+   // the wording can be judged in the browser. The service will own them next:
+   // a `workspaces` table with the session marked on each track, nothing moving.
+-  const [sessions, setSessions] = useState<WorkspaceSession[]>(() => [
+-    { id: 'demo-1', name: 'Ночная смена', createdAt: Date.now(), closedAt: null },
+-    { id: 'demo-2', name: 'Рок-эксперимент', createdAt: Date.now() - 86400000, closedAt: Date.now() - 3600000 },
+-    { id: 'demo-3', name: 'Импорт', createdAt: Date.now() - 172800000, closedAt: Date.now() - 7200000 },
+-  ]);
+-  const [activeSessionId, setActiveSessionId] = useState<string | null>('demo-1');
++  // What the window remembered last time comes back: closed stays closed.
++  const [restoredSessions] = useState(readStoredSessions);
++  const [sessions, setSessions] = useState<WorkspaceSession[]>(
++    restoredSessions?.sessions ?? NEW_SESSIONS,
++  );
++  const [activeSessionId, setActiveSessionId] = useState<string | null>(
++    restoredSessions ? restoredSessions.activeSessionId : NEW_SESSIONS[0].id,
++  );
+   const [sessionView, setSessionView] = useState<SessionView>('session');
+   // The list column shows either the tracks or the session browser.
+   const [centerView, setCenterView] = useState<'tracks' | 'sessions'>('tracks');
+@@ -486,7 +528,9 @@ function AppContent() {
+   const [agentAlwaysAllowed, setAgentAlwaysAllowed] = useState<Set<string>>(new Set());
+   // Until the service marks tracks, everything the studio makes belongs to the
+   // session that was open when it appeared.
+-  const [sessionOfTrack, setSessionOfTrack] = useState<Record<string, string>>({});
++  const [sessionOfTrack, setSessionOfTrack] = useState<Record<string, string>>(
++    restoredSessions?.sessionOfTrack ?? {},
++  );
+   useEffect(() => {
+     setSessionOfTrack((prev) => {
+       let changed = false;
+@@ -501,6 +545,17 @@ function AppContent() {
+     });
+   }, [songs, activeSessionId]);
+ 
++  // Remember the sessions the way the message log is remembered: a reload, a
++  // closed window or a restarted studio must not reopen what was closed.
++  useEffect(() => {
++    try {
++      const stored: StoredSessions = { sessions, activeSessionId, sessionOfTrack };
++      window.localStorage.setItem(SESSIONS_KEY, JSON.stringify(stored));
++    } catch {
++      // blocked or full storage only means no memory, not a broken studio
++    }
++  }, [sessions, activeSessionId, sessionOfTrack]);
++
+   const openSession = sessions.find((session) => session.id === activeSessionId) ?? null;
+   const tracksInSession = (sessionId: string) =>
+     Object.values(sessionOfTrack).filter((value) => value === sessionId).length;
+diff --git a/app/components/AgentJournalPanel.tsx b/app/components/AgentJournalPanel.tsx
+index 445dbf9..7276a05 100644
+--- a/app/components/AgentJournalPanel.tsx
++++ b/app/components/AgentJournalPanel.tsx
+@@ -8,7 +8,7 @@ import type { ToastType } from './Toast';
+  *
+  * The strip dispatches `yue:journal-toggle`; this panel listens for it and shows
+  * everything the window reported, newest first. Every message the toast shows
+- * lands here too, so one that flashed past is still readable — whichever way it
++ * lands here too, so one that flashed past is still readable - whichever way it
+  * arrives: an action inside the window, or an agent working the window over MCP
+  * through the `notify` bridge. Each entry keeps its source, so the two are told
+  * apart at a glance: a robot for the agent, a speaker for the studio.
+diff --git a/app/components/LibraryView.tsx b/app/components/LibraryView.tsx
+index 835e38f..90838b2 100644
+--- a/app/components/LibraryView.tsx
++++ b/app/components/LibraryView.tsx
+@@ -15,7 +15,7 @@ interface LibraryViewProps {
+   onCreatePlaylist: () => void;
+   onSelectPlaylist: (playlist: Playlist) => void;
+   onImported?: () => void;
+-  /** The session browser, shown as the fifth tab — it is a list, not a modal. */
++  /** The session browser, shown as the fifth tab - it is a list, not a modal. */
+   sessionsContent?: React.ReactNode;
+ }
+ 
+diff --git a/app/components/RightSidebar.tsx b/app/components/RightSidebar.tsx
+index 42ea43b..936277e 100644
+--- a/app/components/RightSidebar.tsx
++++ b/app/components/RightSidebar.tsx
+@@ -430,7 +430,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
+                         {/* A part is the result of a separation, not of a prompt:
+                             it has no prompt to repeat and no stems to take, so
+                             both buttons would offer work that cannot come out
+-                            right. Hidden, not disabled — the app hides what does
++                            right. Hidden, not disabled - the app hides what does
+                             not apply instead of promising it. */}
+                         {!songIsPart && (
+                             <>
+diff --git a/app/components/SessionCreateModal.tsx b/app/components/SessionCreateModal.tsx
+index 1558ab1..2979a2a 100644
+--- a/app/components/SessionCreateModal.tsx
++++ b/app/components/SessionCreateModal.tsx
+@@ -4,7 +4,7 @@ import { useI18n } from '../context/I18nContext';
+ 
+ interface SessionCreateModalProps {
+     isOpen: boolean;
+-    /** A session always has a name — that is what tells two apart. */
++    /** A session always has a name - that is what tells two apart. */
+     onCreate: (name: string) => void;
+     onDismiss: () => void;
+ }
+diff --git a/app/components/SessionList.tsx b/app/components/SessionList.tsx
+index ec95e0a..a27083c 100644
+--- a/app/components/SessionList.tsx
++++ b/app/components/SessionList.tsx
+@@ -5,7 +5,7 @@ import { useI18n } from '../context/I18nContext';
+ /**
+  * A workspace session: the working set the studio collects everything into.
+  *
+- * One session is open at a time — the current one. Closing a session files it
++ * One session is open at a time - the current one. Closing a session files it
+  * away; opening it again makes it current. Tracks never move between files: a
+  * session is a mark on them, which is why closing one is instant and lossless.
+  */
+@@ -32,7 +32,7 @@ interface SessionListProps {
+ }
+ 
+ /**
+- * The session browser — built like the song list rather than a modal, so it can
++ * The session browser - built like the song list rather than a modal, so it can
+  * grow the same way: a search field, a list of rows, and room for paging and
+  * filters later. A million sessions would scroll; a million modal rows would not.
+  */
+diff --git a/app/components/SongDropdownMenu.tsx b/app/components/SongDropdownMenu.tsx
+index 0725a9b..fb25d8e 100644
+--- a/app/components/SongDropdownMenu.tsx
++++ b/app/components/SongDropdownMenu.tsx
+@@ -247,7 +247,7 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
+             )}
+             {/* A part is already the result of a separation, and it never had a
+                 prompt of its own: splitting it again, repeating its prompt or
+-                re-rendering it only ever make copies of copies — junk in the
++                re-rendering it only ever make copies of copies - junk in the
+                 library, extra files on disk, minutes of GPU time. The items are
+                 hidden rather than disabled: that is how this app treats an
+                 action that does not apply (see the karaoke item), so the menu
+@@ -286,7 +286,7 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
+             )}
+             {/* A part came out of a separation, not out of a prompt, so reusing
+                 its prompt or re-rendering it would either borrow the base
+-                song's prompt or rebuild something else entirely — misleading
++                song's prompt or rebuild something else entirely - misleading
+                 rather than merely useless. */}
+             {!songIsPart && actions.reusePrompt && (
+                 <MenuItem
+diff --git a/app/components/SongList.tsx b/app/components/SongList.tsx
+index b97ad73..81cad7d 100644
+--- a/app/components/SongList.tsx
++++ b/app/components/SongList.tsx
+@@ -281,15 +281,17 @@ export const SongList: React.FC<SongListProps> = ({
+             onShowDetails={() => onShowDetails && onShowDetails(song)}
+             onNavigateToProfile={onNavigateToProfile}
+             onSongUpdate={onSongUpdate}
+-            // Cancel is also offered during pre-flight (a placeholder card with no
+-            // jobId yet) — `song.id` is the tempId the AbortController was filed under.
++            // Cancel button is also available during pre-flight (placeholder card
++            // with no jobId yet) - pass `song.id` (= tempId) and the App.tsx
++            // handler routes to the registered AbortController.
+             onCancelJob={
+               song.isGenerating
+                 ? () => onCancelJob?.(song.jobId || song.id)
+                 : undefined
+             }
+             // Reset works for both real-job and pre-flight cancelled cards
+-            // (pre-flight cancel sets stage='cancelled' too, no jobId needed).
++            // (pre-flight cancel sets stage='cancelled' too, no jobId needed
++            // - Reset just removes the placeholder).
+             onResetJob={
+               song.stage === 'cancelled'
+                 ? () => onResetJob?.(song.jobId || song.id)
+diff --git a/app/components/TopControlPanel.tsx b/app/components/TopControlPanel.tsx
+index d627a21..b5d2428 100644
+--- a/app/components/TopControlPanel.tsx
++++ b/app/components/TopControlPanel.tsx
+@@ -17,7 +17,7 @@ interface TopControlPanelProps {
+ }
+ 
+ /**
+- * ALPHA — the control strip above the song list.
++ * ALPHA - the control strip above the song list.
+  *
+  * It spans the whole SongList column, flush with its top edge, and is styled
+  * like a ToolStrip: a bar a shade lighter than the window behind it (the list
+diff --git a/app/components/songParts.tsx b/app/components/songParts.tsx
+index a7667fc..708fed9 100644
+--- a/app/components/songParts.tsx
++++ b/app/components/songParts.tsx
+@@ -4,7 +4,7 @@ import { useI18n } from '../context/I18nContext';
+ import type { Song } from '../types';
+ 
+ /**
+- * Parts of a song — the stems a separation tool made from a base track.
++ * Parts of a song - the stems a separation tool made from a base track.
+  *
+  * The service records the link on every part: `metadata.derived.from` names the
+  * base song, `tool` says what made it and `settings.stem` says which part it is.
+@@ -74,7 +74,7 @@ interface PartsToggleProps {
+ 
+ /**
+  * The row that folds a song's parts away: the count says how many there are, and
+- * the icons say which — bass, guitar, vocals — without opening anything.
++ * the icons say which - bass, guitar, vocals - without opening anything.
+  */
+ export const PartsToggle: React.FC<PartsToggleProps> = ({ parts, open, onToggle }) => {
+     const { t } = useI18n();
+diff --git a/app/i18n/en.ts b/app/i18n/en.ts
+index 4392cdb..2c52f0b 100644
+--- a/app/i18n/en.ts
++++ b/app/i18n/en.ts
+@@ -1191,7 +1191,7 @@ export const en = {
+     stemsInstallModel: 'Download the model',
+     stemsStart: 'Separate',
+     stemsAgain: 'Separate again',
+-    stemsPartCannot: 'This is a part: it is itself the result of a separation. Separating it again would only make copies of copies — pick the original track above.',
++    stemsPartCannot: 'This is a part: it is itself the result of a separation. Separating it again would only make copies of copies - pick the original track above.',
+     stemsRunning: 'Separating',
+     stem_drums: 'Drums',
+     stem_bass: 'Bass',
+diff --git a/app/i18n/ja.ts b/app/i18n/ja.ts
+index 4fe43b2..79d6fcc 100644
+--- a/app/i18n/ja.ts
++++ b/app/i18n/ja.ts
+@@ -1186,7 +1186,7 @@ export const ja = {
+     stemsInstallModel: 'モデルをダウンロード',
+     stemsStart: '分離する',
+     stemsAgain: 'もう一度分離',
+-    stemsPartCannot: 'これはパートで、それ自体が分離の結果です。もう一度分離するとコピーのコピーができるだけです — 上の一覧から元の曲を選んでください。',
++    stemsPartCannot: 'これはパートで、それ自体が分離の結果です。もう一度分離するとコピーのコピーができるだけです - 上の一覧から元の曲を選んでください。',
+     stemsRunning: '分離中',
+     stem_drums: 'ドラム',
+     stem_bass: 'ベース',
+diff --git a/app/i18n/ko.ts b/app/i18n/ko.ts
+index b195206..105d0f9 100644
+--- a/app/i18n/ko.ts
++++ b/app/i18n/ko.ts
+@@ -1186,7 +1186,7 @@ export const ko = {
+     stemsInstallModel: '모델 내려받기',
+     stemsStart: '분리하기',
+     stemsAgain: '다시 분리',
+-    stemsPartCannot: '이것은 파트이며 그 자체가 분리의 결과입니다. 다시 분리하면 복사의 복사만 생깁니다 — 위에서 원본 곡을 선택하세요.',
++    stemsPartCannot: '이것은 파트이며 그 자체가 분리의 결과입니다. 다시 분리하면 복사의 복사만 생깁니다 - 위에서 원본 곡을 선택하세요.',
+     stemsRunning: '분리 중',
+     stem_drums: '드럼',
+     stem_bass: '베이스',
+diff --git a/app/i18n/ru.ts b/app/i18n/ru.ts
+index 0321213..e146b09 100644
+--- a/app/i18n/ru.ts
++++ b/app/i18n/ru.ts
+@@ -1190,7 +1190,7 @@ export const ru = {
+     stemsInstallModel: 'Скачать модель',
+     stemsStart: 'Разделить',
+     stemsAgain: 'Разделить заново',
+-    stemsPartCannot: 'Это партия: она сама — результат разделения. Разделять её повторно нельзя, иначе получатся копии копий. Выберите исходный трек выше.',
++    stemsPartCannot: 'Это партия: она сама - результат разделения. Разделять её повторно нельзя, иначе получатся копии копий. Выберите исходный трек выше.',
+     stemsRunning: 'Разделяю',
+     stem_drums: 'Ударные',
+     stem_bass: 'Бас',
+diff --git a/app/i18n/yue2.ts b/app/i18n/yue2.ts
+index b6ae41d..d1677e7 100644
+--- a/app/i18n/yue2.ts
++++ b/app/i18n/yue2.ts
+@@ -163,10 +163,10 @@ const en = {
+   sessionOpen: "Open session",
+   sessionClose: "Close session",
+   sessionRename: "Rename session",
+-  sessionNoOpen: "No sessions yet — create one to start working.",
++  sessionNoOpen: "No sessions yet - create one to start working.",
+   sessionNamePlaceholder: "Session name",
+-  sessionEmpty: "Nothing in this session yet — make a track and it lands here.",
+-  sessionNoneOpen: "No session is open — open or create one.",
++  sessionEmpty: "Nothing in this session yet - make a track and it lands here.",
++  sessionNoneOpen: "No session is open - open or create one.",
+   sessionSearchPlaceholder: "Search sessions...",
+   sessionNoMatch: "No sessions found.",
+   sessionParts: "Parts",
+@@ -340,10 +340,10 @@ const ru: Yue2Strings = {
+   sessionOpen: "Открыть сессию",
+   sessionClose: "Закрыть сессию",
+   sessionRename: "Переименовать сессию",
+-  sessionNoOpen: "Сессий пока нет — создай, чтобы начать работу.",
++  sessionNoOpen: "Сессий пока нет - создай, чтобы начать работу.",
+   sessionNamePlaceholder: "Название сессии",
+-  sessionEmpty: "В этой сессии пока пусто — создай трек, и он появится здесь.",
+-  sessionNoneOpen: "Открытой сессии нет — открой или создай её.",
++  sessionEmpty: "В этой сессии пока пусто - создай трек, и он появится здесь.",
++  sessionNoneOpen: "Открытой сессии нет - открой или создай её.",
+   sessionSearchPlaceholder: "Поиск сессий...",
+   sessionNoMatch: "Сессии не найдены.",
+   sessionParts: "Партии",
+@@ -515,10 +515,10 @@ const zh: Yue2Strings = {
+   sessionOpen: "打开会话",
+   sessionClose: "关闭会话",
+   sessionRename: "重命名会话",
+-  sessionNoOpen: "还没有会话 — 新建一个即可开始。",
++  sessionNoOpen: "还没有会话 - 新建一个即可开始。",
+   sessionNamePlaceholder: "会话名称",
+-  sessionEmpty: "此会话中还没有内容 — 生成一首曲子就会出现在这里。",
+-  sessionNoneOpen: "没有打开的会话 — 打开或新建一个。",
++  sessionEmpty: "此会话中还没有内容 - 生成一首曲子就会出现在这里。",
++  sessionNoneOpen: "没有打开的会话 - 打开或新建一个。",
+   sessionSearchPlaceholder: "搜索会话...",
+   sessionNoMatch: "未找到会话。",
+   sessionParts: "分轨",
+@@ -690,10 +690,10 @@ const ja: Yue2Strings = {
+   sessionOpen: "セッションを開く",
+   sessionClose: "セッションを閉じる",
+   sessionRename: "セッション名を変更",
+-  sessionNoOpen: "セッションはまだありません — 作成して始めましょう。",
++  sessionNoOpen: "セッションはまだありません - 作成して始めましょう。",
+   sessionNamePlaceholder: "セッション名",
+-  sessionEmpty: "このセッションはまだ空です — 曲を作るとここに入ります。",
+-  sessionNoneOpen: "開いているセッションがありません — 開くか作成してください。",
++  sessionEmpty: "このセッションはまだ空です - 曲を作るとここに入ります。",
++  sessionNoneOpen: "開いているセッションがありません - 開くか作成してください。",
+   sessionSearchPlaceholder: "セッションを検索...",
+   sessionNoMatch: "セッションが見つかりません。",
+   sessionParts: "パート",
+@@ -865,10 +865,10 @@ const ko: Yue2Strings = {
+   sessionOpen: "세션 열기",
+   sessionClose: "세션 닫기",
+   sessionRename: "세션 이름 바꾸기",
+-  sessionNoOpen: "아직 세션이 없습니다 — 만들어 시작하세요.",
++  sessionNoOpen: "아직 세션이 없습니다 - 만들어 시작하세요.",
+   sessionNamePlaceholder: "세션 이름",
+-  sessionEmpty: "이 세션은 아직 비어 있습니다 — 곡을 만들면 여기에 들어옵니다.",
+-  sessionNoneOpen: "열린 세션이 없습니다 — 열거나 새로 만드세요.",
++  sessionEmpty: "이 세션은 아직 비어 있습니다 - 곡을 만들면 여기에 들어옵니다.",
++  sessionNoneOpen: "열린 세션이 없습니다 - 열거나 새로 만드세요.",
+   sessionSearchPlaceholder: "세션 검색...",
+   sessionNoMatch: "세션을 찾지 못했습니다.",
+   sessionParts: "파트",
+diff --git a/app/i18n/zh.ts b/app/i18n/zh.ts
+index 8f98d50..4941328 100644
+--- a/app/i18n/zh.ts
++++ b/app/i18n/zh.ts
+@@ -1186,7 +1186,7 @@ export const zh = {
+     stemsInstallModel: '下载模型',
+     stemsStart: '开始分轨',
+     stemsAgain: '重新分轨',
+-    stemsPartCannot: '这是一条分轨，本身就是分离的结果。再次分离只会产生副本的副本——请在上方选择原始曲目。',
++    stemsPartCannot: '这是一条分轨，本身就是分离的结果。再次分离只会产生副本的副本--请在上方选择原始曲目。',
+     stemsRunning: '正在分轨',
+     stem_drums: '鼓',
+     stem_bass: '贝斯',
+-- 
+2.54.0.windows.1
+

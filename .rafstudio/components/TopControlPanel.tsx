@@ -17,7 +17,7 @@ interface TopControlPanelProps {
 }
 
 /**
- * ALPHA — the control strip above the song list.
+ * ALPHA - the control strip above the song list.
  *
  * It spans the whole SongList column, flush with its top edge, and is styled
  * like a ToolStrip: a bar a shade lighter than the window behind it (the list

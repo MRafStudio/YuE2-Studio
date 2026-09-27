@@ -8,7 +8,7 @@ import type { ToastType } from './Toast';
  *
  * The strip dispatches `yue:journal-toggle`; this panel listens for it and shows
  * everything the window reported, newest first. Every message the toast shows
- * lands here too, so one that flashed past is still readable — whichever way it
+ * lands here too, so one that flashed past is still readable - whichever way it
  * arrives: an action inside the window, or an agent working the window over MCP
  * through the `notify` bridge. Each entry keeps its source, so the two are told
  * apart at a glance: a robot for the agent, a speaker for the studio.

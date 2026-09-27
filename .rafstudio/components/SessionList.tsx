@@ -5,7 +5,7 @@ import { useI18n } from '../context/I18nContext';
 /**
  * A workspace session: the working set the studio collects everything into.
  *
- * One session is open at a time — the current one. Closing a session files it
+ * One session is open at a time - the current one. Closing a session files it
  * away; opening it again makes it current. Tracks never move between files: a
  * session is a mark on them, which is why closing one is instant and lossless.
  */
@@ -32,7 +32,7 @@ interface SessionListProps {
 }
 
 /**
- * The session browser — built like the song list rather than a modal, so it can
+ * The session browser - built like the song list rather than a modal, so it can
  * grow the same way: a search field, a list of rows, and room for paging and
  * filters later. A million sessions would scroll; a million modal rows would not.
  */

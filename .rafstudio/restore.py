@@ -8,7 +8,7 @@ it (`patches/*.patch`).
 
 It uses `patch -p1`, not `git apply`: a working copy unpacked from an archive
 has no `.git`, and outside a repository `git apply` silently skips every file
-while still reporting success — which is worse than failing.
+while still reporting success - which is worse than failing.
 
 Usage:
     python restore.py                  # apply to this checkout (its .rafstudio)
@@ -95,7 +95,7 @@ def main() -> int:
 
     found = patches()
     if not found:
-        print("  !!  no patch in patches/ — nothing to apply")
+        print("  !!  no patch in patches/ - nothing to apply")
         return 2
 
     for patch_file in found:
@@ -105,7 +105,7 @@ def main() -> int:
             print("  !!  the patch did not apply cleanly")
             return 2
         if code == 1:
-            print("  !!  some hunks were rejected — check them by hand")
+            print("  !!  some hunks were rejected - check them by hand")
 
     gaps = missing(root)
     if gaps:

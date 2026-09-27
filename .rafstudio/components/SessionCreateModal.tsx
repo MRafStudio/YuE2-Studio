@@ -4,7 +4,7 @@ import { useI18n } from '../context/I18nContext';
 
 interface SessionCreateModalProps {
     isOpen: boolean;
-    /** A session always has a name — that is what tells two apart. */
+    /** A session always has a name - that is what tells two apart. */
     onCreate: (name: string) => void;
     onDismiss: () => void;
 }

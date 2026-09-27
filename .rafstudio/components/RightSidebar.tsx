@@ -430,7 +430,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                         {/* A part is the result of a separation, not of a prompt:
                             it has no prompt to repeat and no stems to take, so
                             both buttons would offer work that cannot come out
-                            right. Hidden, not disabled — the app hides what does
+                            right. Hidden, not disabled - the app hides what does
                             not apply instead of promising it. */}
                         {!songIsPart && (
                             <>
