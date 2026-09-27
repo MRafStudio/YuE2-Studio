@@ -57,6 +57,18 @@ cd app && npm run dev     # интерфейс на http://127.0.0.1:3791
 | `.rafstudio/patches/` | патчи ветки (пересоздаются: `git format-patch upstream/main..HEAD -o .rafstudio/patches`) |
 | `.rafstudio/components/` | копии компонентов этой ветки (для `restore.py`) |
 
+**Обновление ветки `rafstudio/tooling`** (после новых правок): отдельная рабочая копия, копируем
+туда `.rafstudio/` и `IDEA.md`, коммитим, пушим, копию убираем:
+
+```bash
+git worktree add ../YuE2-Studio-tooling -b rafstudio/tooling fc23f9a   # ветка main
+cp -r .rafstudio IDEA.md ../YuE2-Studio-tooling/
+cd ../YuE2-Studio-tooling && git add -f .rafstudio IDEA.md && git commit -m "chore(project): …" && git push origin HEAD
+cd - && git worktree remove --force ../YuE2-Studio-tooling
+```
+В рабочей копии фичи эти файлы остаются неотслеживаемыми (`.git/info/exclude`) — иначе `preflight`
+справедливо забракует pull request: у автора правило «в коммите только исходники фичи».
+
 ## Дорожная карта (ведём здесь, в проекте)
 
 Обозначения: ✅ сделано · 🔄 в работе · ⏳ ждёт решения.
