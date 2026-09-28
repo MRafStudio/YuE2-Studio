@@ -94,14 +94,13 @@ const ru: Guide = {
       ],
     },
     {
-      title: 'Что студия делает сама',
+      title: "Что студия делает сама",
       list: [
-        'Переводит всё в WAV 48 кГц и режет на 10-секундные кусочки.',
-        'Отделяет вокал (вместе с бэк-вокалом) у песен с текстом.',
-        'Привязывает слова к времени по вокалу — модель учит, где какое слово поётся.',
-        'Строит партитуру каждой песни (SheetSage2).',
-        'Подставляет слово-триггер в обучение, а при генерации — в стиль, когда вы выбираете эту LoRA.',
-        'Останавливает обучение сама, когда LoRA достаточно похожа (по метрике KL), и сохраняет чекпоинты.',
+        "Переводит всё в WAV 48 кГц и режет на 10-секундные кусочки.",
+        "Строит партитуру каждой песни (SheetSage2).",
+        "Подставляет слово-триггер в обучение, а при генерации — в стиль, когда вы выбираете эту LoRA.",
+        "Сохраняет чекпоинт каждые 10 шагов и в конце обучения.",
+        "В рецепте «Как раньше» ещё отделяет вокал у песен с текстом, привязывает слова к времени по вокалу (модель учит, где какое слово поётся) и сама останавливает обучение, когда LoRA достаточно похожа (по метрике KL).",
       ],
     },
     {
@@ -114,15 +113,16 @@ const ru: Guide = {
       ],
     },
     {
-      title: 'Настройки запуска',
-      text: ['Настройки по умолчанию — рецепт автора тренера HOT-Step. Без причины их лучше не трогать.'],
+      title: "Настройки запуска",
+      text: [
+        "По умолчанию — рецепт base-matched, основной у автора тренера HOT-Step с 27 сентября 2026: LoRA учится так же, как по техническому отчёту модели обучали саму базовую модель. Без причины настройки лучше не трогать.",
+      ],
       list: [
-        'Остановить на KL = 1.4. Сходство с исполнителем начинается примерно с 1.25, около 1.9 модель начинает портиться (зацикленные концовки). Значение одинаково для любого исполнителя.',
-        'Остановку можно переключить на «по эпохам»: одна эпоха — один проход по всем песням набора, число шагов студия считает сама. Удобно, если KL не доходит до 1.4 или нужен предсказуемый объём обучения.',
-        'Предел шагов 750 — это потолок, а не цель: если к нему KL не дошёл до 1.4, дальше обычно не дойдёт.',
-        'Сохранять каждые 50 шагов — будет из чего выбрать; последний чекпоинт сохраняется в момент остановки.',
-        'LoKr 64 / фактор 4 / alpha 256 и оптимизатор Prodigy — лёгкий адаптер (около 106 МБ) с подбором скорости обучения.',
-        'Тайминги текста включены: они учат модель попадать словами в музыку. Для них нужен установленный разделитель вокала.',
+        "Рецепт задаёт объём: «Быстро» — 50 шагов по 4 песни, «Сбалансированно» — 100 шагов по 4 песни (по умолчанию: у автора тренера на целом альбоме сходство вышло на максимум к сотому шагу), «Тщательно» — 200 шагов по 8 песен, примерно вчетверо дольше.",
+        "Внутри рецепта: AdamW со скоростью 1e-4 и коротким разгоном, к концу скорость плавно снижается до 10%; композиция учится с весом 0.25 и только на том, что модель генерирует сама; в 10% шагов нет стиля, в 10% — текста, в 10% — обоих; звуковая половина видит песню целиком. Тайминги текста не нужны — отделение вокала и выравнивание пропускаются, громкость записей остаётся как есть.",
+        "LoKr 64 / фактор 4 / alpha 256 — лёгкий адаптер (около 106 МБ); можно переключить на LoRA.",
+        "«Как раньше: стоп по KL» — прежний рецепт студии: Prodigy, остановка на KL = 1.4 (сходство начинается около 1.25, около 1.9 модель портится), предел 750 шагов, чекпоинт каждые 50 шагов, тайминги текста (нужен разделитель вокала), остановку можно переключить на «по эпохам». Громкость песен в нём выравнивается к −14 LUFS.",
+        "Запуск, начатый в прошлой версии студии, дообучается тем же рецептом, каким начинался.",
       ],
     },
     {
@@ -135,12 +135,12 @@ const ru: Guide = {
       ],
     },
     {
-      title: 'Если что-то не так',
+      title: "Если что-то не так",
       list: [
-        'Песни зацикливаются, нет концовки, вокал разваливается — LoRA перетренирована: возьмите более ранний чекпоинт или уменьшите силу.',
-        'LoRA почти ничего не меняет — возьмите более поздний чекпоинт, проверьте стиль и тексты, добавьте песен.',
-        'Слова «съезжают» с музыки — проверьте тексты: лишние строки и повторы, которых нет в записи, сбивают тайминги.',
-        'Обучение не стартует с ошибкой про разделитель — установите разделитель вокала или выключите тайминги текста.',
+        "Песни зацикливаются, нет концовки, вокал разваливается — LoRA перетренирована: возьмите более ранний чекпоинт или уменьшите силу.",
+        "LoRA почти ничего не меняет — возьмите более поздний чекпоинт или рецепт «Тщательно», проверьте стиль и тексты, добавьте песен.",
+        "В рецепте «Как раньше» слова «съезжают» с музыки — проверьте тексты: лишние строки и повторы, которых нет в записи, сбивают тайминги.",
+        "Обучение «Как раньше» не стартует с ошибкой про разделитель — установите разделитель вокала или выключите тайминги текста.",
       ],
     },
     {
@@ -229,14 +229,13 @@ const en: Guide = {
       ],
     },
     {
-      title: 'What the studio does itself',
+      title: "What the studio does itself",
       list: [
-        'Converts everything to 48 kHz WAV and cuts it into 10-second pieces.',
-        'Separates the vocals (backing vocals included) of songs with lyrics.',
-        'Aligns the words to the vocals in time — the model learns where each word is sung.',
-        'Builds a score of every song (SheetSage2).',
-        'Adds the trigger word in training, and to the style at generation when you pick this LoRA.',
-        'Stops training by itself once the LoRA is close enough (by the KL metric), and saves checkpoints.',
+        "Converts everything to 48 kHz WAV and cuts it into 10-second pieces.",
+        "Builds a score for every song (SheetSage2).",
+        "Puts the trigger word into training, and into the style when you pick this LoRA for a song.",
+        "Saves a checkpoint every 10 steps and at the end of training.",
+        "Under the As before recipe it also separates the vocals of songs with lyrics, ties the words to time on the vocals (the model learns where each word is sung), and stops training by itself once the LoRA is close enough (by the KL metric).",
       ],
     },
     {
@@ -249,15 +248,16 @@ const en: Guide = {
       ],
     },
     {
-      title: 'Run settings',
-      text: ['The defaults are the recipe of the HOT-Step trainer\'s author. Leave them alone without a reason.'],
+      title: "Run settings",
+      text: [
+        "The default is the base-matched recipe, the main one of the HOT-Step trainer author since 27 September 2026: the LoRA learns the way the base model itself was trained, per the model technical report. Leave the settings alone unless you have a reason.",
+      ],
       list: [
-        'Stop at KL = 1.4. Likeness to the artist starts around 1.25; around 1.9 the model starts to degrade (looping endings). The value means the same for any artist.',
-        'The stop can be switched to by epochs: one epoch is one pass over every song of the dataset, and the studio works out the steps. Useful when KL does not reach 1.4 or a set amount of training is wanted.',
-        'The 750-step limit is a ceiling, not a target: if KL has not reached 1.4 by then, it usually will not.',
-        'Save every 50 steps — there will be something to choose from; the last checkpoint is saved when the run stops.',
-        'LoKr 64 / factor 4 / alpha 256 with the Prodigy optimiser — a light adapter (about 106 MB) that finds its own learning rate.',
-        'Lyric timing is on: it teaches the model to land the words on the music. It needs the vocal separator installed.',
+        "The recipe sets the size: Fast is 50 steps of 4 songs, Balanced 100 steps of 4 songs (the default: on a full album the trainer author heard likeness peak by step 100), Thorough 200 steps of 8 songs, about four times as long.",
+        "Inside the recipe: AdamW at 1e-4 with a short warmup, easing down to 10% of the rate by the end; the composition learns at weight 0.25 and only on what the model generates itself; 10% of steps leave out the style, 10% the lyrics, 10% both; the sound half sees the whole song. No lyric timing is needed, so vocal separation and alignment are skipped, and the recordings keep their loudness.",
+        "LoKr 64 / factor 4 / alpha 256 — a light adapter (about 106 MB); LoRA can be picked instead.",
+        "As before: stop by KL is the studio previous recipe: Prodigy, stop at KL = 1.4 (likeness starts around 1.25, the model degrades around 1.9), a 750-step cap, a checkpoint every 50 steps, lyric timing (needs the vocal separator); the stop can be switched to by epochs. It brings every song to -14 LUFS.",
+        "A run started in an earlier version of the studio trains further with the recipe it started with.",
       ],
     },
     {
@@ -270,12 +270,12 @@ const en: Guide = {
       ],
     },
     {
-      title: 'When something is wrong',
+      title: "When something is wrong",
       list: [
-        'Songs loop, have no ending, the vocal falls apart — the LoRA is overtrained: take an earlier checkpoint or lower the strength.',
-        'The LoRA changes almost nothing — take a later checkpoint, check the styles and lyrics, add songs.',
-        'Words drift off the music — check the lyrics: extra lines and repeats that are not in the recording throw the timing off.',
-        'Training will not start with an error about the separator — install the vocal separator or turn lyric timing off.',
+        "Songs loop, have no ending, the vocal falls apart — the LoRA is overtrained: take an earlier checkpoint or lower the strength.",
+        "The LoRA changes almost nothing — take a later checkpoint or the Thorough recipe, check the styles and lyrics, add songs.",
+        "Under As before the words drift off the music — check the lyrics: extra lines and repeats that are not in the recording throw the timing off.",
+        "As before training will not start with an error about the separator — install the vocal separator or turn lyric timing off.",
       ],
     },
     {
@@ -364,14 +364,13 @@ const zh: Guide = {
       ],
     },
     {
-      title: '工作室自动完成的事',
+      title: "工作室自动完成的事",
       list: [
-        '把所有音频转成 48 kHz WAV 并切成 10 秒片段。',
-        '为有歌词的歌曲分离人声（包括和声）。',
-        '按人声把歌词对齐到时间——模型学习每个词在哪里唱出。',
-        '为每首歌生成乐谱（SheetSage2）。',
-        '训练时加入触发词；选用此 LoRA 生成时自动把触发词加到风格里。',
-        '当 LoRA 足够相似（按 KL 指标）时自动停止训练，并保存检查点。',
+        "把所有音频转为 48 kHz WAV 并切成 10 秒的片段。",
+        "为每首歌生成乐谱（SheetSage2）。",
+        "把触发词放进训练；生成时选择这个 LoRA，它也会自动加到风格里。",
+        "每 10 步以及训练结束时保存检查点。",
+        "在“沿用旧法”配方中，还会分离有歌词歌曲的人声，按人声把歌词对齐到时间（模型学习每个词在哪里唱），并在 LoRA 足够相似（按 KL 指标）时自动停止。",
       ],
     },
     {
@@ -384,15 +383,16 @@ const zh: Guide = {
       ],
     },
     {
-      title: '训练设置',
-      text: ['默认值是 HOT-Step 训练器作者的配方。没有理由时不要改动。'],
+      title: "训练设置",
+      text: [
+        "默认是 base-matched 配方，自 2026 年 9 月 27 日起是 HOT-Step 训练器作者的主要配方：按模型技术报告中训练基础模型本身的方式训练 LoRA。没有理由时最好不要改动设置。",
+      ],
       list: [
-        'KL = 1.4 时停止。约 1.25 开始像这位艺人，约 1.9 模型开始变差（结尾循环）。这个值对任何艺人都一样。',
-        '停止方式也可以改为按轮次：一轮就是把数据集中的每首歌都过一遍，步数由工作室计算。KL 达不到 1.4 或想要固定的训练量时很方便。',
-        '750 步上限是天花板而不是目标：如果到那时 KL 还没到 1.4，通常也不会再到。',
-        '每 50 步保存一次——这样有得选；停止时会保存最后一个检查点。',
-        'LoKr 64 / 因子 4 / alpha 256，配 Prodigy 优化器——轻量适配器（约 106 MB），会自己找学习率。',
-        '歌词对齐已开启：它教模型让歌词落在音乐上。需要已安装人声分离器。',
+        "配方决定训练量：快速为 50 步、每步 4 首；均衡为 100 步、每步 4 首（默认：训练器作者在整张专辑上听到相似度在第 100 步左右达到最佳）；精细为 200 步、每步 8 首，耗时约四倍。",
+        "配方内部：AdamW，学习率 1e-4，短暂预热，到结束时平滑降到 10%；作曲部分以 0.25 的权重、只在模型自己生成的内容上学习；10% 的步骤去掉风格，10% 去掉歌词，10% 两者都去掉；声音部分看到整首歌。不需要歌词时间对齐，因此跳过人声分离和对齐，录音保持原有响度。",
+        "LoKr 64 / 因子 4 / alpha 256——轻量适配器（约 106 MB）；也可以改用 LoRA。",
+        "“沿用旧法：按 KL 停止”是工作室以前的配方：Prodigy，在 KL = 1.4 时停止（约 1.25 开始相似，约 1.9 模型变差），上限 750 步，每 50 步一个检查点，歌词时间对齐（需要人声分离器），停止方式可改为按轮次。它会把每首歌的响度统一到 -14 LUFS。",
+        "在旧版本工作室中开始的训练，继续训练时沿用它开始时的配方。",
       ],
     },
     {
@@ -405,12 +405,12 @@ const zh: Guide = {
       ],
     },
     {
-      title: '出现问题时',
+      title: "出现问题时",
       list: [
-        '歌曲循环、没有结尾、人声散架——LoRA 训练过头了：换更早的检查点或降低强度。',
-        'LoRA 几乎没有变化——换更晚的检查点，检查风格和歌词，增加歌曲。',
-        '歌词跟音乐对不上——检查歌词：录音里没有的多余行和重复会打乱对齐。',
-        '训练因分离器报错无法开始——安装人声分离器或关闭歌词对齐。',
+        "歌曲循环、没有结尾、人声崩坏——LoRA 过度训练：换更早的检查点或降低强度。",
+        "LoRA 几乎没有变化——换更晚的检查点或精细配方，检查风格和歌词，增加歌曲。",
+        "在“沿用旧法”中歌词与音乐错位——检查歌词：录音里没有的多余行和重复会打乱时间对齐。",
+        "“沿用旧法”训练因分离器报错无法开始——安装人声分离器或关闭歌词时间对齐。",
       ],
     },
     {
@@ -499,14 +499,13 @@ const ja: Guide = {
       ],
     },
     {
-      title: 'スタジオが自動でやること',
+      title: "スタジオが自動でやること",
       list: [
-        'すべて 48 kHz の WAV に変換し、10 秒ずつに切ります。',
-        '歌詞のある曲のボーカル（コーラスを含む）を分離します。',
-        'ボーカルに合わせて単語を時間に揃えます。モデルはどの言葉がどこで歌われるかを学びます。',
-        '各曲の楽譜を作ります（SheetSage2）。',
-        '学習ではトリガーワードを加え、この LoRA を選んで生成するときもスタイルに加えます。',
-        'LoRA が十分に似たら（KL 指標で）自動で止め、チェックポイントを保存します。',
+        "すべてを 48 kHz の WAV に変換し、10 秒ずつに切り分けます。",
+        "各曲の楽譜を作ります（SheetSage2）。",
+        "トリガーワードを学習に入れ、生成でこの LoRA を選ぶとスタイルにも入れます。",
+        "10 ステップごとと学習の終わりにチェックポイントを保存します。",
+        "「従来どおり」レシピでは、歌詞のある曲のボーカルを分離し、ボーカルに合わせて単語を時間に結びつけ（どの単語がどこで歌われるかをモデルが学びます）、LoRA が十分に似たら（KL 指標で）自動で止めます。",
       ],
     },
     {
@@ -519,15 +518,16 @@ const ja: Guide = {
       ],
     },
     {
-      title: '学習の設定',
-      text: ['既定値は HOT-Step 学習器の作者のレシピです。理由がなければ変えないでください。'],
+      title: "学習の設定",
+      text: [
+        "既定は base-matched レシピで、2026 年 9 月 27 日から HOT-Step トレーナー作者のメインのレシピです。モデルの技術レポートにある基本モデル自体の学習方法で LoRA を学習します。理由がなければ設定は変えないでください。",
+      ],
       list: [
-        'KL = 1.4 で停止。1.25 前後からアーティストに似始め、1.9 前後でモデルが崩れ始めます（エンディングのループ）。この値はどのアーティストでも同じ意味です。',
-        '停止方法はエポック単位にも切り替えられます。1 エポックはデータセットの全曲を一巡すること、ステップ数はスタジオが計算します。KL が 1.4 に届かないときや、決まった量だけ学習したいときに便利です。',
-        '750 ステップは上限であって目標ではありません。そこまでに KL が 1.4 に届かなければ、たいていその先も届きません。',
-        '50 ステップごとに保存。選べる候補が残り、止まった時点の最後のチェックポイントも保存されます。',
-        'LoKr 64 / 係数 4 / alpha 256 と Prodigy オプティマイザ。軽いアダプタ（約 106 MB）で、学習率を自分で見つけます。',
-        '歌詞タイミングはオン。言葉を音楽に合わせることを学ばせます。ボーカル分離器のインストールが必要です。',
+        "レシピで量が決まります。高速は 4 曲 × 50 ステップ、バランスは 4 曲 × 100 ステップ（既定。トレーナー作者はアルバム全体で 100 ステップ前後で似かたが最良になると聴いています）、入念は 8 曲 × 200 ステップで約 4 倍の時間がかかります。",
+        "レシピの中身: AdamW、学習率 1e-4、短いウォームアップのあと終わりまでに 10% まで緩やかに下げます。作曲側は重み 0.25 で、モデル自身が生成する部分だけで学習します。ステップの 10% はスタイルなし、10% は歌詞なし、10% は両方なし。サウンド側は曲全体を見ます。歌詞タイミングは不要なので、ボーカル分離と整列は省かれ、録音の音量もそのままです。",
+        "LoKr 64 / 係数 4 / alpha 256 — 軽いアダプター（約 106 MB）。LoRA も選べます。",
+        "「従来どおり: KL で停止」はスタジオの以前のレシピです。Prodigy、KL = 1.4 で停止（1.25 前後から似始め、1.9 前後でモデルが崩れます）、上限 750 ステップ、50 ステップごとのチェックポイント、歌詞タイミング（ボーカル分離が必要）。停止はエポック単位にも切り替えられます。曲の音量は -14 LUFS にそろえます。",
+        "以前のバージョンのスタジオで始めた学習は、始めたときのレシピで続けて学習します。",
       ],
     },
     {
@@ -540,12 +540,12 @@ const ja: Guide = {
       ],
     },
     {
-      title: 'うまくいかないとき',
+      title: "うまくいかないとき",
       list: [
-        '曲がループする、終わらない、ボーカルが崩れる — 学習しすぎです。前のチェックポイントにするか強さを下げます。',
-        'LoRA でほとんど変わらない — 後のチェックポイントにし、スタイルと歌詞を確認し、曲を増やします。',
-        '言葉が音楽からずれる — 歌詞を確認。録音にない余分な行や繰り返しがタイミングを乱します。',
-        '分離器のエラーで学習が始まらない — ボーカル分離器を入れるか、歌詞タイミングをオフにします。',
+        "曲がループする、終わりがない、ボーカルが崩れる — LoRA が学習しすぎです。前のチェックポイントを使うか強さを下げてください。",
+        "LoRA がほとんど何も変えない — 後のチェックポイントか入念レシピを使い、スタイルと歌詞を確認し、曲を増やしてください。",
+        "「従来どおり」で単語が音楽からずれる — 歌詞を確認してください。録音にない余分な行や繰り返しがタイミングを狂わせます。",
+        "「従来どおり」の学習が分離器のエラーで始まらない — ボーカル分離器をインストールするか、歌詞タイミングをオフにしてください。",
       ],
     },
     {
@@ -634,14 +634,13 @@ const ko: Guide = {
       ],
     },
     {
-      title: '스튜디오가 알아서 하는 일',
+      title: "스튜디오가 알아서 하는 일",
       list: [
-        '모두 48 kHz WAV로 바꾸고 10초 조각으로 자릅니다.',
-        '가사가 있는 곡의 보컬(백보컬 포함)을 분리합니다.',
-        '보컬에 맞춰 단어를 시간에 맞춥니다. 모델은 어떤 말이 어디서 불리는지 배웁니다.',
-        '각 곡의 악보를 만듭니다(SheetSage2).',
-        '학습에 트리거 단어를 넣고, 이 LoRA로 생성할 때도 스타일에 넣습니다.',
-        'LoRA가 충분히 비슷해지면(KL 지표) 알아서 멈추고 체크포인트를 저장합니다.',
+        "모든 것을 48 kHz WAV로 바꾸고 10초 조각으로 자릅니다.",
+        "곡마다 악보를 만듭니다(SheetSage2).",
+        "트리거 단어를 학습에 넣고, 생성할 때 이 LoRA를 고르면 스타일에도 넣습니다.",
+        "10스텝마다, 그리고 학습이 끝날 때 체크포인트를 저장합니다.",
+        "\"이전 방식\" 레시피에서는 가사가 있는 곡의 보컬을 분리하고, 보컬에 맞춰 단어를 시간에 연결하며(어떤 단어가 어디서 불리는지 모델이 배웁니다), LoRA가 충분히 비슷해지면(KL 지표로) 스스로 학습을 멈춥니다.",
       ],
     },
     {
@@ -654,15 +653,16 @@ const ko: Guide = {
       ],
     },
     {
-      title: '학습 설정',
-      text: ['기본값은 HOT-Step 학습기 제작자의 레시피입니다. 이유 없이 바꾸지 마세요.'],
+      title: "학습 설정",
+      text: [
+        "기본값은 base-matched 레시피로, 2026년 9월 27일부터 HOT-Step 트레이너 제작자의 주 레시피입니다. 모델 기술 보고서에 나온 기본 모델 학습 방식 그대로 LoRA를 학습합니다. 이유가 없다면 설정은 건드리지 않는 편이 좋습니다.",
+      ],
       list: [
-        'KL = 1.4에서 멈춤. 1.25 부근부터 아티스트와 닮기 시작하고, 1.9 부근에서 모델이 망가지기 시작합니다(엔딩 반복). 이 값은 어느 아티스트에게나 같은 의미입니다.',
-        '멈춤 방식을 에포크 단위로 바꿀 수 있습니다. 에포크 하나는 데이터셋의 모든 곡을 한 번 도는 것이고, 단계 수는 스튜디오가 계산합니다. KL이 1.4에 닿지 않거나 정해진 만큼만 학습하고 싶을 때 편합니다.',
-        '750 스텝은 목표가 아니라 상한입니다. 그때까지 KL이 1.4에 닿지 않으면 보통 그 뒤에도 닿지 않습니다.',
-        '50 스텝마다 저장 — 고를 거리가 남고, 멈춘 순간의 마지막 체크포인트도 저장됩니다.',
-        'LoKr 64 / 계수 4 / alpha 256과 Prodigy 옵티마이저 — 가벼운 어댑터(약 106 MB)로 학습률을 스스로 찾습니다.',
-        '가사 타이밍이 켜져 있습니다. 말을 음악에 맞추는 법을 가르칩니다. 보컬 분리기가 설치되어 있어야 합니다.',
+        "레시피가 학습량을 정합니다. 빠름은 4곡 × 50스텝, 균형은 4곡 × 100스텝(기본값: 트레이너 제작자는 앨범 전체에서 100스텝 무렵 닮음이 최고라고 들었습니다), 꼼꼼은 8곡 × 200스텝으로 약 4배 오래 걸립니다.",
+        "레시피 내용: AdamW, 학습률 1e-4, 짧은 워밍업 후 끝까지 10%로 부드럽게 낮춥니다. 작곡 부분은 가중치 0.25로, 모델이 스스로 생성하는 부분에서만 배웁니다. 스텝의 10%는 스타일 없이, 10%는 가사 없이, 10%는 둘 다 없이 진행하고, 사운드 부분은 곡 전체를 봅니다. 가사 타이밍이 필요 없어 보컬 분리와 정렬을 건너뛰며, 녹음의 음량은 그대로 둡니다.",
+        "LoKr 64 / 팩터 4 / alpha 256 — 가벼운 어댑터(약 106 MB). LoRA로 바꿀 수도 있습니다.",
+        "\"이전 방식: KL로 중지\"는 스튜디오의 예전 레시피입니다. Prodigy, KL = 1.4에서 중지(1.25 무렵부터 닮기 시작하고 1.9 무렵 모델이 망가집니다), 750스텝 상한, 50스텝마다 체크포인트, 가사 타이밍(보컬 분리기 필요). 중지 방식은 에포크 단위로 바꿀 수 있습니다. 곡의 음량을 -14 LUFS로 맞춥니다.",
+        "이전 버전 스튜디오에서 시작한 학습은 시작할 때의 레시피로 이어서 학습합니다.",
       ],
     },
     {
@@ -675,12 +675,12 @@ const ko: Guide = {
       ],
     },
     {
-      title: '문제가 있을 때',
+      title: "문제가 있을 때",
       list: [
-        '곡이 반복되거나 끝나지 않거나 보컬이 무너지면 과학습입니다. 더 이른 체크포인트를 쓰거나 강도를 낮추세요.',
-        'LoRA가 거의 아무것도 바꾸지 않으면 더 늦은 체크포인트를 쓰고, 스타일과 가사를 확인하고, 곡을 늘리세요.',
-        '말이 음악에서 어긋나면 가사를 확인하세요. 녹음에 없는 줄이나 반복이 타이밍을 흐트러뜨립니다.',
-        '분리기 오류로 학습이 시작되지 않으면 보컬 분리기를 설치하거나 가사 타이밍을 끄세요.',
+        "곡이 반복되거나 끝이 없고 보컬이 무너진다 — LoRA가 과학습되었습니다. 더 이른 체크포인트를 쓰거나 강도를 낮추세요.",
+        "LoRA가 거의 아무것도 바꾸지 않는다 — 더 늦은 체크포인트나 꼼꼼 레시피를 쓰고, 스타일과 가사를 확인하고, 곡을 더하세요.",
+        "\"이전 방식\"에서 단어가 음악과 어긋난다 — 가사를 확인하세요. 녹음에 없는 줄과 반복이 타이밍을 흐트러뜨립니다.",
+        "\"이전 방식\" 학습이 분리기 오류로 시작되지 않는다 — 보컬 분리기를 설치하거나 가사 타이밍을 끄세요.",
       ],
     },
     {

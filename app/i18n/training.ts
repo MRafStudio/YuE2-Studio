@@ -27,7 +27,7 @@ const en = {
   trainingLibraryFailed: 'The library did not load:',
   trainingSearchLibrary: 'Search the library…',
   trainingAddSelected: 'Add',
-  trainingGroup_stop: 'When to stop',
+  trainingGroup_stop: 'Recipe and stop',
   trainingGroup_adapter: 'Adapter',
   trainingGroup_optimizer: 'Optimisation',
   trainingGroup_lyrics: 'Lyrics',
@@ -199,6 +199,13 @@ const en = {
   trainingEpochSteps: '{epochs} epochs × {songs} songs = {steps} steps.',
   trainingHint_target_kl: 'KL is how far the LoRA has moved from the base model in how it composes. 0 is the base model unchanged; it grows as the LoRA learns the songs. Around 1.25 the artist can be heard, 1.4 is the recipe of the trainer author, and around 1.9 the model starts to break (looping endings). The step limit is a cap the run rarely reaches.',
   trainingChoice_steps: 'By steps',
+  trainingField_preset: 'Recipe',
+  trainingChoice_fast: 'Fast: 50 steps of 4 songs',
+  trainingChoice_balanced: 'Balanced: 100 steps of 4 songs',
+  trainingChoice_thorough: 'Thorough: 200 steps of 8 songs',
+  trainingChoice_tuned: 'As before: stop by KL',
+  trainingHint_preset: 'Fast, Balanced and Thorough train the LoRA the way the base model itself was trained, per the model\'s technical report: several songs per step, the whole song through the sound half, no lyric timing (so no vocal separation). HOT-Step made it its default after listening tests on a full album. Balanced is the usual choice; Thorough takes about four times as long. As before is the previous recipe with its KL stop and lyric timing.',
+  trainingSongsPerStep: 'songs per step',
 };
 
 export type TrainingStrings = { readonly [K in keyof typeof en]: string };
@@ -227,7 +234,7 @@ const ru: TrainingStrings = {
   trainingLibraryFailed: 'Библиотека не загрузилась:',
   trainingSearchLibrary: 'Поиск по библиотеке…',
   trainingAddSelected: 'Добавить',
-  trainingGroup_stop: 'Когда остановить',
+  trainingGroup_stop: 'Рецепт и остановка',
   trainingGroup_adapter: 'Адаптер',
   trainingGroup_optimizer: 'Оптимизация',
   trainingGroup_lyrics: 'Текст',
@@ -399,6 +406,13 @@ const ru: TrainingStrings = {
   trainingEpochSteps: '{epochs} эпох × {songs} песен = {steps} шагов.',
   trainingHint_target_kl: 'KL — насколько LoRA отошла от исходной модели в том, как она сочиняет. 0 — исходная модель без изменений, по мере обучения число растёт. Около 1,25 уже слышно исполнителя, 1,4 — рецепт автора тренера, около 1,9 модель начинает портиться (зацикленные концовки). Предел шагов — потолок, до которого обучение обычно не доходит.',
   trainingChoice_steps: 'По шагам',
+  trainingField_preset: 'Рецепт',
+  trainingChoice_fast: 'Быстро: 50 шагов по 4 песни',
+  trainingChoice_balanced: 'Сбалансированно: 100 шагов по 4 песни',
+  trainingChoice_thorough: 'Тщательно: 200 шагов по 8 песен',
+  trainingChoice_tuned: 'Как раньше: стоп по KL',
+  trainingHint_preset: 'Быстро, Сбалансированно и Тщательно учат LoRA так же, как по техническому отчёту модели обучали саму базовую модель: несколько песен за шаг, песня целиком через звуковую половину, без разметки таймингов текста (значит, и без отделения вокала). HOT-Step сделал этот метод основным после прослушивания на целом альбоме. Обычно хватает «Сбалансированно»; «Тщательно» идёт примерно вчетверо дольше. «Как раньше» — прежний рецепт с остановкой по KL и таймингами текста.',
+  trainingSongsPerStep: 'песен за шаг',
 };
 
 const zh: TrainingStrings = {
@@ -425,7 +439,7 @@ const zh: TrainingStrings = {
   trainingLibraryFailed: '曲库未能加载：',
   trainingSearchLibrary: '搜索曲库…',
   trainingAddSelected: '添加',
-  trainingGroup_stop: '何时停止',
+  trainingGroup_stop: '配方与停止',
   trainingGroup_adapter: '适配器',
   trainingGroup_optimizer: '优化',
   trainingGroup_lyrics: '歌词',
@@ -597,6 +611,13 @@ const zh: TrainingStrings = {
   trainingEpochSteps: '{epochs} 轮 × {songs} 首 = {steps} 步。',
   trainingHint_target_kl: 'KL 表示 LoRA 在作曲方式上偏离原模型的程度。0 表示与原模型相同，随训练逐渐增大。约 1.25 时能听出这位艺人，1.4 是训练器作者的配方，约 1.9 时模型开始变差（结尾循环）。步数上限是训练很少达到的上限。',
   trainingChoice_steps: '按步数',
+  trainingField_preset: '配方',
+  trainingChoice_fast: '快速：50 步，每步 4 首',
+  trainingChoice_balanced: '均衡：100 步，每步 4 首',
+  trainingChoice_thorough: '精细：200 步，每步 8 首',
+  trainingChoice_tuned: '沿用旧法：按 KL 停止',
+  trainingHint_preset: '快速、均衡和精细按模型技术报告中训练基础模型的方式训练 LoRA：每步多首歌曲，整首歌通过声音部分，不做歌词时间对齐（因此也不需要分离人声）。HOT-Step 在整张专辑的试听后把它设为默认。一般选均衡；精细大约耗时四倍。“沿用旧法”是以前的配方，按 KL 停止并对齐歌词时间。',
+  trainingSongsPerStep: '每步歌曲数',
 };
 
 const ja: TrainingStrings = {
@@ -623,7 +644,7 @@ const ja: TrainingStrings = {
   trainingLibraryFailed: 'ライブラリを読み込めませんでした：',
   trainingSearchLibrary: 'ライブラリを検索…',
   trainingAddSelected: '追加',
-  trainingGroup_stop: '停止条件',
+  trainingGroup_stop: 'レシピと停止',
   trainingGroup_adapter: 'アダプター',
   trainingGroup_optimizer: '最適化',
   trainingGroup_lyrics: '歌詞',
@@ -795,6 +816,13 @@ const ja: TrainingStrings = {
   trainingEpochSteps: '{epochs} エポック × {songs} 曲 = {steps} ステップ。',
   trainingHint_target_kl: 'KL は、作曲の仕方で LoRA が元のモデルからどれだけ離れたかを示します。0 は元のモデルのままで、学習とともに増えます。1.25 前後でアーティストらしさが聞こえ、1.4 はトレーナー作者のレシピ、1.9 前後でモデルが崩れ始めます（エンディングのループ）。ステップ上限は学習がめったに届かない上限です。',
   trainingChoice_steps: 'ステップ数で',
+  trainingField_preset: 'レシピ',
+  trainingChoice_fast: '高速: 50 ステップ × 4 曲',
+  trainingChoice_balanced: 'バランス: 100 ステップ × 4 曲',
+  trainingChoice_thorough: '入念: 200 ステップ × 8 曲',
+  trainingChoice_tuned: '従来どおり: KL で停止',
+  trainingHint_preset: '高速・バランス・入念は、モデルの技術レポートにある基本モデル自体の学習方法で LoRA を学習します。1 ステップに複数の曲、曲全体をサウンド側に通し、歌詞のタイミング合わせはしません（ボーカル分離も不要）。HOT-Step はアルバム全体での試聴を経てこれを標準にしました。通常はバランスで十分で、入念は約 4 倍の時間がかかります。「従来どおり」は KL 停止と歌詞タイミングを使う以前のレシピです。',
+  trainingSongsPerStep: '1 ステップの曲数',
 };
 
 const ko: TrainingStrings = {
@@ -821,7 +849,7 @@ const ko: TrainingStrings = {
   trainingLibraryFailed: '라이브러리를 불러오지 못했습니다:',
   trainingSearchLibrary: '라이브러리 검색…',
   trainingAddSelected: '추가',
-  trainingGroup_stop: '멈출 시점',
+  trainingGroup_stop: '레시피와 중지',
   trainingGroup_adapter: '어댑터',
   trainingGroup_optimizer: '최적화',
   trainingGroup_lyrics: '가사',
@@ -993,6 +1021,13 @@ const ko: TrainingStrings = {
   trainingEpochSteps: '{epochs} 에폭 × {songs}곡 = {steps} 단계.',
   trainingHint_target_kl: 'KL은 LoRA가 작곡 방식에서 원래 모델로부터 얼마나 멀어졌는지를 나타냅니다. 0은 원래 모델 그대로이고, 학습할수록 커집니다. 1.25 부근부터 아티스트가 들리고, 1.4는 트레이너 제작자의 레시피이며, 1.9 부근에서 모델이 망가지기 시작합니다(끝부분 반복). 단계 상한은 학습이 거의 도달하지 않는 상한입니다.',
   trainingChoice_steps: '단계 수 기준',
+  trainingField_preset: '레시피',
+  trainingChoice_fast: '빠름: 50스텝 × 4곡',
+  trainingChoice_balanced: '균형: 100스텝 × 4곡',
+  trainingChoice_thorough: '꼼꼼: 200스텝 × 8곡',
+  trainingChoice_tuned: '이전 방식: KL로 중지',
+  trainingHint_preset: '빠름·균형·꼼꼼은 모델 기술 보고서에 나온 기본 모델 학습 방식 그대로 LoRA를 학습합니다. 한 스텝에 여러 곡, 곡 전체를 사운드 부분에 통과시키고, 가사 타이밍 정렬은 하지 않습니다(보컬 분리도 필요 없음). HOT-Step은 앨범 전체 청취 테스트 후 이것을 기본으로 삼았습니다. 보통은 균형이면 충분하고, 꼼꼼은 약 4배 오래 걸립니다. "이전 방식"은 KL 중지와 가사 타이밍을 쓰는 예전 레시피입니다.',
+  trainingSongsPerStep: '스텝당 곡 수',
 };
 
 export const trainingStrings = { en, ru, zh, ja, ko };

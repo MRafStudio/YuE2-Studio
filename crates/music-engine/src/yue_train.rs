@@ -97,12 +97,24 @@ pub struct TrainingInputs {
     pub recipe: Recipe,
 }
 
-/// What a run is asked for. The defaults are HOT-Step's joint recipe as its
-/// training page sends it (Yue2AitkTrainCard DEFAULT_FORM at the pinned
-/// commit); the trainer's own flag defaults are an older baseline.
+/// What a run is asked for.
+///
+/// The default method is HOT-Step's base-matched recipe (its training page
+/// since 2026-09-27): the adapter is trained the way the YuE2 report says the
+/// base was - AdamW at 1e-4 with the report's betas, several songs per
+/// update, cosine to a floor, the planner's loss on the tokens it generates
+/// at a quarter weight, prompt dropout, the whole song through the decoder -
+/// with no KL stop and no lyric timing. `fast`, `balanced` and `thorough` are
+/// its three sizes. `tuned` is the recipe before it (KL stop, Prodigy, lyric
+/// timing), kept as it was so a run can go back to it; the fields from `stop`
+/// to `cursor_weight` are that recipe's.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Recipe {
+    /// `fast`, `balanced`, `thorough` or `tuned`. A run saved before there
+    /// was a choice was trained the tuned way.
+    #[serde(default = "tuned_preset")]
+    pub preset: String,
     /// `kl`: stop once the planner has moved `target_kl` from the base model,
     /// `steps` a cap; `epochs`: train `epochs` passes over the songs.
     pub stop: String,
@@ -130,11 +142,33 @@ pub struct Recipe {
     /// Supervises where each lyric line is sung, aligned on the vocals.
     pub lyric_timing: bool,
     pub cursor_weight: f64,
+    /// Songs per optimizer update: the method's size, 1 under `tuned`.
+    #[serde(default = "one")]
+    pub grad_accum: u32,
+    /// Warmup updates, fixed when the run starts so a continuation keeps them.
+    pub warmup: u32,
 }
+
+fn tuned_preset() -> String {
+    "tuned".into()
+}
+
+fn one() -> u32 {
+    1
+}
+
+/// The base-matched sizes, as HOT-Step's presets: updates, songs per update.
+/// Balanced reached its likeness at update 100 on a full album; Thorough is
+/// the 8-song run.
+pub const PRESETS: [(&str, u32, u32); 3] = [("fast", 50, 4), ("balanced", 100, 4), ("thorough", 200, 8)];
+
+/// Checkpoints of a base-matched run: every tenth update, as HOT-Step saves them.
+const BASE_MATCHED_SAVE_EVERY: u32 = 10;
 
 impl Default for Recipe {
     fn default() -> Self {
         Self {
+            preset: "balanced".into(),
             stop: "kl".into(),
             epochs: 20,
             steps: 750,
@@ -151,6 +185,8 @@ impl Default for Recipe {
             planner_lr_scale: 0.3,
             lyric_timing: true,
             cursor_weight: 0.08,
+            grad_accum: 4,
+            warmup: 0,
         }
     }
 }
@@ -172,9 +208,9 @@ pub struct RecipeField {
     pub step: Option<f64>,
     #[serde(skip_serializing_if = "<[_]>::is_empty")]
     pub choices: &'static [&'static str],
-    /// Shown only while another field holds one of these values.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shown_when: Option<FieldCondition>,
+    /// Shown only while every present condition holds.
+    #[serde(serialize_with = "present_conditions", skip_serializing_if = "no_conditions")]
+    pub shown_when: [Option<FieldCondition>; 2],
     /// Greyed out, with `trainingHint_<key>_off`, while another field holds one of these values.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub off_when: Option<FieldCondition>,
@@ -195,42 +231,53 @@ pub struct FieldCondition {
     pub values: &'static [&'static str],
 }
 
+fn no_conditions(conditions: &[Option<FieldCondition>; 2]) -> bool {
+    conditions.iter().all(Option::is_none)
+}
+
+fn present_conditions<S: serde::Serializer>(conditions: &[Option<FieldCondition>; 2], serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.collect_seq(conditions.iter().flatten())
+}
+
 const fn number(key: &'static str, group: &'static str, min: f64, max: f64, step: f64) -> RecipeField {
-    RecipeField { key, group, kind: FieldKind::Number, min: Some(min), max: Some(max), step: Some(step), choices: &[], shown_when: None, off_when: None }
+    RecipeField { key, group, kind: FieldKind::Number, min: Some(min), max: Some(max), step: Some(step), choices: &[], shown_when: [None, None], off_when: None }
 }
 
 const fn integer(key: &'static str, group: &'static str, min: f64, max: f64, step: f64) -> RecipeField {
-    RecipeField { key, group, kind: FieldKind::Integer, min: Some(min), max: Some(max), step: Some(step), choices: &[], shown_when: None, off_when: None }
+    RecipeField { key, group, kind: FieldKind::Integer, min: Some(min), max: Some(max), step: Some(step), choices: &[], shown_when: [None, None], off_when: None }
 }
 
 const fn choice(key: &'static str, group: &'static str, choices: &'static [&'static str]) -> RecipeField {
-    RecipeField { key, group, kind: FieldKind::Choice, min: None, max: None, step: None, choices, shown_when: None, off_when: None }
+    RecipeField { key, group, kind: FieldKind::Choice, min: None, max: None, step: None, choices, shown_when: [None, None], off_when: None }
 }
 
 const fn toggle(key: &'static str, group: &'static str) -> RecipeField {
-    RecipeField { key, group, kind: FieldKind::Toggle, min: None, max: None, step: None, choices: &[], shown_when: None, off_when: None }
+    RecipeField { key, group, kind: FieldKind::Toggle, min: None, max: None, step: None, choices: &[], shown_when: [None, None], off_when: None }
 }
 
 /// The settings of a YuE2 run, in the order the page shows them.
 pub fn recipe_fields() -> Vec<RecipeField> {
+    const TUNED: FieldCondition = FieldCondition { field: "preset", values: &["tuned"] };
     let lokr = FieldCondition { field: "adapter", values: &["lokr"] };
+    let tuned = |field: RecipeField| RecipeField { shown_when: [Some(TUNED), field.shown_when[0]], ..field };
     vec![
-        choice("stop", "stop", &["kl", "epochs"]),
-        RecipeField { shown_when: Some(FieldCondition { field: "stop", values: &["kl"] }), ..number("target_kl", "stop", 0.1, 5.0, 0.1) },
-        RecipeField { shown_when: Some(FieldCondition { field: "stop", values: &["kl"] }), ..integer("steps", "stop", 1.0, 5000.0, 50.0) },
-        RecipeField { shown_when: Some(FieldCondition { field: "stop", values: &["epochs"] }), ..integer("epochs", "stop", 1.0, 500.0, 1.0) },
-        integer("save_every", "stop", 1.0, 1000.0, 10.0),
+        choice("preset", "stop", &["fast", "balanced", "thorough", "tuned"]),
+        tuned(choice("stop", "stop", &["kl", "epochs"])),
+        tuned(RecipeField { shown_when: [Some(FieldCondition { field: "stop", values: &["kl"] }), None], ..number("target_kl", "stop", 0.1, 5.0, 0.1) }),
+        tuned(RecipeField { shown_when: [Some(FieldCondition { field: "stop", values: &["kl"] }), None], ..integer("steps", "stop", 1.0, 5000.0, 50.0) }),
+        tuned(RecipeField { shown_when: [Some(FieldCondition { field: "stop", values: &["epochs"] }), None], ..integer("epochs", "stop", 1.0, 500.0, 1.0) }),
+        tuned(integer("save_every", "stop", 1.0, 1000.0, 10.0)),
         integer("seed", "stop", 0.0, 4_294_967_295.0, 1.0),
         choice("adapter", "adapter", &["lokr", "lora"]),
         integer("rank", "adapter", 1.0, 512.0, 8.0),
         number("alpha", "adapter", 1.0, 1024.0, 8.0),
-        RecipeField { shown_when: Some(lokr), ..integer("lokr_dim", "adapter", 1.0, 512.0, 8.0) },
-        RecipeField { shown_when: Some(lokr), ..integer("lokr_factor", "adapter", 1.0, 64.0, 1.0) },
-        choice("optimizer", "optimizer", &["prodigy", "adamw"]),
-        RecipeField { off_when: Some(FieldCondition { field: "optimizer", values: &["prodigy"] }), ..number("learning_rate", "optimizer", 0.0, 0.01, 0.00005) },
-        number("planner_lr_scale", "optimizer", 0.05, 1.0, 0.05),
-        toggle("lyric_timing", "lyrics"),
-        RecipeField { off_when: Some(FieldCondition { field: "lyric_timing", values: &["false"] }), ..number("cursor_weight", "lyrics", 0.0, 1.0, 0.01) },
+        RecipeField { shown_when: [Some(lokr), None], ..integer("lokr_dim", "adapter", 1.0, 512.0, 8.0) },
+        RecipeField { shown_when: [Some(lokr), None], ..integer("lokr_factor", "adapter", 1.0, 64.0, 1.0) },
+        tuned(choice("optimizer", "optimizer", &["prodigy", "adamw"])),
+        tuned(RecipeField { off_when: Some(FieldCondition { field: "optimizer", values: &["prodigy"] }), ..number("learning_rate", "optimizer", 0.0, 0.01, 0.00005) }),
+        tuned(number("planner_lr_scale", "optimizer", 0.05, 1.0, 0.05)),
+        tuned(toggle("lyric_timing", "lyrics")),
+        tuned(RecipeField { off_when: Some(FieldCondition { field: "lyric_timing", values: &["false"] }), ..number("cursor_weight", "lyrics", 0.0, 1.0, 0.01) }),
     ]
 }
 
@@ -239,6 +286,18 @@ impl Recipe {
     /// steps are the epochs times the songs and nothing stops it earlier.
     pub fn for_songs(&self, songs: usize) -> Recipe {
         let mut recipe = self.clone();
+        if let Some((_, updates, songs_per_update)) = PRESETS.iter().find(|(name, ..)| *name == recipe.preset) {
+            recipe.steps = *updates;
+            recipe.grad_accum = *songs_per_update;
+            recipe.save_every = BASE_MATCHED_SAVE_EVERY;
+            recipe.target_kl = 0.0;
+            recipe.lyric_timing = false;
+            recipe.cursor_weight = 0.0;
+            // the base's joint phase warmed up over about 3% of its updates
+            recipe.warmup = ((f64::from(*updates) * 0.03).round() as u32).max(1);
+            return recipe;
+        }
+        recipe.grad_accum = 1;
         if recipe.stop == "epochs" {
             recipe.steps = recipe.epochs.saturating_mul(songs.max(1) as u32);
             recipe.target_kl = 0.0;
@@ -246,10 +305,21 @@ impl Recipe {
         recipe
     }
 
+    /// Trained the base-matched way: any method but `tuned`.
+    pub fn base_matched(&self) -> bool {
+        self.preset != "tuned"
+    }
+
     /// Refuses what the trainer would refuse, before any stage starts.
     pub fn check(&self) -> Result<(), String> {
         if self.steps == 0 || self.save_every == 0 || self.epochs == 0 {
             return Err("steps, epochs and the checkpoint interval must be at least 1".into());
+        }
+        if self.preset != "tuned" && !PRESETS.iter().any(|(name, ..)| *name == self.preset) {
+            return Err(format!("unknown training preset {}", self.preset));
+        }
+        if self.grad_accum == 0 {
+            return Err("songs per update must be at least 1".into());
         }
         if !matches!(self.stop.as_str(), "kl" | "epochs") {
             return Err(format!("unknown stopping rule {}", self.stop));
@@ -310,16 +380,33 @@ fn train_args(models: &Path, run: &Path, recipe: &Recipe, output: &Path) -> Vec<
         text(&recipe.alpha),
         arg("--adapter-type"),
         arg(&recipe.adapter),
+    ];
+    if recipe.adapter == "lokr" {
+        train.extend([arg("--lokr-dim"), text(&recipe.lokr_dim), arg("--lokr-factor"), text(&recipe.lokr_factor)]);
+    }
+    if recipe.base_matched() {
+        // HOT-Step's applyBaseMatchedRecipe: its forced parts and its defaults
+        train.extend(
+            [
+                "--optimizer", "adamw-lm", "--lr", "1e-4", "--weight-decay", "0.1", "--beta1", "0.9", "--beta2", "0.95",
+                "--kl-weight", "0", "--caption-dropout", "0", "--abc-dropout", "0.5", "--planner-lr-scale", "1",
+                "--lr-schedule", "cosine-floor", "--lr-floor", "0.1", "--ar-loss-weight", "0.25", "--ar-targets", "base",
+                "--nar-crop-frames", "0", "--text-dropout", "0.1", "--lyric-dropout", "0.1", "--both-dropout", "0.1",
+                "--cursor-weight", "0",
+            ]
+            .map(arg),
+        );
+        train.extend([arg("--warmup"), text(&recipe.warmup.max(1)), arg("--grad-accum"), text(&recipe.grad_accum.max(1))]);
+        return train;
+    }
+    train.extend([
         arg("--optimizer"),
         arg(&recipe.optimizer),
         arg("--planner-lr-scale"),
         text(&recipe.planner_lr_scale),
         arg("--cursor-weight"),
         if recipe.lyric_timing { text(&recipe.cursor_weight) } else { arg("0") },
-    ];
-    if recipe.adapter == "lokr" {
-        train.extend([arg("--lokr-dim"), text(&recipe.lokr_dim), arg("--lokr-factor"), text(&recipe.lokr_factor)]);
-    }
+    ]);
     if recipe.optimizer == "prodigy" {
         train.extend([arg("--prodigy-d0"), arg("1e-6")]);
     } else {
@@ -415,6 +502,10 @@ pub fn training_stages(inputs: &TrainingInputs) -> Vec<TrainingStage> {
                 arg("standard"),
                 arg("--caption-mode"),
                 arg("yue2"),
+                // the base was trained on the recordings as mastered; the tuned
+                // recipe brings every track to -14 LUFS, the trainer's default
+                arg("--loudness-lufs"),
+                arg(if recipe.base_matched() { "0" } else { "-14" }),
             ],
         },
         TrainingStage { id: "codes", args: vec![arg("yue2-tokenize"), arg("--manifest"), path(&manifest), arg("--models"), path(models)] },
@@ -551,11 +642,30 @@ mod tests {
 
     #[test]
     fn epochs_become_steps_and_turn_the_likeness_stop_off() {
-        let by_epochs = Recipe { stop: "epochs".into(), epochs: 20, ..Recipe::default() }.for_songs(61);
+        let tuned = Recipe { preset: "tuned".into(), ..Recipe::default() };
+        let by_epochs = Recipe { stop: "epochs".into(), epochs: 20, ..tuned.clone() }.for_songs(61);
         assert_eq!(by_epochs.steps, 1220);
         assert_eq!(by_epochs.target_kl, 0.0);
-        let by_likeness = Recipe::default().for_songs(61);
-        assert_eq!((by_likeness.steps, by_likeness.target_kl), (750, 1.4));
+        let by_likeness = tuned.for_songs(61);
+        assert_eq!((by_likeness.steps, by_likeness.target_kl, by_likeness.grad_accum), (750, 1.4, 1));
+    }
+
+    #[test]
+    fn a_method_size_sets_the_updates_the_songs_per_update_and_the_warmup() {
+        let balanced = Recipe::default().for_songs(61);
+        assert_eq!((balanced.steps, balanced.grad_accum, balanced.warmup, balanced.save_every), (100, 4, 3, 10));
+        assert!(!balanced.lyric_timing && balanced.target_kl == 0.0);
+        let thorough = Recipe { preset: "thorough".into(), ..Recipe::default() }.for_songs(61);
+        assert_eq!((thorough.steps, thorough.grad_accum, thorough.warmup), (200, 8, 6));
+        let fast = Recipe { preset: "fast".into(), ..Recipe::default() }.for_songs(3);
+        assert_eq!((fast.steps, fast.grad_accum, fast.warmup), (50, 4, 2));
+        assert!(Recipe { preset: "slow".into(), ..Recipe::default() }.check().is_err());
+    }
+
+    #[test]
+    fn a_run_saved_before_the_methods_was_trained_the_tuned_way() {
+        let old: Recipe = serde_json::from_str(r#"{"stop":"kl","steps":750,"target_kl":1.4}"#).unwrap();
+        assert_eq!((old.preset.as_str(), old.grad_accum), ("tuned", 1));
     }
 
     #[test]
@@ -578,8 +688,21 @@ mod tests {
             run: "r".into(),
             vocals: "v".into(),
             trigger: "sks".into(),
-            recipe: Recipe::default(),
+            recipe: Recipe::default().for_songs(10),
         };
+        // base-matched: no lyric timing, the recordings as mastered
+        let stages = training_stages(&inputs);
+        assert_eq!(stages.iter().map(|stage| stage.id).collect::<Vec<_>>(), ["latents", "codes", "scores", "prepare", "train"]);
+        let args = |stage: &TrainingStage| -> Vec<String> { stage.args.iter().map(|arg| arg.to_string_lossy().into_owned()).collect() };
+        assert!(args(&stages[0]).windows(2).any(|pair| pair == ["--loudness-lufs", "0"]));
+        let train = args(&stages[4]);
+        for pair in [["--optimizer", "adamw-lm"], ["--lr", "1e-4"], ["--grad-accum", "4"], ["--warmup", "3"], ["--ar-targets", "base"], ["--cursor-weight", "0"], ["--lokr-dim", "64"]] {
+            assert!(train.windows(2).any(|window| window == pair), "{pair:?}");
+        }
+        assert!(!train.iter().any(|arg| arg == "--target-kl" || arg == "--prodigy-d0"));
+        assert!(args(&stages[3]).windows(2).any(|pair| pair == ["--lyric-timing", "0"]));
+
+        let inputs = TrainingInputs { recipe: Recipe { preset: "tuned".into(), ..Recipe::default() }.for_songs(10), ..inputs };
         let stages = training_stages(&inputs);
         assert_eq!(stages.iter().map(|stage| stage.id).collect::<Vec<_>>(), ["latents", "codes", "align", "scores", "prepare", "train"]);
         let strings = |index: usize| -> Vec<String> { stages[index].args.iter().map(|arg| arg.to_string_lossy().into_owned()).collect() };
@@ -594,7 +717,7 @@ mod tests {
         assert!(prepare.windows(2).any(|pair| pair == ["--lyric-timing", "1"]));
         assert!(strings(2).windows(2).any(|pair| pair == ["--stems", "v"]));
 
-        let plain = TrainingInputs { recipe: Recipe { lyric_timing: false, optimizer: "adamw".into(), adapter: "lora".into(), ..Recipe::default() }, ..inputs };
+        let plain = TrainingInputs { recipe: Recipe { preset: "tuned".into(), lyric_timing: false, optimizer: "adamw".into(), adapter: "lora".into(), ..Recipe::default() }, ..inputs };
         let stages = training_stages(&plain);
         assert!(!stages.iter().any(|stage| stage.id == "align"));
         let train: Vec<String> = stages.last().unwrap().args.iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
@@ -608,6 +731,8 @@ mod tests {
         let recipe = serde_json::to_value(Recipe::default()).unwrap();
         let keys: Vec<&str> = recipe.as_object().unwrap().keys().map(String::as_str).collect();
         let fields: Vec<&str> = recipe_fields().iter().map(|field| field.key).collect();
+        // set by the method, not by hand
+        let keys: Vec<&str> = keys.into_iter().filter(|key| !["grad_accum", "warmup"].contains(key)).collect();
         for key in &keys {
             assert!(fields.contains(key), "{key} has no field");
         }

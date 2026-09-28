@@ -111,8 +111,10 @@ connected and the address to paste.
    - Save with `dataset_song_update`; what you write is final and marks the song done.
    - `lyrics_state: wanted` after preparation: nothing found it. `lyrics_find` with other
      spellings, or ask the user, or write it instrumental.
-5. `training_start` with `recipe_defaults` from `training_status` (stop `kl` at 1.4, or
-   stop `epochs`). `studio_wait until: training`; `training_status` shows step, loss, KL.
+5. `training_start` with `recipe_defaults` from `training_status`: preset `balanced`
+   (100 steps of 4 songs; `fast` and `thorough` are the smaller and larger sizes), or
+   `tuned`, the previous recipe with stop `kl` at 1.4 or stop `epochs`.
+   `studio_wait until: training`; `training_status` shows step and loss (KL under `tuned`).
 6. `training_checkpoint_install` for the chosen step, then `song_create` with that LoRA
    in `adapters` and its trigger word in the style.
 7. Not there yet after the run? `training_continue` with `steps` above the run's

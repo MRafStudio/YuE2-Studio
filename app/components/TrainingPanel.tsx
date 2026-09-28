@@ -166,7 +166,7 @@ const RecipeForm: React.FC<{ recipe: Recipe; defaults: Recipe; fields: RecipeFie
   return (
     <div className="mt-3 space-y-4">
       {groups.map(group => {
-        const shown = fields.filter(field => field.group === group && (field.shown_when === undefined || holds(field.shown_when)));
+        const shown = fields.filter(field => field.group === group && (field.shown_when ?? []).every(holds));
         const hints = shown.map(field => ({ key: field.key, text: tt(`trainingHint_${field.key}`) })).filter(entry => entry.text !== `trainingHint_${entry.key}`);
         return (
           <div key={group}>
@@ -905,7 +905,9 @@ const RunCard: React.FC<{ run: TrainingRun; onChanged: () => void; onError: (mes
   const cap = Number(run.recipe.steps) || 1;
   // an engine that stops on drift reports it per step; the stop is on the mean of the last 20
   const target = Number(run.recipe.target_kl ?? 0);
-  const lastKl = run.steps.slice(-20).map(step => step.ar_kl).filter((kl): kl is number => typeof kl === 'number');
+  // the base-matched method does not measure the planner's KL
+  const tunedRun = String(run.recipe.preset ?? 'tuned') === 'tuned';
+  const lastKl = tunedRun ? run.steps.slice(-20).map(step => step.ar_kl).filter((kl): kl is number => typeof kl === 'number') : [];
   const kl = lastKl.length ? lastKl.reduce((a, b) => a + b, 0) / lastKl.length : null;
   const recent = run.steps.slice(-10).map(step => step.step_ms).filter((ms): ms is number => typeof ms === 'number');
   const perStep = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length / 1000 : 0;
@@ -936,7 +938,9 @@ const RunCard: React.FC<{ run: TrainingRun; onChanged: () => void; onError: (mes
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{run.name}</p>
-          <p className="mt-0.5 text-[11px] text-zinc-500">{run.dataset_name}{run.trigger ? ` · ${run.trigger}` : ''} · {target > 0 ? `KL ${target} · ` : ''}{target > 0 ? '≤ ' : ''}{cap} {t('trainingSteps')}</p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">{run.dataset_name}{run.trigger ? ` · ${run.trigger}` : ''} · {tunedRun
+            ? <>{target > 0 ? `KL ${target} · ≤ ` : ''}{cap} {t('trainingSteps')}</>
+            : <>{tt(`trainingChoice_${run.recipe.preset}`)} · {cap} {t('trainingSteps')} · {t('trainingSongsPerStep')}: {Number(run.recipe.grad_accum ?? 1)}</>}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className={`inline-flex items-center gap-1 text-xs font-semibold ${tone}`}>{running && <Loader2 size={12} className="animate-spin" />}{tt(`trainingStatus_${run.status}`)}</span>

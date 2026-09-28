@@ -54,7 +54,8 @@ export interface RecipeField {
   max?: number;
   step?: number;
   choices?: string[];
-  shown_when?: FieldCondition;
+  /** Shown only while every one of these holds. */
+  shown_when?: FieldCondition[];
   off_when?: FieldCondition;
 }
 

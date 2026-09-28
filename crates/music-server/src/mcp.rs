@@ -120,7 +120,7 @@ fn compact_run(run: &Value) -> Value {
     let last = steps.last().cloned().unwrap_or(Value::Null);
     json!({
         "id": run["id"], "name": run["name"], "dataset": run["dataset_name"], "trigger": run["trigger"], "status": run["status"], "stage": run["stage"],
-        "steps_done": steps.len(), "step_limit": run["recipe"]["steps"], "stop": run["recipe"]["stop"], "target_kl": run["recipe"]["target_kl"],
+        "steps_done": steps.len(), "step_limit": run["recipe"]["steps"], "preset": run["recipe"]["preset"], "songs_per_step": run["recipe"]["grad_accum"], "stop": run["recipe"]["stop"], "target_kl": run["recipe"]["target_kl"],
         "last_step": last, "checkpoints": run["checkpoints"], "installed": run["installed"], "error": run["error"],
     })
 }
@@ -1942,7 +1942,7 @@ fn tools() -> &'static [Tool] {
             },
             Tool {
                 name: "training_start",
-                description: "Train a LoRA on a dataset. recipe: the recipe from training_status (recipe_defaults) with your changes, e.g. stop 'kl' with target_kl 1.4, or stop 'epochs' with epochs. Watch training_status; one run at a time, and it holds the card.",
+                description: "Train a LoRA on a dataset. recipe: the recipe from training_status (recipe_defaults) with your changes. preset picks the size: 'fast' (50 steps of 4 songs), 'balanced' (100 of 4, the default), 'thorough' (200 of 8) - the base-matched method, trained the way the base model was; or 'tuned', the previous recipe, with stop 'kl' and target_kl 1.4 or stop 'epochs' with epochs. Watch training_status; one run at a time, and it holds the card.",
                 schema: || object(json!({ "dataset_id": { "type": "string" }, "name": { "type": "string" }, "recipe": { "type": "object" } }), &["dataset_id", "recipe"]),
                 call: |args| post("/v1/training/runs".into(), args.clone()),
             },
