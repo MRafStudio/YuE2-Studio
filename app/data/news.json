@@ -1,5 +1,43 @@
 [
   {
+    "id": "yue2-studio-3-1-0",
+    "date": "2026-09-29",
+    "title": {
+      "en": "YuE2 Studio 3.1.0",
+      "ru": "YuE2 Studio 3.1.0",
+      "zh": "YuE2 Studio 3.1.0",
+      "ja": "YuE2 Studio 3.1.0",
+      "ko": "YuE2 Studio 3.1.0"
+    },
+    "body": {
+      "en": "Access from anywhere, the card of your choice and LoRA for ComfyUI.\n\n- **The studio from another computer.** Settings - Appearance - Access from the network: the studio opens in a browser on your phone or laptop, with an access key.\n- **The card to compute on.** With two or more NVIDIA cards, Settings - Engine picks the one the engine, the trainer and the assistant use.\n- **LoRA for ComfyUI.** A trained LoRA is saved as one file that ComfyUI's stock loader takes.\n- **Without stopping and bigger queues.** More than ten songs at once, a form that keeps making songs, new songs straight into a playlist.\n- **Stems of any track**, imported ones too; **stop after this track**; player buttons in the sidebar can be hidden.\n- **A switch for the stock photo** of a track without a cover, on by default.\n- **Older cards**: GTX 900 and 10-series and older drivers get a CUDA 12 build; AIFF and ALAC are read everywhere.\n- **Everything updated**: the engines, llama.cpp, HOT-Step, Tauri, React, Vite 8, Tailwind 4, TypeScript 7 and the Rust crates on their current majors.\n\n**Also in YuE2 Studio:** LoRA training now follows HOT-Step's base-matched recipe - Fast, Balanced and Thorough, with the old recipe kept as a preset; listen to the score and save it as MIDI; a cover's style by ear; seven more LoRA in the catalogue.\n\nThe whole family moved to 3.1.0 on the same day: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models, the links below.",
+      "ru": "Доступ отовсюду, своя видеокарта и LoRA для ComfyUI.\n\n- **Студия с другого компьютера.** Настройки - Внешний вид - Доступ из сети: студия открывается в браузере телефона или ноутбука, по ключу доступа.\n- **Выбор видеокарты.** Если NVIDIA две и больше, в Настройки - Движок выбирается карта для движка, тренера и ассистента.\n- **LoRA для ComfyUI.** Обученная LoRA сохраняется одним файлом, который берёт штатный загрузчик ComfyUI.\n- **Без остановки и большие очереди.** Больше десяти песен разом, форма, которая делает песни сама, новые песни сразу в плейлист.\n- **Стемы любого трека**, и импортированного тоже; **стоп после этого трека**; кнопки плеера в боковой панели можно скрыть.\n- **Переключатель стокового фото** для трека без обложки, по умолчанию включён.\n- **Старые карты**: для GTX 900 и 10-й серии и старых драйверов есть сборка на CUDA 12; AIFF и ALAC читаются везде.\n- **Всё обновлено**: движки, llama.cpp, HOT-Step, Tauri, React, Vite 8, Tailwind 4, TypeScript 7 и Rust-крейты на текущих мажорах.\n\n**Ещё в YuE2 Studio:** обучение LoRA теперь идёт по рецепту base-matched из HOT-Step - Быстро, Сбалансированно и Тщательно, старый рецепт остался пресетом; партитуру можно послушать и сохранить в MIDI; стиль кавера на слух; ещё семь LoRA в каталоге.\n\nВсё семейство перешло на 3.1.0 в один день: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели, ссылки ниже.",
+      "zh": "随处访问、自选显卡，以及用于 ComfyUI 的 LoRA。\n\n- **从另一台电脑使用工作室。** 设置 - 外观 - 网络访问：在手机或笔记本的浏览器中打开工作室，凭访问密钥进入。\n- **选择显卡。** 有两块及以上 NVIDIA 显卡时，在 设置 - 引擎 中选择引擎、训练器和助手使用的显卡。\n- **用于 ComfyUI 的 LoRA。** 训练好的 LoRA 保存为单个文件，ComfyUI 自带的加载器即可读取。\n- **不停歇与更大的队列。** 一次超过十首歌，表单可持续自动生成，新歌直接进入播放列表。\n- **任意曲目的分轨**，导入的也可以；**播完本曲后停止**；侧栏的播放器按钮可以隐藏。\n- **无封面曲目的图库照片开关**，默认开启。\n- **旧显卡**：GTX 900、10 系列和较旧驱动使用 CUDA 12 版本；AIFF 和 ALAC 处处可读。\n- **全面更新**：引擎、llama.cpp、HOT-Step、Tauri、React、Vite 8、Tailwind 4、TypeScript 7 以及最新大版本的 Rust crate。\n\n**YuE2 Studio 另外：**LoRA 训练改用 HOT-Step 的 base-matched 配方——快速、均衡、细致三档，旧配方保留为预设；乐谱可试听并保存为 MIDI；按听感描述翻唱风格；目录新增七个 LoRA。\n\n整个家族在同一天升级到 3.1.0：YuE2 Studio、MiniMax Music3 Studio 和 ACE-Step Studio——同一核心、三个模型，链接见下。",
+      "ja": "どこからでもアクセス、選べるカード、ComfyUI 用 LoRA。\n\n- **別のコンピューターからスタジオを。** 設定 - 外観 - ネットワークからのアクセス：スマホやノート PC のブラウザでアクセスキーを使って開けます。\n- **計算に使うカード。** NVIDIA が 2 枚以上あれば、設定 - エンジン でエンジン、トレーナー、アシスタントが使うカードを選べます。\n- **ComfyUI 用 LoRA。** 学習した LoRA を ComfyUI 標準のローダーで読める 1 ファイルとして保存します。\n- **止まらずに、より大きなキュー。** 一度に 10 曲以上、フォームが曲を作り続け、新しい曲はそのままプレイリストへ。\n- **どのトラックもステム分離**、インポートした曲も；**この曲の後で停止**；サイドバーのプレーヤーボタンは非表示にできます。\n- **カバーのない曲のストック写真スイッチ**、既定でオン。\n- **古いカード**：GTX 900・10 シリーズと古いドライバー向けに CUDA 12 ビルド；AIFF と ALAC はどこでも読めます。\n- **すべて更新**：エンジン、llama.cpp、HOT-Step、Tauri、React、Vite 8、Tailwind 4、TypeScript 7、最新メジャーの Rust クレート。\n\n**YuE2 Studio ではさらに：**LoRA 学習は HOT-Step の base-matched レシピに——高速・バランス・丁寧の 3 段階、旧レシピはプリセットとして残ります；楽譜を試聴して MIDI で保存；耳で聴いてカバーのスタイルを記述；カタログに LoRA が 7 つ追加。\n\nファミリー全体が同じ日に 3.1.0 に：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio——ひとつのコア、3 つのモデル。リンクは下に。",
+      "ko": "어디서나 접속, 원하는 카드, ComfyUI용 LoRA.\n\n- **다른 컴퓨터에서 스튜디오를.** 설정 - 모양 - 네트워크에서 접속: 휴대폰이나 노트북 브라우저에서 접근 키로 스튜디오를 엽니다.\n- **계산에 쓸 카드.** NVIDIA 카드가 두 장 이상이면 설정 - 엔진에서 엔진, 트레이너, 어시스턴트가 쓸 카드를 고릅니다.\n- **ComfyUI용 LoRA.** 학습한 LoRA를 ComfyUI 기본 로더가 읽는 파일 하나로 저장합니다.\n- **멈추지 않고, 더 큰 대기열.** 한 번에 열 곡 이상, 계속 곡을 만드는 폼, 새 곡은 바로 플레이리스트로.\n- **어떤 트랙이든 스템 분리**, 가져온 곡도; **이 트랙 후 정지**; 사이드바의 플레이어 버튼은 숨길 수 있습니다.\n- **커버 없는 트랙의 스톡 사진 스위치**, 기본값은 켜짐.\n- **오래된 카드**: GTX 900·10 시리즈와 오래된 드라이버용 CUDA 12 빌드; AIFF와 ALAC을 어디서나 읽습니다.\n- **모두 업데이트**: 엔진, llama.cpp, HOT-Step, Tauri, React, Vite 8, Tailwind 4, TypeScript 7, 최신 메이저의 Rust 크레이트.\n\n**YuE2 Studio에서는 또:** LoRA 학습이 HOT-Step의 base-matched 레시피로 — 빠르게·균형·꼼꼼히 세 단계, 이전 레시피는 프리셋으로 남습니다; 악보를 들어 보고 MIDI로 저장; 귀로 듣고 커버 스타일 작성; 카탈로그에 LoRA 7개 추가.\n\n패밀리 전체가 같은 날 3.1.0으로: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio — 하나의 코어, 세 가지 모델, 링크는 아래에."
+    },
+    "tags": [
+      "YuE2",
+      "3.1.0",
+      "LoRA",
+      "ComfyUI"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
     "id": "yue2-studio-3-0-0",
     "date": "2026-09-26",
     "title": {
