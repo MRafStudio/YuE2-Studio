@@ -1028,7 +1028,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <input
                 ref={audioFile}
                 type="file"
-                accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a"
+                accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aiff,.aif"
                 className="hidden"
                 onChange={event => {
                   const file = event.target.files?.[0];
