@@ -259,7 +259,9 @@ fn launch(state: &AppState, job: Job) -> anyhow::Result<PrepareStatus> {
         }
         // finished, stopped or failed: nothing to pick up after a restart
         let _ = std::fs::remove_file(background.training.prepare_job_path());
-        let clean = outcome.is_ok() && !cancelled && shared.lock().unwrap_or_else(|p| p.into_inner()).as_ref().is_some_and(|status| status.failures.is_empty());
+        let clean = outcome.is_ok()
+            && !cancelled
+            && shared.lock().unwrap_or_else(|p| p.into_inner()).as_ref().is_some_and(|status| status.failures.is_empty() && !status.notices.contains(&ASSISTANT_MISSING));
         let train = background.prepare_train.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take();
         if let (true, Writer::Studio, Some(train)) = (clean, job.writer, train) {
             stage(&shared, "training", Vec::new());
@@ -290,6 +292,74 @@ pub async fn set_train_after(State(state): State<AppState>, Json(request): Json<
     *state.prepare_train.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = request.train;
     update(&state.prepare, |status| status.train_after = on);
     Json(serde_json::json!({ "train_after": on }))
+}
+
+/// The notice of a preparation that found songs to write and no assistant.
+const ASSISTANT_MISSING: &str = "assistant_missing";
+
+#[derive(Debug, Default, Deserialize)]
+pub struct TakeAsIsRequest {
+    #[serde(default)]
+    pub items: Option<Vec<String>>,
+}
+
+/// Songs whose lyrics were found and whose style was heard, taken as they
+/// are: the lyrics without their times and section tags, the style as
+/// MOSS-Music described the song. For a studio with no writing assistant.
+pub async fn take_as_is(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<TakeAsIsRequest>,
+) -> Result<Json<training::Dataset>, (StatusCode, Json<ApiError>)> {
+    use training::{LyricsState, StyleState};
+    let preparing = state.prepare.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).as_ref().is_some_and(|job| !job.finished && job.dataset == id);
+    if preparing {
+        return Err(api_error(StatusCode::CONFLICT, "the songs are being prepared; wait for it or stop it".into()));
+    }
+    let dataset = state.training.dataset(&id).map_err(crate::training_error)?;
+    for item in dataset.items.iter().filter(|item| request.items.as_ref().is_none_or(|ids| ids.contains(&item.id))) {
+        let mut patch = training::ItemPatch::default();
+        let mut changed = false;
+        if item.lyrics_state == LyricsState::Found {
+            patch.lyrics = Some(plain_lyrics(&item.lyrics));
+            patch.instrumental = Some(false);
+            patch.lyrics_state = Some(LyricsState::Done);
+            changed = true;
+        }
+        if item.style_state == StyleState::Heard {
+            if let Some(note) = &item.heard {
+                patch.style = Some(heard_style(note));
+                patch.style_state = Some(StyleState::Done);
+                patch.heard = Some(None);
+                changed = true;
+            }
+        }
+        if changed {
+            state.training.update_item(&id, &item.id, patch).map_err(crate::training_error)?;
+        }
+    }
+    let mut status = state.prepare.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(status) = status.as_mut().filter(|status| status.dataset == id) {
+        status.notices.retain(|notice| *notice != ASSISTANT_MISSING);
+    }
+    drop(status);
+    Ok(Json(state.training.dataset(&id).map_err(crate::training_error)?))
+}
+
+/// Found lyrics as plain lines: a recognised transcript loses its times.
+fn plain_lyrics(found: &str) -> String {
+    found.lines().map(|line| without_time(line.trim())).filter(|line| !line.is_empty()).collect::<Vec<_>>().join("\n")
+}
+
+/// The style a song is prompted with when no assistant writes it: what
+/// MOSS-Music heard, its genre tags first, closed with the tempo.
+fn heard_style(note: &training::HeardNote) -> String {
+    let heard = match (note.genre.trim(), note.caption.trim()) {
+        ("", caption) => caption.to_string(),
+        (genre, "") => genre.to_string(),
+        (genre, caption) => format!("{genre}. {caption}"),
+    };
+    listen::normalize_yue2(&heard, note.bpm)
 }
 
 pub async fn cancel(State(state): State<AppState>) -> Json<serde_json::Value> {
@@ -374,6 +444,16 @@ async fn run(state: &AppState, job: &Job) -> anyhow::Result<()> {
     settle_pending(&state.training, job, &shared, can_listen, Passed::Listening);
     // an agent writes what is left found and heard itself
     if job.writer == Writer::Agent {
+        return Ok(());
+    }
+    // without an assistant nothing lays the lyrics out or writes the styles:
+    // the songs stay found and heard, and the page offers to set one up or
+    // to take them as they are, instead of every song failing on its own
+    let unwritten = songs(state, job)?
+        .iter()
+        .any(|item| (job.lyrics && item.lyrics_state == LyricsState::Found) || (job.style && item.style_state == StyleState::Heard));
+    if unwritten && !state.assistant.read().await.available() {
+        update(&shared, |status| status.notices.push(ASSISTANT_MISSING));
         return Ok(());
     }
     let outcome = async {
@@ -926,6 +1006,17 @@ async fn describe(state: &AppState, heard: &listen::Heard, facts: &audio_facts::
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn found_lyrics_taken_as_they_are_lose_only_their_times() {
+        assert_eq!(plain_lyrics("[0:12] Среди связок\n\n[1:05] [Смех] ха-ха\nбез времени"), "Среди связок\n[Смех] ха-ха\nбез времени");
+    }
+
+    #[test]
+    fn a_heard_song_gets_its_genre_first_and_its_tempo_last() {
+        let note = training::HeardNote { genre: "synthpop, new wave".into(), caption: "A bright synth-pop song with a female vocal.".into(), bpm: 118 };
+        assert_eq!(heard_style(&note), "synthpop, new wave. A bright synth-pop song with a female vocal, 118 BPM");
+    }
 
     #[test]
     fn only_a_time_leaves_the_start_of_a_line() {

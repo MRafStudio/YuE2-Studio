@@ -545,7 +545,7 @@ enum AssistantProvider {
 }
 
 impl AssistantConfig {
-    fn available(&self) -> bool {
+    pub(crate) fn available(&self) -> bool {
         match self.provider {
             AssistantProvider::None => false,
             AssistantProvider::Agent => true,
@@ -717,6 +717,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/network/proxy/test", post(test_proxy))
         .route("/v1/assistant/status", get(assistant_status).put(update_assistant_settings))
         .route("/v1/assistant/local-models", get(assistant_local_models))
+        .route("/v1/assistant/local-key", post(set_local_server_key))
         .route("/v1/assistant/write", post(assistant_write))
         .route("/v1/assistant/write/stream", post(assistant_write_stream))
         .route("/v1/assistant/sections", post(assistant_sections))
@@ -792,6 +793,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/library/songs/{id}/midi/file", get(song_midi_file))
         .route("/v1/training/datasets/{id}/items/{item}/files", get(dataset_song_files))
         .route("/v1/training/prepare/cancel", post(prepare::cancel))
+        .route("/v1/training/datasets/{id}/take-as-is", post(prepare::take_as_is))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -2006,6 +2008,9 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
             }
             if active.as_deref() == Some(run.id.as_str()) || run.status == training::RunStatus::Failed {
                 value["log"] = serde_json::json!(training.log_tail(&run.id, 12));
+            }
+            if active.as_deref() == Some(run.id.as_str()) {
+                value["device"] = serde_json::json!(training.run_device(&run.id));
             }
             value
         })
@@ -3364,6 +3369,30 @@ fn last_run_log() -> String {
     tail[start..].join("\n")
 }
 
+/// The engine log of the run before the current one: after a restart, the
+/// run that ended is where the reason is.
+fn previous_run_log() -> String {
+    let tail = music_engine::yue_server::startup_log_tail(600);
+    let starts: Vec<usize> = tail.iter().enumerate().filter(|(_, line)| line.contains("---- starting")).map(|(index, _)| index).collect();
+    match starts.as_slice() {
+        [.., before, last] => tail[*before..*last].join("\n"),
+        _ => tail.join("\n"),
+    }
+}
+
+/// Why a song was lost with an engine that restarted during it, from the log
+/// of the run that ended.
+fn lost_job_reason(log: &str) -> String {
+    let log = log.to_lowercase();
+    if describes_exhausted_memory(&log) {
+        "The graphics card ran out of memory on this song and the engine restarted, so the song was lost. Choose a smaller model set in the model manager or a shorter song, and close whatever else uses the card; a card below the smallest set cannot make songs.".into()
+    } else if describes_device_failure(&log) {
+        "The graphics card failed during this song (a CUDA or driver error) and the engine restarted, so the song was lost. The engine log is in Settings, Engine.".into()
+    } else {
+        "The engine stopped during this song and restarted, so the song was lost. The engine log is in Settings, Engine.".into()
+    }
+}
+
 /// Whether the engine ended without a word about why. Its own failures -
 /// an assertion, an error, running out of memory - are written before it
 /// goes; a device lost under the driver takes the process with nothing said.
@@ -4001,6 +4030,7 @@ async fn assistant_status(State(state): State<AppState>) -> Json<Value> {
         "provider": config.provider,
         "local_base_url": config.local_base_url,
         "local_model": config.local_model,
+        "local_api_key_set": credentials::local_server_key().is_some(),
         "openrouter_model": config.openrouter_model,
     }))
 }
@@ -4037,8 +4067,7 @@ async fn assistant_local_models(
         return Err(api_error(StatusCode::BAD_REQUEST, "no server address".into()));
     }
     let url = format!("{base}/models");
-    let response = net::client()
-        .get(&url)
+    let response = local_server_auth(net::client().get(&url), AssistantProvider::Local)
         .timeout(std::time::Duration::from_secs(8))
         .send()
         .await
@@ -4058,6 +4087,27 @@ async fn assistant_local_models(
     Ok(Json(serde_json::json!({ "models": models })))
 }
 
+/// A request to the user's own server with its key, when one is stored. The
+/// studio's own llama-server and the other providers take none of it.
+fn local_server_auth(request: reqwest::RequestBuilder, provider: AssistantProvider) -> reqwest::RequestBuilder {
+    match (provider, credentials::local_server_key()) {
+        (AssistantProvider::Local, Some(key)) => request.bearer_auth(key),
+        _ => request,
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct LocalServerKeyRequest {
+    api_key: Option<String>,
+}
+
+/// Stores or clears the key of the user's own server; the key itself is never
+/// sent back, only whether one is set.
+async fn set_local_server_key(Json(request): Json<LocalServerKeyRequest>) -> Result<Json<Value>, (StatusCode, Json<ApiError>)> {
+    let set = credentials::store_local_server_key(request.api_key.as_deref()).map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("{error:#}")))?;
+    Ok(Json(serde_json::json!({ "local_api_key_set": set })))
+}
+
 /// Which local server runs `model` and with what context, asked of the
 /// server's own API: LM Studio's `/api/v0/models`, then Ollama's `/api/ps`.
 /// None for any other server, or while the model is not loaded yet.
@@ -4065,7 +4115,7 @@ async fn local_server_context(base: &str, model: &str) -> Option<(assistant::Loc
     let root = base.trim().trim_end_matches('/').trim_end_matches("/v1");
     let client = net::client();
     let read = |path: &'static str| {
-        let request = client.get(format!("{root}{path}")).timeout(std::time::Duration::from_secs(3));
+        let request = local_server_auth(client.get(format!("{root}{path}")), AssistantProvider::Local).timeout(std::time::Duration::from_secs(3));
         async move {
             let response = request.send().await.ok()?;
             if !response.status().is_success() {
@@ -4677,7 +4727,7 @@ async fn assistant_write_stream(
             _ => (
                 config.local_base_url.clone().unwrap_or_default(),
                 config.local_model.clone().unwrap_or_default(),
-                None,
+                credentials::local_server_key(),
             ),
         };
 
@@ -4993,8 +5043,7 @@ async fn assistant_ask(
                     config.local_model.clone().unwrap_or_default(),
                 ),
             };
-            let sent = net::client()
-                .post(format!("{}/chat/completions", base.trim_end_matches('/')))
+            let sent = local_server_auth(net::client().post(format!("{}/chat/completions", base.trim_end_matches('/'))), config.provider)
                 .json(&assistant::fit_to_local_task(assistant::chat_body_constrained(
                     &model,
                     system,
@@ -6117,13 +6166,17 @@ fn spawn_job_watcher(state: AppState, job_id: String) {
                 }
                 Err(error) => {
                     // The engine restarting drops its job table; a few missed
-                    // polls are a restart, a minute of them is a lost job.
+                    // polls are a restart, a minute of them is a lost job. A
+                    // job the engine answers it does not know was lost with
+                    // the process that had it, and the log of that process
+                    // says why.
+                    let forgotten = error.to_string().contains("404");
                     unreachable += 1;
-                    if unreachable >= 60 {
+                    if forgotten || unreachable >= 60 {
                         if let Some(job) = state.jobs.write().await.get_mut(&job_id) {
                             job.status = MusicJobStatus::Failed;
                             job.phase = MusicJobPhase::Failed;
-                            job.message = format!("The engine stopped answering about this job: {error}");
+                            job.message = if forgotten { lost_job_reason(&previous_run_log()) } else { format!("The engine stopped answering about this job: {error}") };
                         }
                         return;
                     }
@@ -6904,6 +6957,13 @@ fn api_error(status: StatusCode, error: String) -> (StatusCode, Json<ApiError>) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_lost_song_is_told_why_from_the_run_that_ended() {
+        assert!(lost_job_reason("ggml_backend_cuda_buffer_type_alloc_buffer: allocating 2048 MB on device 0: cudaMalloc failed: out of memory").contains("ran out of memory"));
+        assert!(lost_job_reason("CUDA error: an illegal memory access was encountered").contains("CUDA or driver error"));
+        assert!(lost_job_reason("[Server] listening").contains("stopped during this song"));
+    }
 
     #[test]
     fn a_song_file_is_found_in_the_media_folder_however_its_path_is_written() {

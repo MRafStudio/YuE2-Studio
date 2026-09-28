@@ -9,6 +9,7 @@ import { EngineSettings } from './EngineSettings';
 import { SetupGate } from './SetupGate';
 import { CoverTemplateSettings } from './CoverTemplateSettings';
 import { AgentPanel } from './AgentPanel';
+import { onSidebarExtras, setSidebarExtras, sidebarExtras, type SidebarExtras } from '../services/playerPanels';
 
 /**
  * Settings.
@@ -202,6 +203,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, initialSec
                     </button>
                   </div>
                 </div>
+
+                <SidebarExtrasSetting />
               </div>
             )}
 
@@ -265,6 +268,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, initialSec
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+/** Which of the player's extras the sidebar keeps: the player bar has them all. */
+const SidebarExtrasSetting: React.FC = () => {
+  const { t } = useI18n();
+  const [extras, setExtras] = React.useState(sidebarExtras);
+  React.useEffect(() => onSidebarExtras(setExtras), []);
+  const row = (key: keyof SidebarExtras, label: string) => (
+    <label key={key} className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200">
+      <input type="checkbox" checked={extras[key]} onChange={(event) => setSidebarExtras({ [key]: event.target.checked })} className="accent-pink-500" />
+      {label}
+    </label>
+  );
+  return (
+    <div className="space-y-2">
+      <span className="text-sm font-semibold text-zinc-900 dark:text-white">{t('sidebarExtras')}</span>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('sidebarExtrasHint')}</p>
+      {row('winamp', t('winampTitle'))}
+      {row('equalizer', t('eqTitle'))}
+      {row('visualizer', t('vizTitle'))}
     </div>
   );
 };

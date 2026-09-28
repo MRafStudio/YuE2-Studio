@@ -775,6 +775,23 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     }
   };
 
+  // Without stopping: the request as it was when the button was pressed goes
+  // again with new seeds whenever the queue runs low, until switched off. A
+  // snapshot, so editing the form meanwhile does not change the next songs.
+  const [forever, setForever] = useState(false);
+  const foreverRequest = useRef<(YueRequest & { _tempId?: string }) | null>(null);
+  const generate = (request: YueRequest & { _tempId?: string }) => {
+    if (forever) foreverRequest.current = { ...request };
+    onGenerate(request);
+  };
+  useEffect(() => {
+    if (!forever) { foreverRequest.current = null; return; }
+    const snapshot = foreverRequest.current;
+    if (!snapshot || activeJobCount >= 2) return;
+    onGenerate({ ...snapshot, lm_seed: Math.floor(Math.random() * 0x100000000), seed: Math.floor(Math.random() * 0x100000000) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forever, activeJobCount]);
+
   const submit = () => {
     if (!ready) { setError(t('downloadProfileFirst')); return; }
     if (!style.trim() && !lyrics.trim() && !semanticTokens.trim()) { setError(tt('styleOrLyricsRequired')); return; }
@@ -782,7 +799,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     // Audio codes hold a performance already sung: ask whether to render that
     // take again or perform the prompt anew, as the engine's own WebUI does.
     if (semanticTokens.trim()) { setTakeChoiceOpen(true); return; }
-    onGenerate(buildRequest());
+    generate(buildRequest());
   };
 
   const renderTake = (fresh: boolean) => {
@@ -794,7 +811,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       request.seed = Math.floor(Math.random() * 0x100000000);
       setSemanticTokens('');
     }
-    onGenerate(request);
+    generate(request);
   };
 
   // An agent connected over MCP reads and fills this form as the user sees it
@@ -1459,15 +1476,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             </div>
           </div>
         )}
+        <label className="mb-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300" title={tt('generateForeverHint')}>
+          <input type="checkbox" checked={forever} onChange={event => setForever(event.target.checked)} className="accent-pink-500" />
+          {tt('generateForever')}
+        </label>
         <button
           type="button"
           onClick={submit}
-          disabled={activeJobCount >= 10}
           className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isGenerating ? <Square size={18} /> : <Sparkles size={18} />}
           {t('create')}
-          {activeJobCount > 0 && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{activeJobCount}/10</span>}
+          {activeJobCount > 0 && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{activeJobCount}</span>}
         </button>
       </footer>
     </section>

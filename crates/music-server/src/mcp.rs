@@ -906,7 +906,7 @@ fn tools() -> &'static [Tool] {
             Tool {
                 name: "player_set",
                 description: "Set the player's volume (0 to 1), shuffle, and repeat (none, all, one).",
-                schema: || object(json!({ "volume": { "type": "number" }, "shuffle": { "type": "boolean" }, "repeat": { "type": "string", "enum": ["none", "all", "one"] } }), &[]),
+                schema: || object(json!({ "volume": { "type": "number" }, "shuffle": { "type": "boolean" }, "repeat": { "type": "string", "enum": ["none", "all", "one", "stop"], "description": "stop: play the current track to its end and stay there" } }), &[]),
                 call: |args| window("player_set", args, 15),
             },
             // ---------------------------------------------------------------- the equalizer, the visualiser, the Winamp mode
@@ -1914,6 +1914,12 @@ fn tools() -> &'static [Tool] {
                     "writer": { "type": "string", "enum": ["studio", "agent"], "description": "agent: the studio finds, recognises and listens, and leaves the lyric layout and the styles to you - songs stay lyrics_state 'found' (lyrics as found, lyrics_source says from where) and style_state 'heard' (heard: genre, caption, bpm); write them with dataset_song_update, following writing_guide" }
                 }), &["dataset_id"]),
                 call: |args| post(format!("/v1/training/datasets/{}/prepare", segment(&text(args, "dataset_id")?)), body_without(args, &["dataset_id"])),
+            },
+            Tool {
+                name: "dataset_take_as_is",
+                description: "Without a writing assistant: keep the found lyrics as they are (no section tags) and the heard style as MOSS-Music described it, and mark those songs ready. items: song ids, all songs when left out.",
+                schema: || object(json!({ "dataset_id": { "type": "string" }, "items": { "type": "array", "items": { "type": "string" } } }), &["dataset_id"]),
+                call: |args| post(format!("/v1/training/datasets/{}/take-as-is", segment(&text(args, "dataset_id")?)), body_without(args, &["dataset_id"])),
             },
             Tool {
                 name: "dataset_prepare_cancel",
