@@ -245,6 +245,236 @@
       ]
     },
     {
+      "id": "yue2-militant-reggae",
+      "engine": "yue2-cpp",
+      "kind": "style",
+      "author": "becausereasons",
+      "page": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae",
+      "trigger": "mltnt",
+      "name": {
+        "en": "Militant Reggae",
+        "ru": "Воинственное регги",
+        "zh": "激进雷鬼",
+        "ja": "ミリタント・レゲエ",
+        "ko": "밀리턴트 레게"
+      },
+      "description": {
+        "en": "Modern militant roots reggae: raspy patois vocals, steppers grooves, deep sub bass. Start the style with mltnt and one descriptive sentence.",
+        "ru": "Современное воинственное рутс-регги: хрипловатый вокал на патуа, грувы стэпперс, глубокий саб-бас. Начните стиль с mltnt и одного описательного предложения.",
+        "zh": "现代激进根源雷鬼：沙哑的帕托瓦语演唱、steppers 律动、深沉的超低音。风格以 mltnt 开头，再写一句描述。",
+        "ja": "モダンなミリタント・ルーツ・レゲエ：かすれたパトワ語ボーカル、ステッパーズのグルーヴ、深いサブベース。スタイルは mltnt と説明文 1 文で始めます。",
+        "ko": "현대적인 밀리턴트 루츠 레게: 거친 파투아 보컬, 스테퍼스 그루브, 깊은 서브 베이스. 스타일을 mltnt와 설명 한 문장으로 시작하세요."
+      },
+      "scales": {
+        "ar": 1,
+        "nar": 1
+      },
+      "files": [
+        {
+          "url": "https://huggingface.co/becausereasons/yue2-mltnt-militant-reggae/resolve/a9fedc857cd1f3952be3177326c76526abcea53a/mltnt_steppers.safetensors",
+          "file": "mltnt_steppers.safetensors",
+          "bytes": 177279888
+        }
+      ]
+    },
+    {
+      "id": "yue2-chanson-francaise",
+      "engine": "yue2-cpp",
+      "kind": "style",
+      "author": "becausereasons",
+      "page": "https://huggingface.co/becausereasons/yue2-chnsn-chanson-francaise",
+      "trigger": "chnsn",
+      "name": {
+        "en": "Chanson Française",
+        "ru": "Французский шансон",
+        "zh": "法国香颂",
+        "ja": "シャンソン",
+        "ko": "샹송"
+      },
+      "description": {
+        "en": "French chanson with expressive voices, clean breaths and whispers. Start the style with chnsn and one descriptive sentence.",
+        "ru": "Французский шансон: выразительные голоса, чистые вдохи и шёпот. Начните стиль с chnsn и одного описательного предложения.",
+        "zh": "法国香颂：富有表现力的嗓音、清晰的呼吸与低语。风格以 chnsn 开头，再写一句描述。",
+        "ja": "表情豊かな声、きれいなブレスとささやきのシャンソン。スタイルは chnsn と説明文 1 文で始めます。",
+        "ko": "표현력 있는 목소리와 깨끗한 숨소리, 속삭임의 샹송. 스타일을 chnsn과 설명 한 문장으로 시작하세요."
+      },
+      "scales": {
+        "ar": 1,
+        "nar": 1
+      },
+      "files": [
+        {
+          "url": "https://huggingface.co/becausereasons/yue2-chnsn-chanson-francaise/resolve/e34acbcb1a14e818855093ea0dede46bf3cb1bd6/chnsn_montmartre.safetensors",
+          "file": "chnsn_montmartre.safetensors",
+          "bytes": 117500808
+        }
+      ]
+    },
+    {
+      "id": "yue2-qawwali",
+      "engine": "yue2-cpp",
+      "kind": "style",
+      "author": "becausereasons",
+      "page": "https://huggingface.co/becausereasons/yue2-qwwl-qawwali-sufi-tabla",
+      "trigger": "qwwl",
+      "name": {
+        "en": "Qawwali",
+        "ru": "Каввали",
+        "zh": "卡瓦利",
+        "ja": "カッワーリー",
+        "ko": "카왈리"
+      },
+      "description": {
+        "en": "Sufi qawwali as a live party performs it: a lead voice, a male chorus, harmonium, tabla and handclaps. Start the style with qwwl and describe the delivery.",
+        "ru": "Суфийское каввали вживую: ведущий голос, мужской хор, фисгармония, табла и хлопки. Начните стиль с qwwl и опишите манеру исполнения.",
+        "zh": "现场演出的苏菲卡瓦利：领唱、男声合唱、簧风琴、塔布拉鼓和拍手。风格以 qwwl 开头并描述演唱方式。",
+        "ja": "ライブで演奏されるスーフィーのカッワーリー：リードボーカル、男性コーラス、ハルモニウム、タブラ、手拍子。スタイルは qwwl で始め、歌い方を書きます。",
+        "ko": "라이브로 연주되는 수피 카왈리: 리드 보컬, 남성 합창, 하모니움, 타블라, 손뼉. 스타일을 qwwl로 시작하고 창법을 적으세요."
+      },
+      "scales": {
+        "ar": 1,
+        "nar": 1
+      },
+      "files": [
+        {
+          "url": "https://huggingface.co/becausereasons/yue2-qwwl-qawwali-sufi-tabla/resolve/6e5d0344b8ad9c4a799e93416953d5e0698c62af/qwwl_mehfil.safetensors",
+          "file": "qwwl_mehfil.safetensors",
+          "bytes": 177279760
+        }
+      ]
+    },
+    {
+      "id": "yue2-bulgarian-voices",
+      "engine": "yue2-cpp",
+      "kind": "style",
+      "author": "becausereasons",
+      "page": "https://huggingface.co/becausereasons/yue2-blgr-bulgarian-voices",
+      "trigger": "blgr",
+      "name": {
+        "en": "Bulgarian Voices",
+        "ru": "Болгарские голоса",
+        "zh": "保加利亚之声",
+        "ja": "ブルガリアン・ヴォイス",
+        "ko": "불가리아 보이스"
+      },
+      "description": {
+        "en": "The Bulgarian women's choir: a cappella, and fusion with trap, jungle or tribal house. Start the style with blgr; language Bulgarian.",
+        "ru": "Болгарский женский хор: а капелла и сплавы с трэпом, джанглом, трайбл-хаусом. Начните стиль с blgr; язык — Bulgarian.",
+        "zh": "保加利亚女声合唱：无伴奏，也可与 trap、jungle、tribal house 融合。风格以 blgr 开头；语言写 Bulgarian。",
+        "ja": "ブルガリア女声合唱：ア・カペラ、トラップやジャングル、トライバル・ハウスとの融合も。スタイルは blgr で始め、言語は Bulgarian。",
+        "ko": "불가리아 여성 합창: 아카펠라, 트랩·정글·트라이벌 하우스와의 퓨전. 스타일을 blgr로 시작하고 언어는 Bulgarian으로."
+      },
+      "scales": {
+        "ar": 1,
+        "nar": 1
+      },
+      "files": [
+        {
+          "url": "https://huggingface.co/becausereasons/yue2-blgr-bulgarian-voices/resolve/de8ab624782e4f936383a499aca5aa38f8f719c4/blgr_rhodope.safetensors",
+          "file": "blgr_rhodope.safetensors",
+          "bytes": 177279960
+        }
+      ]
+    },
+    {
+      "id": "yue2-folk-troubadour",
+      "engine": "yue2-cpp",
+      "kind": "style",
+      "author": "becausereasons",
+      "page": "https://huggingface.co/becausereasons/yue2-trbdr-folk-troubadour",
+      "trigger": "trbdr",
+      "name": {
+        "en": "Folk Troubadour",
+        "ru": "Фолк-трубадур",
+        "zh": "民谣游吟诗人",
+        "ja": "フォーク・トルバドゥール",
+        "ko": "포크 트루바두르"
+      },
+      "description": {
+        "en": "Storytelling folk: protest ballads, hymns, fingerpicked waltzes. Start the style with trbdr and describe the delivery.",
+        "ru": "Фолк-повествование: протестные баллады, гимны, вальсы с перебором. Начните стиль с trbdr и опишите манеру исполнения.",
+        "zh": "叙事民谣：抗议民谣、赞美诗、指弹华尔兹。风格以 trbdr 开头并描述演唱方式。",
+        "ja": "語りのフォーク：プロテスト・バラード、賛美歌、フィンガーピッキングのワルツ。スタイルは trbdr で始め、歌い方を書きます。",
+        "ko": "이야기하는 포크: 저항 발라드, 찬송가, 핑거피킹 왈츠. 스타일을 trbdr로 시작하고 창법을 적으세요."
+      },
+      "scales": {
+        "ar": 1,
+        "nar": 1
+      },
+      "files": [
+        {
+          "url": "https://huggingface.co/becausereasons/yue2-trbdr-folk-troubadour/resolve/078b19e52baebaa71463ea94afac5ce13abfe29a/trbdr_broadside.safetensors",
+          "file": "trbdr_broadside.safetensors",
+          "bytes": 117500816
+        }
+      ]
+    },
+    {
+      "id": "yue2-canzone-italiana",
+      "engine": "yue2-cpp",
+      "kind": "style",
+      "author": "becausereasons",
+      "page": "https://huggingface.co/becausereasons/yue2-cnzn-canzone-italiana",
+      "trigger": "cnzn",
+      "name": {
+        "en": "Canzone Italiana",
+        "ru": "Итальянская эстрада",
+        "zh": "意大利流行",
+        "ja": "カンツォーネ",
+        "ko": "칸초네"
+      },
+      "description": {
+        "en": "The Sanremo-era Italian ballad: a warm raspy baritone, piano, strings and a sweeping chorus, sung in Italian. Start the style with cnzn.",
+        "ru": "Итальянская баллада эпохи Сан-Ремо: тёплый хрипловатый баритон, фортепиано, струнные и размашистый припев, на итальянском. Начните стиль с cnzn.",
+        "zh": "圣雷莫时代的意大利抒情歌：温暖沙哑的男中音、钢琴、弦乐和宏大的副歌，意大利语演唱。风格以 cnzn 开头。",
+        "ja": "サンレモ時代のイタリアン・バラード：温かくかすれたバリトン、ピアノ、ストリングス、壮大なサビ、イタリア語。スタイルは cnzn で始めます。",
+        "ko": "산레모 시대 이탈리아 발라드: 따뜻하고 거친 바리톤, 피아노, 현악, 웅장한 후렴, 이탈리아어. 스타일을 cnzn으로 시작하세요."
+      },
+      "scales": {
+        "ar": 1,
+        "nar": 1
+      },
+      "files": [
+        {
+          "url": "https://huggingface.co/becausereasons/yue2-cnzn-canzone-italiana/resolve/89508af770d21ea26215603fdd777f182ba4ecee/cnzn_sanremo.safetensors",
+          "file": "cnzn_sanremo.safetensors",
+          "bytes": 177279960
+        }
+      ]
+    },
+    {
+      "id": "yue2-melodic-death-metal",
+      "engine": "yue2-cpp",
+      "kind": "style",
+      "author": "pduncan",
+      "page": "https://huggingface.co/pduncan/YuE2_Deathmetalv1_lora",
+      "trigger": "deathmetal",
+      "name": {
+        "en": "Melodic Death Metal",
+        "ru": "Мелодичный дэт-метал",
+        "zh": "旋律死亡金属",
+        "ja": "メロディック・デスメタル",
+        "ko": "멜로딕 데스메탈"
+      },
+      "description": {
+        "en": "Melodic death metal: growled vocals over harmonised guitars and blast beats. Start the style with deathmetal.",
+        "ru": "Мелодичный дэт-метал: гроулинг поверх гармонизованных гитар и бластбитов. Начните стиль с deathmetal.",
+        "zh": "旋律死亡金属：嘶吼演唱配和声吉他与 blast beat。风格以 deathmetal 开头。",
+        "ja": "メロディック・デスメタル：ハモるギターとブラストビートにグロウル。スタイルは deathmetal で始めます。",
+        "ko": "멜로딕 데스메탈: 화성 기타와 블래스트 비트 위의 그로울링. 스타일을 deathmetal로 시작하세요."
+      },
+      "scales": {
+        "ar": 1
+      },
+      "files": [
+        {
+          "url": "https://huggingface.co/pduncan/YuE2_Deathmetalv1_lora/resolve/84ff5f6fe5ad1d9db10b05cc258fe881f590b1e2/deathmetalv1_step-000600.safetensors",
+          "file": "deathmetalv1_step-000600.safetensors",
+          "bytes": 278968264
+        }
+      ]
+    },
+    {
       "id": "yue2-slider-female",
       "engine": "yue2-cpp",
       "kind": "slider",
