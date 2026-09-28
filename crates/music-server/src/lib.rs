@@ -18,6 +18,7 @@ mod engine_runtime;
 mod lyrics_db;
 mod mcp;
 mod lyrics_sync;
+mod comfy_export;
 mod credentials;
 mod model_manager;
 mod hardware;
@@ -805,6 +806,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/training/datasets/{id}/take-as-is", post(prepare::take_as_is))
         .route("/v1/library/songs/{id}/describe-style", post(prepare::describe_song_style))
         .route("/v1/system/gpus", get(system_gpus))
+        .route("/v1/adapters/{id}/comfyui", get(export_adapter_comfyui))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -6183,6 +6185,60 @@ async fn music_job_status(
         .cloned()
         .map(Json)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Music job was not found.".into()))
+}
+
+#[derive(Debug, Deserialize)]
+struct ComfyExportQuery {
+    /// Strength of the planner half, folded into the file; 1 when left out.
+    ar: Option<f32>,
+    /// Strength of the sound half.
+    nar: Option<f32>,
+}
+
+/// A trained adapter as one LoRA file for ComfyUI's native YuE2, served for
+/// the page to save where the user says.
+async fn export_adapter_comfyui(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<ComfyExportQuery>,
+) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
+    if !state.adapters.exists(&id) || id.contains(['/', '\\']) || id.contains("..") {
+        return Err(api_error(StatusCode::NOT_FOUND, format!("no adapter {id}")));
+    }
+    let folder = state.adapters.root().join(&id);
+    let meta: Value = std::fs::read(folder.join("adapter.json")).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or(Value::Null);
+    let name = meta.get("name").and_then(Value::as_str).unwrap_or(&id).to_string();
+    let trigger = meta.get("trigger").and_then(Value::as_str).map(str::to_string);
+    let (ar_strength, nar_strength) = (query.ar.unwrap_or(1.0), query.nar.unwrap_or(1.0));
+    let exported = tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
+        let (mut ar, mut nar) = (None, None);
+        for entry in std::fs::read_dir(&folder)? {
+            let path = entry?.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("safetensors") {
+                continue;
+            }
+            match comfy_export::yue2_half(&path)? {
+                Some(true) => nar = Some(path),
+                Some(false) => ar = Some(path),
+                None => {}
+            }
+        }
+        if ar.is_none() && nar.is_none() {
+            anyhow::bail!("this adapter is not in the studio's own format, so there is nothing to convert: a LoRA downloaded for ComfyUI loads there as it is");
+        }
+        let work = tempfile::tempdir()?;
+        let out = work.path().join("comfyui.safetensors");
+        comfy_export::export_yue2(ar.as_deref(), nar.as_deref(), ar_strength, nar_strength, &out, &name, trigger.as_deref())?;
+        Ok(std::fs::read(&out)?)
+    })
+    .await
+    .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
+    .map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("{error:#}")))?;
+    Ok(axum::response::Response::builder()
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(header::CONTENT_LENGTH, exported.len())
+        .body(axum::body::Body::from(exported))
+        .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?)
 }
 
 /// Songs appended to a playlist, each once.
