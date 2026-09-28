@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useI18n } from '../context/I18nContext';
+import type { TranslationKey } from '../i18n/translations';
 import { saveFile } from '../services/saveFile';
 import { Song } from '../types';
 import { X, Play, Pause, Download, Wand2, Image as ImageIcon, Music, Video, Loader2, Palette, Layers, Zap, Type, Monitor, Aperture, Activity, Circle, Grid, Box, BarChart2, Waves, Disc, Upload, Plus, Trash2, Settings2, MousePointer2, Search, ExternalLink, Sun, Film, Minus } from 'lucide-react';
@@ -99,7 +100,7 @@ interface PexelsVideo {
   user: { name: string };
 }
 
-const PRESETS: { id: PresetType; labelKey: string; icon: React.ReactNode }[] = [
+const PRESETS: { id: PresetType; labelKey: TranslationKey; icon: React.ReactNode }[] = [
   { id: 'NCS Circle', labelKey: 'presetClassicNcs', icon: <Circle size={16} /> },
   { id: 'Linear Bars', labelKey: 'presetSpectrum', icon: <BarChart2 size={16} /> },
   { id: 'Dual Mirror', labelKey: 'presetMirror', icon: <ColumnsIcon /> },
@@ -1208,7 +1209,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
       const silent = await hardware.finish();
       const audioSource = song.audioUrl || (song as unknown as { audio_url?: string }).audio_url || '';
       if (!audioSource) {
-        await finishExport(new Blob([silent], { type: 'video/mp4' }));
+        await finishExport(new Blob([silent as Uint8Array<ArrayBuffer>], { type: 'video/mp4' }));
         return;
       }
       const ffmpeg = new FFmpeg();
@@ -1232,7 +1233,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
       ]);
       const merged = (await ffmpeg.readFile('out.mp4')) as Uint8Array;
       if (merged.length === 0) throw new Error('The encoder produced an empty file.');
-      await finishExport(new Blob([merged], { type: 'video/mp4' }));
+      await finishExport(new Blob([merged as Uint8Array<ArrayBuffer>], { type: 'video/mp4' }));
       return;
     }
 
@@ -1278,7 +1279,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
       throw new Error('The encoder produced an empty file.');
     }
     setExportProgress(98);
-    await finishExport(new Blob([outputData], { type: 'video/mp4' }));
+    await finishExport(new Blob([outputData as Uint8Array<ArrayBuffer>], { type: 'video/mp4' }));
   };
 
   const stopRecording = () => {
