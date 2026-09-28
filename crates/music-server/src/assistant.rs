@@ -711,12 +711,38 @@ pub fn content_of(response: &Value) -> Result<String> {
     // appear when a model answers with its thinking and an empty content.
     for field in ["content", "reasoning_content", "reasoning"] {
         if let Some(text) = message.get(field).and_then(Value::as_str) {
-            if !text.trim().is_empty() {
-                return Ok(text.to_owned());
+            let answer = without_thinking(text);
+            if !answer.is_empty() {
+                return Ok(answer);
             }
         }
     }
     Err(anyhow!("the assistant response contained no message content"))
+}
+
+/// The answer without the thinking a model wrote into it: whole thinking
+/// blocks, an unclosed one to the end, and - when the chat template opened
+/// the block itself and the model reasoned in plain text - everything before
+/// the last closing tag, which otherwise ended up in a song's style. As
+/// HOT-Step's stripThinkingBlocks (its #189).
+fn without_thinking(text: &str) -> String {
+    use std::sync::LazyLock;
+    static BLOCKS: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"(?s)<(think|analysis|reasoning|reflection|thought)>.*?</(think|analysis|reasoning|reflection|thought)>|<\|channel>thought.*?<channel\|>").expect("thinking blocks")
+    });
+    static UNCLOSED: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"(?s)(<(think|analysis|reasoning|reflection|thought)>|<\|channel>thought).*").expect("unclosed thinking"));
+    static CLOSER: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"</(think|analysis|reasoning|reflection|thought)>").expect("closing tag"));
+    static PROCESS: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"(?is)^(\s*\*+\s*)?(Thinking Process|Thought Process|Thinking|Reasoning):\s*.*?(---|\*{3,}|={3,})\s*").expect("thinking process")
+    });
+    let text = BLOCKS.replace_all(text, "");
+    let text = UNCLOSED.replace(&text, "");
+    let text = match CLOSER.find_iter(&text).last() {
+        Some(closer) => text[closer.end()..].to_string(),
+        None => text.into_owned(),
+    };
+    PROCESS.replace(&text, "").trim().to_string()
 }
 
 #[cfg(test)]
@@ -879,6 +905,19 @@ mod tests {
         assert_eq!(draft.lyrics.unwrap(), "[Verse 1]\nline");
         assert!(parse_draft("{\"lyrics\": \"x\"}", &["style"]).is_err());
         assert!(parse_draft("no json here", &["lyrics"]).is_err());
+    }
+
+    #[test]
+    fn thinking_is_taken_out_of_an_answer() {
+        assert_eq!(without_thinking("<think>plan it</think>\n{\"style\": \"rock\"}"), "{\"style\": \"rock\"}");
+        // the template opened the block, the model closed it
+        assert_eq!(without_thinking("I need to write a style first.\n</think>\nindie rock, 120 BPM"), "indie rock, 120 BPM");
+        assert_eq!(without_thinking("indie rock <think>and then"), "indie rock");
+        assert_eq!(without_thinking("<|channel>thought ok<channel|>answer"), "answer");
+        assert_eq!(without_thinking("Thinking Process: weigh it\n---\nfolk pop"), "folk pop");
+        assert_eq!(without_thinking("plain answer"), "plain answer");
+        let response = serde_json::json!({ "choices": [{ "message": { "content": "<think>only thoughts</think>", "reasoning_content": "the answer" } }] });
+        assert_eq!(content_of(&response).unwrap(), "the answer");
     }
 
     #[test]
