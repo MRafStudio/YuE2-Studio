@@ -502,10 +502,10 @@ pub fn training_stages(inputs: &TrainingInputs) -> Vec<TrainingStage> {
                 arg("standard"),
                 arg("--caption-mode"),
                 arg("yue2"),
-                // the base was trained on the recordings as mastered; the tuned
-                // recipe brings every track to -14 LUFS, the trainer's default
+                // the recordings as mastered: the base was trained on them, and
+                // the tuned recipe ran on them before the trainer's -14 LUFS default
                 arg("--loudness-lufs"),
-                arg(if recipe.base_matched() { "0" } else { "-14" }),
+                arg("0"),
             ],
         },
         TrainingStage { id: "codes", args: vec![arg("yue2-tokenize"), arg("--manifest"), path(&manifest), arg("--models"), path(models)] },

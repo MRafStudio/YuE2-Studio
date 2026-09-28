@@ -11,6 +11,7 @@ import { lineProgress } from '../services/lrc-parser';
 import { useResponsive } from '../context/ResponsiveContext';
 import { useBridgeCommand } from '../services/mcpBridge';
 import { apiUrl } from '../services/apiBase';
+import { trackCoverUrl } from '../services/playerPanels';
 
 interface VideoGeneratorModalProps {
   isOpen: boolean;
@@ -540,7 +541,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
 
   // The picture in the centre: the one chosen here, or the song's cover.
   // Loaded once and drawn from memory on every frame.
-  const albumArtSource = customAlbumArt || song?.coverUrl || '';
+  const albumArtSource = customAlbumArt || (song ? trackCoverUrl(song) : '');
   useEffect(() => {
     albumArtImageRef.current = null;
     if (!albumArtSource) return;
@@ -749,7 +750,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
     }
 
     // Load album art (use custom if set, otherwise song cover)
-    const albumArtSource = customAlbumArt || song.coverUrl;
+    const albumArtSource = customAlbumArt || trackCoverUrl(song);
     if (albumArtSource) {
       // Custom album art might already be a data URL
       const albumDataUrl = albumArtSource.startsWith('data:')
@@ -2697,11 +2698,13 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                 <div className="flex items-center gap-3">
                                     {/* Preview */}
                                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
-                                        <img
-                                            src={customAlbumArt || song?.coverUrl || ''}
-                                            alt="Center"
-                                            className="w-full h-full object-cover"
-                                        />
+                                        {albumArtSource && (
+                                            <img
+                                                src={albumArtSource}
+                                                alt="Center"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        )}
                                     </div>
                                     <div className="flex-1 space-y-2">
                                         <div className="grid grid-cols-2 gap-2">

@@ -118,9 +118,12 @@ fn compact_training(training: &Value) -> Value {
 fn compact_run(run: &Value) -> Value {
     let steps = run["steps"].as_array().cloned().unwrap_or_default();
     let last = steps.last().cloned().unwrap_or(Value::Null);
+    // only the tuned preset stops on the planner's KL
+    let tuned = run["recipe"]["preset"].as_str() == Some("tuned");
     json!({
         "id": run["id"], "name": run["name"], "dataset": run["dataset_name"], "trigger": run["trigger"], "status": run["status"], "stage": run["stage"],
-        "steps_done": steps.len(), "step_limit": run["recipe"]["steps"], "preset": run["recipe"]["preset"], "songs_per_step": run["recipe"]["grad_accum"], "stop": run["recipe"]["stop"], "target_kl": run["recipe"]["target_kl"],
+        "steps_done": steps.len(), "step_limit": run["recipe"]["steps"], "preset": run["recipe"]["preset"], "songs_per_step": run["recipe"]["grad_accum"],
+        "stop": if tuned { run["recipe"]["stop"].clone() } else { Value::Null }, "target_kl": if tuned { run["recipe"]["target_kl"].clone() } else { Value::Null },
         "last_step": last, "checkpoints": run["checkpoints"], "installed": run["installed"], "error": run["error"],
     })
 }
