@@ -19,6 +19,8 @@ mod lyrics_db;
 mod mcp;
 mod lyrics_sync;
 mod comfy_export;
+mod remote;
+pub use remote::{set_asset_source, AssetSource};
 mod credentials;
 mod model_manager;
 mod hardware;
@@ -409,6 +411,9 @@ struct PersistedStudioSettings {
     cover_auto: Option<bool>,
     #[serde(default)]
     proxy: Option<net::ProxySettings>,
+    /// Access from other computers, off unless turned on.
+    #[serde(default)]
+    network: Option<remote::NetworkAccess>,
 }
 
 #[derive(Default)]
@@ -620,6 +625,7 @@ pub async fn serve() -> anyhow::Result<()> {
         eprintln!("[ERROR] the saved proxy cannot be used, requests go straight out until it is fixed in Settings: {error:#}");
     }
     net::set(proxy);
+    let bind_to = remote::start(persisted.as_ref().and_then(|settings| settings.network.clone()));
     let model_manager = ModelManager::from_environment()?;
     let persisted_components = persisted
         .as_ref()
@@ -806,6 +812,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/training/datasets/{id}/take-as-is", post(prepare::take_as_is))
         .route("/v1/library/songs/{id}/describe-style", post(prepare::describe_song_style))
         .route("/v1/system/gpus", get(system_gpus))
+        .route("/v1/network", get(remote::status).put(remote::change))
         .route("/v1/adapters/{id}/comfyui", get(export_adapter_comfyui).post(save_adapter_comfyui))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
@@ -860,6 +867,8 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/mcp/status", get(mcp::status))
         .route("/mcp/window", get(mcp::window_events))
         .route("/mcp/window/result", post(mcp::window_result))
+        .fallback(remote::interface)
+        .layer(axum::middleware::from_fn(remote::guard))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 
@@ -929,10 +938,10 @@ pub async fn serve() -> anyhow::Result<()> {
         });
     }
 
-    let address = SocketAddr::from(([127, 0, 0, 1], listen_port()));
+    let address = SocketAddr::from((bind_to, listen_port()));
     let listener = tokio::net::TcpListener::bind(address).await?;
     println!("music-server listening on http://{address}");
-    axum::serve(listener, app)
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown())
         .await?;
     Ok(())
@@ -3877,6 +3886,7 @@ async fn persist_studio_settings(state: &AppState) -> anyhow::Result<()> {
         separation: Some(state.separation_config.read().await.clone()),
         cover_auto: Some(*state.cover_auto.read().await),
         proxy: Some(net::current()),
+        network: Some(remote::current()),
     };
     if let Some(parent) = state.settings_path.parent() { fs::create_dir_all(parent)?; }
     let temporary = state.settings_path.with_extension("json.part");

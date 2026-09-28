@@ -9,6 +9,7 @@ import { EngineSettings } from './EngineSettings';
 import { SetupGate } from './SetupGate';
 import { CoverTemplateSettings } from './CoverTemplateSettings';
 import { AgentPanel } from './AgentPanel';
+import { isDesktop } from '../services/externalLinks';
 import { onSidebarExtras, setSidebarExtras, sidebarExtras, type SidebarExtras } from '../services/playerPanels';
 
 /**
@@ -205,6 +206,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, initialSec
                 </div>
 
                 <SidebarExtrasSetting />
+
+                {isDesktop() && <NetworkAccessSetting />}
               </div>
             )}
 
@@ -290,6 +293,68 @@ const SidebarExtrasSetting: React.FC = () => {
       {row('winamp', t('winampTitle'))}
       {row('equalizer', t('eqTitle'))}
       {row('visualizer', t('vizTitle'))}
+    </div>
+  );
+};
+
+interface NetworkStatus {
+  enabled: boolean;
+  key: string | null;
+  listening: boolean;
+  addresses: string[];
+  port: number;
+}
+
+/**
+ * The studio from another computer's browser: off by default, on with a key.
+ * The address is bound when the studio starts, so a change asks for a restart.
+ */
+const NetworkAccessSetting: React.FC = () => {
+  const { t } = useI18n();
+  const [status, setStatus] = React.useState<NetworkStatus | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    void fetch('/v1/network').then(response => (response.ok ? response.json() : null)).then(setStatus).catch(() => undefined);
+  }, []);
+  const change = async (body: { enabled?: boolean; new_key?: boolean }) => {
+    setError(null);
+    try {
+      const response = await fetch('/v1/network', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const answer = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(answer?.error || `HTTP ${response.status}`);
+      setStatus(answer);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  };
+  if (!status) return null;
+  const links = status.key ? status.addresses.map(address => `http://${address}:${status.port}/?key=${status.key}`) : [];
+  const restart = status.enabled !== status.listening;
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+        <input type="checkbox" checked={status.enabled} onChange={event => void change({ enabled: event.target.checked })} className="accent-pink-500" />
+        {t('networkAccess')}
+      </label>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('networkAccessHint')}</p>
+      {restart && <p className="text-xs text-amber-600 dark:text-amber-300">{t('networkAccessRestart')}</p>}
+      {status.enabled && status.key && (
+        <div className="space-y-1.5 rounded-lg border border-zinc-200 p-2 text-xs dark:border-white/10">
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-zinc-500">{t('networkAccessKey')}</span>
+            <code className="min-w-0 flex-1 truncate font-mono text-zinc-800 dark:text-zinc-100">{status.key}</code>
+            <button type="button" onClick={() => void change({ new_key: true })} className="shrink-0 rounded-md border border-zinc-200 px-2 py-0.5 hover:border-pink-400 hover:text-pink-600 dark:border-white/10">{t('networkAccessNewKey')}</button>
+          </div>
+          {links.map(link => (
+            <div key={link} className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate font-mono text-zinc-600 dark:text-zinc-300">{link}</code>
+              <button type="button" onClick={() => void navigator.clipboard.writeText(link)} className="shrink-0 rounded-md border border-zinc-200 px-2 py-0.5 hover:border-pink-400 hover:text-pink-600 dark:border-white/10">{t('copy')}</button>
+            </div>
+          ))}
+          <p className="text-zinc-500">{t('networkAccessInternet')}</p>
+        </div>
+      )}
+      {error && <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
     </div>
   );
 };
