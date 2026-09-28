@@ -177,23 +177,23 @@ move around. Check the result with `ui_screenshot`.
 - **models**: status, catalog, download, adopt (files already on disk), select, cancel,
   remove; **engine**: options,
   restart, logs.
-- **song**: create, defaults (what a field left out becomes), job get/list/cancel, replay; **score**: compose, transcribe, job
+- **song**: create (playlist_id puts the made songs into a playlist), defaults (what a field left out becomes), job get/list/cancel, replay; **score**: compose, transcribe, job
   get/cancel.
 - **writing**: guide, examples; **assistant**: write, status, set, runtime, models;
   requests wait and answer (when you are the assistant).
 - **library**: songs list (since/until), liked, song like, song get/update/delete/files,
-  import audio, versions;
+  import audio, versions, describe style (by ear, for a cover of a recording without one);
   **playlist**: list/create/update/delete.
 - **cover**: draw, set from file, templates, prompt render; **karaoke**: make, delete,
   settings; **recogniser**: install/remove; **stems**: split, get; **separator**: status,
   install, settings; **midi**: status, transcribe, get, delete, install, remove, cancel; **processing**: start, get, keep, discard, reference; **vst**.
 - **lora**: list, install from the catalogue or Hugging Face, import files, update,
-  delete.
+  delete, export for ComfyUI (a trained LoRA as one file for ComfyUI's native YuE2).
 - **dataset**: create, add folder or library songs, import, get, update, delete, song
-  update/delete/files, prepare (+ cancel, train after), reveal; **lyrics**: find;
+  update/delete/files, prepare (+ cancel, train after), take as is (no assistant: found lyrics and heard styles kept as they are), reveal; **lyrics**: find;
   **training**: status, start, cancel, checkpoint install, run delete, packs.
 - **ui**: screenshot, read page, click, type, select, press key, scroll, navigate, open
-  settings, notify, console; **create_form**: get, set, submit; **player**: state, play, pause, seek, next, previous, set; **equalizer**: get, set,
+  settings, notify, console; **create_form**: get, set, submit; **player**: state, play, pause, seek, next, previous, set (repeat none, all, one, or stop after the track); **equalizer**: get, set,
   import, export; **visualizer**: get, set, presets; **winamp**: get, set, skins, skin add,
   museum; **video**: open,
   get, set, render, play, pause, seek, close.

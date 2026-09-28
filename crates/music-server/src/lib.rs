@@ -806,7 +806,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/training/datasets/{id}/take-as-is", post(prepare::take_as_is))
         .route("/v1/library/songs/{id}/describe-style", post(prepare::describe_song_style))
         .route("/v1/system/gpus", get(system_gpus))
-        .route("/v1/adapters/{id}/comfyui", get(export_adapter_comfyui))
+        .route("/v1/adapters/{id}/comfyui", get(export_adapter_comfyui).post(save_adapter_comfyui))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -6239,6 +6239,29 @@ async fn export_adapter_comfyui(
         .header(header::CONTENT_LENGTH, exported.len())
         .body(axum::body::Body::from(exported))
         .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?)
+}
+
+#[derive(Debug, Deserialize)]
+struct ComfySaveRequest {
+    /// Where the file goes, a full path ending in .safetensors.
+    path: String,
+    ar: Option<f32>,
+    nar: Option<f32>,
+}
+
+/// The ComfyUI file written where an agent says, for it has no Save dialog.
+async fn save_adapter_comfyui(State(state): State<AppState>, Path(id): Path<String>, Json(request): Json<ComfySaveRequest>) -> Result<Json<Value>, (StatusCode, Json<ApiError>)> {
+    let target = PathBuf::from(request.path.trim());
+    if !target.is_absolute() || target.extension().and_then(|extension| extension.to_str()) != Some("safetensors") {
+        return Err(api_error(StatusCode::BAD_REQUEST, "path must be a full path ending in .safetensors".into()));
+    }
+    let response = export_adapter_comfyui(State(state), Path(id), axum::extract::Query(ComfyExportQuery { ar: request.ar, nar: request.nar })).await?;
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("create {}: {error}", parent.display())))?;
+    }
+    std::fs::write(&target, &bytes).map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("write {}: {error}", target.display())))?;
+    Ok(Json(serde_json::json!({ "path": target.display().to_string(), "bytes": bytes.len() })))
 }
 
 /// Songs appended to a playlist, each once.

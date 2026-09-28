@@ -1917,6 +1917,12 @@ fn tools() -> &'static [Tool] {
                 call: |args| post(format!("/v1/training/datasets/{}/prepare", segment(&text(args, "dataset_id")?)), body_without(args, &["dataset_id"])),
             },
             Tool {
+                name: "lora_export_comfyui",
+                description: "Write a trained LoRA as one file for ComfyUI's native YuE2 (planner and sound halves together, the stock LoRA loader takes it). path: full path ending in .safetensors. ar, nar: strength of each half folded in, 1 when left out.",
+                schema: || object(json!({ "lora_id": { "type": "string" }, "path": { "type": "string" }, "ar": { "type": "number" }, "nar": { "type": "number" } }), &["lora_id", "path"]),
+                call: |args| post(format!("/v1/adapters/{}/comfyui", segment(&text(args, "lora_id")?)), body_without(args, &["lora_id"])),
+            },
+            Tool {
                 name: "library_song_describe_style",
                 description: "Describe a library song's style by ear, for a cover of a recording that came without one: MOSS-Music hears it and the tempo is measured; with a writing assistant the answer is a YuE2 style line, without one what MOSS heard. Needs auto-describe installed; holds the card for a minute.",
                 schema: || object(json!({ "song_id": { "type": "string" } }), &["song_id"]),
