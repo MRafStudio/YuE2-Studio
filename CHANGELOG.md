@@ -3,6 +3,70 @@
 What changed, newest first. Dates are release dates; the studio is versioned by its
 Windows build.
 
+## 2026-09-29 — 3.1.0
+
+### Added
+
+- **Training the way the base model was trained.** The LoRA recipe is now HOT-Step's
+  base-matched one, its default since 27 September after listening tests on a full album: AdamW
+  with the YuE2 report's settings, several songs per step, the whole song through the sound half,
+  no KL stop and no lyric timing, so no vocal separation either. Three sizes - Fast (50 steps of
+  4 songs), Balanced (100 of 4, the default) and Thorough (200 of 8). The previous recipe stays as
+  "As before: stop by KL", and a run started in 3.0 trains further the way it started. The
+  training guide says the same in all five languages.
+- **LoRA for ComfyUI.** A trained LoRA is saved as one file for ComfyUI's native YuE2 - both
+  halves in one, every module a plain LoRA, so the stock loader and the YuE2 LoRA node take it
+  whole. On the LoRA page and as `lora_export_comfyui` for agents.
+- **The studio from another computer** (Settings - Appearance - Access from the network, off by
+  default). The service listens on the network and hands a browser the studio itself; the access
+  key is shown in the settings and asked once. A tunnel or proxy on the same computer needs the
+  key too. (#22)
+- **The card to compute on.** With two or more NVIDIA cards, Settings - Engine picks the one the
+  engine, the trainer and the assistant run on. (#19)
+- **Stop after this track**, a fourth position of the repeat button. (#17)
+- **Player buttons in the sidebar** can be hidden: Winamp, equalizer, visualiser. (#19)
+- **Without stopping and bigger queues.** The Create form takes more than ten songs at once, and
+  "Without stopping" keeps making songs from the form as it was when turned on. New songs can go
+  straight into a playlist.
+- **Listen to the score** and download it as MIDI, played on the studio's own voices.
+- **Stems of any library track**, imported ones included, from the song's panel.
+- **A cover's style by ear**: "Describe by ear" hears the source track with MOSS-Music and writes
+  the style from it.
+- **A key for your own assistant server** (Settings - Assistant). (#24)
+- **Seven more LoRA in the catalogue**: militant reggae, chanson, qawwali, Bulgarian voices, folk
+  troubadour, canzone italiana and melodic death metal, each with its trigger.
+- **A switch for the stock photo** of a track without a cover (Settings - Cover art), on by
+  default as before; off, the track shows its drawn pattern and nothing is fetched. (#16)
+- AIFF and Apple Lossless (ALAC) files are read wherever audio is taken.
+
+### Fixed
+
+- **Preparation without an assistant** no longer fails every song: it says an assistant writes
+  the lyrics layout and the style, with "Set up the assistant" and "Take as they are". (#23)
+- **The writing wand** explains why it opens the assistant settings: music models do not write
+  lyrics, and the built-in assistant is one button away. (#18)
+- **"yue-server returned 404: job not found"** now says why the engine restarted - out of video
+  memory, a CUDA error - instead of the bare code.
+- **The assistant on GTX 900 and 10-series cards and older drivers**: llama.cpp's CUDA 12 build
+  where CUDA 13 does not run. (#19)
+- **WebView2 that will not install** stops the installer with a plain message and Microsoft's
+  standalone installer link.
+- **A slow training run says why**: it shows what it computes on, and warns when that is the
+  processor or when the card's memory is full.
+- The training card could fail while a run was going; playlist durations showed NaN; a suggested
+  cloud model never filled in; a song title and creator answered clicks with an error.
+- An assistant answer no longer carries the model's reasoning into a style or lyrics.
+- Engine calls ride out a dropped local connection instead of failing the song.
+- MOSS-Music describes the whole track, not its intro.
+- The licence text matches YuE2's: individual creators may sell the songs they make. (#21)
+
+### Updated
+
+- llama.cpp b11236, the yue2.cpp engine with upstream's ggml, the HOT-Step trainer at 3e7a0778.
+- Tauri 2.12, React 19.3, Vite 8, Tailwind 4, TypeScript 7, vitest 5, lucide 1; Rust crates on
+  their current majors (reqwest 0.13, symphonia 0.6, rusqlite 0.40, sysinfo 0.39, tower-http 0.7,
+  zip 8, ort 2.0.0-rc.13).
+
 ## 2026-09-26 — 3.0.0
 
 ### Added
