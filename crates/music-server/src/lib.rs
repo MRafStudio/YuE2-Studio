@@ -2037,8 +2037,8 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
             value
         })
         .collect();
-    // Lyric timing is aligned on the vocals, so the separator is part of what
-    // training needs; its files come through its own downloaders.
+    // Lyric timing is aligned on the vocals, so a recipe with it needs the
+    // separator too; its files come through its own downloaders.
     let separator_ready = vocal_separator(&state).await.is_some();
     let separator_download = match state.separator.downloader().active_for("separation").await {
         Some(active) if !active.done => Some(active),
@@ -2055,7 +2055,8 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
     let listen_download = training.downloader().active_for(training::LISTEN_SCOPE).await.filter(|active| !active.done);
     Json(serde_json::json!({
         "pack": pack,
-        "pack_ready": training.pack_ready() && separator_ready,
+        "pack_ready": training.pack_ready(),
+        "separator_ready": separator_ready,
         "recipe_defaults": training::Recipe::default(),
         "recipe_fields": music_engine::yue_train::recipe_fields(),
         "min_vram_gb": music_engine::yue_train::MIN_VRAM_GB,

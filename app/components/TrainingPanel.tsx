@@ -223,7 +223,7 @@ const PackCard: React.FC<{ state: TrainingState; onError: (message: string) => v
           <button type="button" onClick={() => void cancelTrainingPack().then(onChanged)} className={`${OUTLINE} mt-3`}><X size={13} />{t('adaptersCancel')}</button>
         </div>
       ) : (
-        !state.pack_ready && (
+        missing > 0 && (
           <button type="button" onClick={() => void installTrainingPack().then(onChanged).catch(problem => onError(errorText(problem)))} className={`${PRIMARY} mt-3`}>
             <Download size={15} />{t('trainingDownload')} · {gigabytes(missing)}
           </button>
@@ -731,6 +731,9 @@ const TrainStep: React.FC<{ state: TrainingState; dataset: Dataset; job: Prepare
   const total = dataset.items.reduce((sum, item) => sum + item.seconds, 0);
   const preparing = Boolean(job && !job.finished);
   const blocker = !dataset.items.length ? t('trainingNeedSongs') : lyricsProblem ? lyricsProblem : preparing ? t('trainingWaitPrepare') : state.active ? t('trainingBusy') : null;
+  // only the previous recipe's lyric timing reads separated vocals
+  const chosen = recipe ?? state.recipe_defaults;
+  const packReady = state.pack_ready && (state.separator_ready || String(chosen.preset) !== 'tuned' || chosen.lyric_timing !== true);
   const start = async () => {
     setStarting(true);
     try {
@@ -747,7 +750,7 @@ const TrainStep: React.FC<{ state: TrainingState; dataset: Dataset; job: Prepare
   );
   return (
     <div className="space-y-3">
-      {!state.pack_ready && <PackCard state={state} onError={onError} onChanged={onRefresh} />}
+      {!packReady && <PackCard state={state} onError={onError} onChanged={onRefresh} />}
       <section className={CARD}>
         <div className="grid gap-3 sm:grid-cols-2">
           <label>
@@ -783,7 +786,7 @@ const TrainStep: React.FC<{ state: TrainingState; dataset: Dataset; job: Prepare
         <button type="button" onClick={onBack} className={OUTLINE}><ChevronLeft size={14} />{t('trainingBackSongs')}</button>
         <div className="flex items-center gap-3">
           {blocker && <span className="text-xs text-zinc-500">{blocker}</span>}
-          <button type="button" onClick={() => void start()} disabled={Boolean(blocker) || !state.pack_ready || starting} className={PRIMARY}>
+          <button type="button" onClick={() => void start()} disabled={Boolean(blocker) || !packReady || starting} className={PRIMARY}>
             {starting ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}{t('trainingStart')}
           </button>
         </div>
@@ -940,7 +943,7 @@ const RunCard: React.FC<{ run: TrainingRun; onChanged: () => void; onError: (mes
           <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{run.name}</p>
           <p className="mt-0.5 text-[11px] text-zinc-500">{run.dataset_name}{run.trigger ? ` · ${run.trigger}` : ''} · {tunedRun
             ? <>{target > 0 ? `KL ${target} · ≤ ` : ''}{cap} {t('trainingSteps')}</>
-            : <>{tt(`trainingChoice_${run.recipe.preset}`)} · {cap} {t('trainingSteps')} · {t('trainingSongsPerStep')}: {Number(run.recipe.grad_accum ?? 1)}</>}</p>
+            : <>{tt(`trainingPresetName_${run.recipe.preset}`)} · {cap} {t('trainingSteps')} · {t('trainingSongsPerStep')}: {Number(run.recipe.grad_accum ?? 1)}</>}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className={`inline-flex items-center gap-1 text-xs font-semibold ${tone}`}>{running && <Loader2 size={12} className="animate-spin" />}{tt(`trainingStatus_${run.status}`)}</span>

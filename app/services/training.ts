@@ -90,6 +90,8 @@ export interface TrainingRun {
 export interface TrainingState {
   pack: PackFile[];
   pack_ready: boolean;
+  /** The vocal separator the previous recipe's lyric timing needs. */
+  separator_ready: boolean;
   recipe_defaults: Recipe;
   recipe_fields: RecipeField[];
   /** Video memory a run of the default recipe needs, in GB. */

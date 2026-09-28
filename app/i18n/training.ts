@@ -152,7 +152,7 @@ const en = {
   trainingCardSongs: '{songs} · {minutes} min',
   trainingCardTraining: 'Training…',
   trainingDeleteDataset: 'Delete dataset',
-  trainingDropHint: 'A folder of one artist or style, 5–50 songs: WAV, MP3, FLAC, OGG, M4A. The lyrics and style of every song are prepared by themselves; an album in one file is cut by its .cue, lyrics beside a song in a .txt or .lrc are taken as they are.',
+  trainingDropHint: 'A folder of one artist or style, 5–50 songs: WAV, MP3, FLAC, OGG, M4A, AIFF. The lyrics and style of every song are prepared by themselves; an album in one file is cut by its .cue, lyrics beside a song in a .txt or .lrc are taken as they are.',
   trainingDropMore: 'Drop more songs here',
   trainingDropTitle: 'Drop a folder with songs here',
   trainingFillMissing: 'Fill in what is missing',
@@ -206,6 +206,9 @@ const en = {
   trainingChoice_tuned: 'As before: stop by KL',
   trainingHint_preset: 'Fast, Balanced and Thorough train the LoRA the way the base model itself was trained, per the model\'s technical report: several songs per step, the whole song through the sound half, no lyric timing (so no vocal separation). HOT-Step made it its default after listening tests on a full album. Balanced is the usual choice; Thorough takes about four times as long. As before is the previous recipe with its KL stop and lyric timing.',
   trainingSongsPerStep: 'songs per step',
+  trainingPresetName_fast: 'Fast',
+  trainingPresetName_balanced: 'Balanced',
+  trainingPresetName_thorough: 'Thorough',
 };
 
 export type TrainingStrings = { readonly [K in keyof typeof en]: string };
@@ -359,7 +362,7 @@ const ru: TrainingStrings = {
   trainingCardSongs: '{songs} · {minutes} мин',
   trainingCardTraining: 'Обучается…',
   trainingDeleteDataset: 'Удалить набор',
-  trainingDropHint: 'Папка одного исполнителя или стиля, 5–50 песен: WAV, MP3, FLAC, OGG, M4A. Текст и стиль каждой песни подготовятся сами; альбом одним файлом режется по .cue, текст рядом в .txt или .lrc берётся как есть.',
+  trainingDropHint: 'Папка одного исполнителя или стиля, 5–50 песен: WAV, MP3, FLAC, OGG, M4A, AIFF. Текст и стиль каждой песни подготовятся сами; альбом одним файлом режется по .cue, текст рядом в .txt или .lrc берётся как есть.',
   trainingDropMore: 'Перетащите сюда ещё песни',
   trainingDropTitle: 'Перетащите сюда папку с песнями',
   trainingFillMissing: 'Заполнить недостающее',
@@ -413,6 +416,9 @@ const ru: TrainingStrings = {
   trainingChoice_tuned: 'Как раньше: стоп по KL',
   trainingHint_preset: 'Быстро, Сбалансированно и Тщательно учат LoRA так же, как по техническому отчёту модели обучали саму базовую модель: несколько песен за шаг, песня целиком через звуковую половину, без разметки таймингов текста (значит, и без отделения вокала). HOT-Step сделал этот метод основным после прослушивания на целом альбоме. Обычно хватает «Сбалансированно»; «Тщательно» идёт примерно вчетверо дольше. «Как раньше» — прежний рецепт с остановкой по KL и таймингами текста.',
   trainingSongsPerStep: 'песен за шаг',
+  trainingPresetName_fast: 'Быстро',
+  trainingPresetName_balanced: 'Сбалансированно',
+  trainingPresetName_thorough: 'Тщательно',
 };
 
 const zh: TrainingStrings = {
@@ -564,7 +570,7 @@ const zh: TrainingStrings = {
   trainingCardSongs: '{songs} · {minutes} 分钟',
   trainingCardTraining: '正在训练…',
   trainingDeleteDataset: '删除数据集',
-  trainingDropHint: '同一艺人或风格的文件夹，5–50 首：WAV、MP3、FLAC、OGG、M4A。每首歌的歌词和风格会自动准备；整轨专辑按 .cue 切分，旁边 .txt 或 .lrc 中的歌词直接采用。',
+  trainingDropHint: '同一艺人或风格的文件夹，5–50 首：WAV、MP3、FLAC、OGG、M4A、AIFF。每首歌的歌词和风格会自动准备；整轨专辑按 .cue 切分，旁边 .txt 或 .lrc 中的歌词直接采用。',
   trainingDropMore: '把更多歌曲拖到这里',
   trainingDropTitle: '把歌曲文件夹拖到这里',
   trainingFillMissing: '补全缺失内容',
@@ -618,6 +624,9 @@ const zh: TrainingStrings = {
   trainingChoice_tuned: '沿用旧法：按 KL 停止',
   trainingHint_preset: '快速、均衡和精细按模型技术报告中训练基础模型的方式训练 LoRA：每步多首歌曲，整首歌通过声音部分，不做歌词时间对齐（因此也不需要分离人声）。HOT-Step 在整张专辑的试听后把它设为默认。一般选均衡；精细大约耗时四倍。“沿用旧法”是以前的配方，按 KL 停止并对齐歌词时间。',
   trainingSongsPerStep: '每步歌曲数',
+  trainingPresetName_fast: '快速',
+  trainingPresetName_balanced: '均衡',
+  trainingPresetName_thorough: '精细',
 };
 
 const ja: TrainingStrings = {
@@ -769,7 +778,7 @@ const ja: TrainingStrings = {
   trainingCardSongs: '{songs} · {minutes} 分',
   trainingCardTraining: '学習中…',
   trainingDeleteDataset: 'データセットを削除',
-  trainingDropHint: '一人のアーティストやスタイルのフォルダー、5〜50 曲：WAV、MP3、FLAC、OGG、M4A。各曲の歌詞とスタイルは自動で準備されます。一枚ファイルのアルバムは .cue で分割され、横の .txt や .lrc の歌詞はそのまま使われます。',
+  trainingDropHint: '一人のアーティストやスタイルのフォルダー、5〜50 曲：WAV、MP3、FLAC、OGG、M4A、AIFF。各曲の歌詞とスタイルは自動で準備されます。一枚ファイルのアルバムは .cue で分割され、横の .txt や .lrc の歌詞はそのまま使われます。',
   trainingDropMore: 'ここにさらに曲をドロップ',
   trainingDropTitle: 'ここに曲のフォルダーをドロップ',
   trainingFillMissing: '足りないものを埋める',
@@ -823,6 +832,9 @@ const ja: TrainingStrings = {
   trainingChoice_tuned: '従来どおり: KL で停止',
   trainingHint_preset: '高速・バランス・入念は、モデルの技術レポートにある基本モデル自体の学習方法で LoRA を学習します。1 ステップに複数の曲、曲全体をサウンド側に通し、歌詞のタイミング合わせはしません（ボーカル分離も不要）。HOT-Step はアルバム全体での試聴を経てこれを標準にしました。通常はバランスで十分で、入念は約 4 倍の時間がかかります。「従来どおり」は KL 停止と歌詞タイミングを使う以前のレシピです。',
   trainingSongsPerStep: '1 ステップの曲数',
+  trainingPresetName_fast: '高速',
+  trainingPresetName_balanced: 'バランス',
+  trainingPresetName_thorough: '入念',
 };
 
 const ko: TrainingStrings = {
@@ -974,7 +986,7 @@ const ko: TrainingStrings = {
   trainingCardSongs: '{songs} · {minutes}분',
   trainingCardTraining: '학습 중…',
   trainingDeleteDataset: '데이터셋 삭제',
-  trainingDropHint: '한 아티스트나 스타일의 폴더, 5–50곡: WAV, MP3, FLAC, OGG, M4A. 각 곡의 가사와 스타일은 자동으로 준비됩니다. 한 파일짜리 앨범은 .cue로 나뉘고, 옆의 .txt나 .lrc 가사는 그대로 사용합니다.',
+  trainingDropHint: '한 아티스트나 스타일의 폴더, 5–50곡: WAV, MP3, FLAC, OGG, M4A, AIFF. 각 곡의 가사와 스타일은 자동으로 준비됩니다. 한 파일짜리 앨범은 .cue로 나뉘고, 옆의 .txt나 .lrc 가사는 그대로 사용합니다.',
   trainingDropMore: '여기에 곡을 더 끌어다 놓으세요',
   trainingDropTitle: '여기에 노래 폴더를 끌어다 놓으세요',
   trainingFillMissing: '빠진 것 채우기',
@@ -1028,6 +1040,9 @@ const ko: TrainingStrings = {
   trainingChoice_tuned: '이전 방식: KL로 중지',
   trainingHint_preset: '빠름·균형·꼼꼼은 모델 기술 보고서에 나온 기본 모델 학습 방식 그대로 LoRA를 학습합니다. 한 스텝에 여러 곡, 곡 전체를 사운드 부분에 통과시키고, 가사 타이밍 정렬은 하지 않습니다(보컬 분리도 필요 없음). HOT-Step은 앨범 전체 청취 테스트 후 이것을 기본으로 삼았습니다. 보통은 균형이면 충분하고, 꼼꼼은 약 4배 오래 걸립니다. "이전 방식"은 KL 중지와 가사 타이밍을 쓰는 예전 레시피입니다.',
   trainingSongsPerStep: '스텝당 곡 수',
+  trainingPresetName_fast: '빠름',
+  trainingPresetName_balanced: '균형',
+  trainingPresetName_thorough: '꼼꼼',
 };
 
 export const trainingStrings = { en, ru, zh, ja, ko };
