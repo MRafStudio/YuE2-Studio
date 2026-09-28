@@ -6214,15 +6214,28 @@ async fn export_adapter_comfyui(
     Path(id): Path<String>,
     axum::extract::Query(query): axum::extract::Query<ComfyExportQuery>,
 ) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
-    if !state.adapters.exists(&id) || id.contains(['/', '\\']) || id.contains("..") {
+    let work = tempfile::tempdir().map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    let out = work.path().join("comfyui.safetensors");
+    export_comfyui_to(&state, &id, query.ar, query.nar, out.clone()).await?;
+    let exported = std::fs::read(&out).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    Ok(axum::response::Response::builder()
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(header::CONTENT_LENGTH, exported.len())
+        .body(axum::body::Body::from(exported))
+        .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?)
+}
+
+/// Writes an installed adapter as one ComfyUI file at `out`; returns its size.
+async fn export_comfyui_to(state: &AppState, id: &str, ar: Option<f32>, nar: Option<f32>, out: PathBuf) -> Result<u64, (StatusCode, Json<ApiError>)> {
+    if !state.adapters.exists(id) || id.contains(['/', '\\']) || id.contains("..") {
         return Err(api_error(StatusCode::NOT_FOUND, format!("no adapter {id}")));
     }
-    let folder = state.adapters.root().join(&id);
+    let folder = state.adapters.root().join(id);
     let meta: Value = std::fs::read(folder.join("adapter.json")).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or(Value::Null);
-    let name = meta.get("name").and_then(Value::as_str).unwrap_or(&id).to_string();
+    let name = meta.get("name").and_then(Value::as_str).unwrap_or(id).to_string();
     let trigger = meta.get("trigger").and_then(Value::as_str).map(str::to_string);
-    let (ar_strength, nar_strength) = (query.ar.unwrap_or(1.0), query.nar.unwrap_or(1.0));
-    let exported = tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
+    let (ar_strength, nar_strength) = (ar.unwrap_or(1.0), nar.unwrap_or(1.0));
+    tokio::task::spawn_blocking(move || -> anyhow::Result<u64> {
         let (mut ar, mut nar) = (None, None);
         for entry in std::fs::read_dir(&folder)? {
             let path = entry?.path();
@@ -6238,19 +6251,12 @@ async fn export_adapter_comfyui(
         if ar.is_none() && nar.is_none() {
             anyhow::bail!("this adapter is not in the studio's own format, so there is nothing to convert: a LoRA downloaded for ComfyUI loads there as it is");
         }
-        let work = tempfile::tempdir()?;
-        let out = work.path().join("comfyui.safetensors");
         comfy_export::export_yue2(ar.as_deref(), nar.as_deref(), ar_strength, nar_strength, &out, &name, trigger.as_deref())?;
-        Ok(std::fs::read(&out)?)
+        Ok(std::fs::metadata(&out)?.len())
     })
     .await
     .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
-    .map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("{error:#}")))?;
-    Ok(axum::response::Response::builder()
-        .header(header::CONTENT_TYPE, "application/octet-stream")
-        .header(header::CONTENT_LENGTH, exported.len())
-        .body(axum::body::Body::from(exported))
-        .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?)
+    .map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("{error:#}")))
 }
 
 #[derive(Debug, Deserialize)]
@@ -6262,18 +6268,29 @@ struct ComfySaveRequest {
 }
 
 /// The ComfyUI file written where an agent says, for it has no Save dialog.
+/// A file already there is refused, not replaced: the path could name a model.
 async fn save_adapter_comfyui(State(state): State<AppState>, Path(id): Path<String>, Json(request): Json<ComfySaveRequest>) -> Result<Json<Value>, (StatusCode, Json<ApiError>)> {
     let target = PathBuf::from(request.path.trim());
     if !target.is_absolute() || target.extension().and_then(|extension| extension.to_str()) != Some("safetensors") {
         return Err(api_error(StatusCode::BAD_REQUEST, "path must be a full path ending in .safetensors".into()));
     }
-    let response = export_adapter_comfyui(State(state), Path(id), axum::extract::Query(ComfyExportQuery { ar: request.ar, nar: request.nar })).await?;
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    if target.exists() {
+        return Err(api_error(StatusCode::CONFLICT, format!("{} already exists; give a new file name", target.display())));
+    }
     if let Some(parent) = target.parent() {
         std::fs::create_dir_all(parent).map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("create {}: {error}", parent.display())))?;
     }
-    std::fs::write(&target, &bytes).map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("write {}: {error}", target.display())))?;
-    Ok(Json(serde_json::json!({ "path": target.display().to_string(), "bytes": bytes.len() })))
+    // written beside it and renamed once whole, so a failed export leaves no half file
+    let partial = target.with_extension("safetensors.part");
+    let bytes = match export_comfyui_to(&state, &id, request.ar, request.nar, partial.clone()).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            let _ = std::fs::remove_file(&partial);
+            return Err(error);
+        }
+    };
+    std::fs::rename(&partial, &target).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, format!("rename to {}: {error}", target.display())))?;
+    Ok(Json(serde_json::json!({ "path": target.display().to_string(), "bytes": bytes })))
 }
 
 /// Songs appended to a playlist, each once.
