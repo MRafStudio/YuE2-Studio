@@ -5,7 +5,7 @@
 //! so the tempo it states is replaced with the one `audio_facts` measured. The YuE2 style sentence is then written from what MOSS heard by
 //! the writing assistant, with HOT-Step's YuE2 caption prompt.
 //!
-//! Prompts, sampling and the caption clean-up follow HOT-Step-CPP 8a5e42c4:
+//! Prompts, sampling and the caption clean-up follow HOT-Step-CPP 3e7a0778:
 //! server/src/services/training/{captionPrompt,mossCaption}.ts and
 //! server/src/services/lireek/prompts.ts.
 
