@@ -820,6 +820,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   // snapshot, so editing the form meanwhile does not change the next songs.
   const [forever, setForever] = useState(false);
   const foreverRequest = useRef<(YueRequest & { _tempId?: string }) | null>(null);
+  useEffect(() => {
+    const stop = () => setForever(false);
+    window.addEventListener('yue:cancel-all', stop);
+    return () => window.removeEventListener('yue:cancel-all', stop);
+  }, []);
   const generate = (request: YueRequest & { _tempId?: string }) => {
     if (forever) foreverRequest.current = { ...request };
     onGenerate(request);
