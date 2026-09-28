@@ -1135,6 +1135,7 @@ fn tools() -> &'static [Tool] {
                     "lyrics": { "type": "string" },
                     "title": { "type": "string" },
                     "abc": { "type": "string" },
+                    "playlist_id": { "type": "string", "description": "a playlist (see playlist_list) the made songs are added to" },
                     "cot": { "type": "string", "enum": ["full", "melody", "off"] },
                     "duration_seconds": { "type": "number" },
                     "seed": { "type": "integer" },

@@ -468,9 +468,14 @@ I build open-source software and do AI research. Most of what I create is free a
 
 ## License
 
-The studio is MIT, and so is yue2.cpp. **The models are not:** YuE2-3B, the YuE2 VAE and
-SheetSage2 are released under **CC BY-NC 4.0** — songs you make with them are for
-non-commercial use unless you obtain other terms from their authors.
+The studio is MIT, and so is yue2.cpp. **The models are not.** The YuE2-3B and YuE2 VAE
+weights are **CC BY-NC 4.0 with an individual-creator permission**
+([MODEL_LICENSE](https://github.com/multimodal-art-projection/YuE/blob/main/MODEL_LICENSE),
+16 September 2026): personal users, content creators and musicians acting on their own may use
+them free of charge and publish, sell, license or otherwise monetize the songs they make, as long
+as the use is not illegal, harmful or deceptive. Companies that want to use the weights
+commercially need a license from their authors. SheetSage2, which reads the source song for
+covers, is **CC BY-NC 4.0** without that permission.
 
 One bundled component is under a different licence: the visualiser's spectrum looks come from
 [audioMotion-analyzer](https://github.com/hvianna/audioMotion-analyzer), which is **AGPL-3.0**;

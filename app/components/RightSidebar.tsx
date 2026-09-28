@@ -1,3 +1,4 @@
+import { openStems } from '../services/openStems';
 import React, { useState, useEffect } from 'react';
 import { TRACK_ARTIST } from '../services/studio';
 import { Song } from '../types';
@@ -430,14 +431,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                             <Repeat size={18} strokeWidth={1.5} />
                         </button>
                         <button
-                            onClick={() => {
-                                if (!song?.audioUrl) return;
-                                const baseUrl = window.location.port === '3000'
-                                    ? `${window.location.protocol}//${window.location.hostname}:3001`
-                                    : window.location.origin;
-                                const audioUrl = song.audioUrl.startsWith('http') ? song.audioUrl : `${baseUrl}${song.audioUrl}`;
-                                window.open(`${baseUrl}/demucs-web/?audioUrl=${encodeURIComponent(audioUrl)}`, '_blank');
-                            }}
+                            onClick={() => { if (song?.audioUrl) openStems(song); }}
                             title={t('extractStems')}
                             className="p-3 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-300/50 dark:hover:bg-white/10 rounded-xl transition-all duration-200"
                         >
@@ -806,7 +800,7 @@ const SongScore: React.FC<{ song: Song }> = ({ song }) => {
             </div>
             {open && (
                 <div className="max-h-[420px] overflow-auto bg-white p-2 custom-scrollbar">
-                    <ScoreView abc={abc} />
+                    <ScoreView abc={abc} title={song.title} />
                 </div>
             )}
         </div>

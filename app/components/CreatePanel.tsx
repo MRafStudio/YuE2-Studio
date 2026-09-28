@@ -1,3 +1,4 @@
+import { loadNativePlaylists } from '../services/nativeLibrary';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { karaokeReason } from '../services/karaoke';
 import {
@@ -555,6 +556,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     if (name.trim()) request.title = name.trim();
     if (coverPrompt.trim()) request.cover_prompt = coverPrompt.trim();
     if (adapters.length > 0) request.adapters = adapters;
+    if (!forFile && chosenPlaylist) request.playlist_id = chosenPlaylist;
     return request;
   };
 
@@ -774,6 +776,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       setAssisting(null);
     }
   };
+
+  // The playlist new songs go into, kept between sessions: the project the
+  // user is working on, so a day's takes do not mix with the others.
+  const [playlistId, setPlaylistId] = useState(() => {
+    try { return window.localStorage.getItem('studio.createPlaylist') ?? ''; } catch { return ''; }
+  });
+  const [playlists, setPlaylists] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    const load = () => void loadNativePlaylists().then(list => setPlaylists(list.map(entry => ({ id: entry.id, name: entry.name })))).catch(() => undefined);
+    load();
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, []);
+  const choosePlaylist = (id: string) => {
+    setPlaylistId(id);
+    try { window.localStorage.setItem('studio.createPlaylist', id); } catch { /* kept until a reload */ }
+  };
+  // a playlist deleted elsewhere is no longer offered or sent
+  const chosenPlaylist = playlists.some(entry => entry.id === playlistId) ? playlistId : '';
 
   // Without stopping: the request as it was when the button was pressed goes
   // again with new seeds whenever the queue runs low, until switched off. A
@@ -1475,6 +1496,15 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <button type="button" onClick={() => setTakeChoiceOpen(false)} className="ml-auto px-2 py-1.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-white">{t('cancel')}</button>
             </div>
           </div>
+        )}
+        {playlists.length > 0 && (
+          <label className="mb-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+            <span className="shrink-0">{tt('createIntoPlaylist')}</span>
+            <select value={chosenPlaylist} onChange={event => choosePlaylist(event.target.value)} className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-black/20">
+              <option value="">{tt('createIntoNoPlaylist')}</option>
+              {playlists.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+            </select>
+          </label>
         )}
         <label className="mb-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300" title={tt('generateForeverHint')}>
           <input type="checkbox" checked={forever} onChange={event => setForever(event.target.checked)} className="accent-pink-500" />

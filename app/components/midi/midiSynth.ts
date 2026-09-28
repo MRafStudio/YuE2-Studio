@@ -55,6 +55,11 @@ export class MidiSynth {
   private timer: number | null = null;
   private active: Set<{ stop: (t: number) => void }> = new Set();
   private crossfade = 0.5;
+  // Playing alone, with no track to follow: the audio context is the clock,
+  // counted from this context time. Null while following a track or stopped.
+  private aloneFrom: number | null = null;
+  /** Called once the notes played alone have all sounded. */
+  onEnded: (() => void) | null = null;
 
   // per-instrument-family sub-mix (mute/solo support)
   private familyGains = new Map<string, GainNode>();
@@ -131,8 +136,22 @@ export class MidiSynth {
     this.resync();
   }
 
-  get currentTime(): number { return this.audioEl?.currentTime ?? 0; }
-  get playing(): boolean { return !!this.audioEl && !this.audioEl.paused; }
+  get currentTime(): number {
+    if (this.aloneFrom !== null) return Math.max(0, this.ctx.currentTime - this.aloneFrom);
+    return this.audioEl?.currentTime ?? 0;
+  }
+  get playing(): boolean { return this.aloneFrom !== null || (!!this.audioEl && !this.audioEl.paused); }
+
+  /** Plays the notes on their own - a score heard without a recording. */
+  async playAlone(notes: PlayNote[]): Promise<void> {
+    this.pause();
+    await this.ctx.resume();
+    this.setCrossfade(1);
+    this.notes = [...notes].sort((a, b) => a.start - b.start);
+    this.schedIdx = 0;
+    this.aloneFrom = this.ctx.currentTime + 0.1;
+    this.timer = window.setInterval(() => this.tick(), TICK_MS);
+  }
 
   async play(): Promise<void> {
     if (!this.audioEl) return;
@@ -145,6 +164,7 @@ export class MidiSynth {
   }
 
   pause(): void {
+    this.aloneFrom = null;
     this.audioEl?.pause();
     this.stopScheduled();
     if (this.timer !== null) { window.clearInterval(this.timer); this.timer = null; }
@@ -178,11 +198,20 @@ export class MidiSynth {
   }
 
   private tick(): void {
-    if (!this.audioEl || this.audioEl.paused) return;
-    const trackTime = this.audioEl.currentTime;
+    const alone = this.aloneFrom !== null;
+    if (!alone && (!this.audioEl || this.audioEl.paused)) return;
+    const trackTime = this.currentTime;
     const horizon = trackTime + LOOKAHEAD_S;
     // map track seconds -> ctx seconds (recomputed every tick: absorbs drift)
     const ctxBase = this.ctx.currentTime - trackTime;
+    if (alone && this.schedIdx >= this.notes.length) {
+      const last = this.notes.reduce((end, note) => Math.max(end, note.start + note.duration), 0);
+      if (trackTime > last + 0.5) {
+        this.pause();
+        this.onEnded?.();
+      }
+      return;
+    }
 
     while (this.schedIdx < this.notes.length && this.notes[this.schedIdx].start < horizon) {
       const n = this.notes[this.schedIdx++];

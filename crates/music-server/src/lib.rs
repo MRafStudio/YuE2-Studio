@@ -195,6 +195,9 @@ struct CreateMusicJobRequest {
     lyrics: String,
     /// ABC score to realise; empty lets the model write one.
     abc: Option<String>,
+    /// The playlist the made songs are added to.
+    #[serde(default)]
+    playlist_id: Option<String>,
     /// Chain-of-thought mode: `full`, `melody` or `off`.
     cot: Option<String>,
     /// Target length in seconds; the model may end the song earlier.
@@ -305,6 +308,9 @@ struct MusicJob {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     songs: Vec<CompletedSong>,
     message: String,
+    /// The playlist the made songs go into, a project the user works in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    playlist_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -6000,6 +6006,7 @@ async fn create_music_job(
                 song: None,
                 songs: vec![],
                 message: "Submitted to yue-server.".into(),
+                playlist_id: request.playlist_id.clone(),
             };
             state.jobs.write().await.insert(job.id.clone(), job.clone());
             spawn_job_watcher(state.clone(), job.id.clone());
@@ -6064,6 +6071,7 @@ async fn replay_music_job(
         song: None,
         songs: vec![],
         message: "Submitted a re-render: the semantic stream is present, so the autoregressive stage is skipped.".into(),
+        playlist_id: None,
     };
     if let Some(song_id) = &request.song_id {
         if let Some(original) = state.library.get_song(song_id).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))? {
@@ -6145,6 +6153,19 @@ async fn music_job_status(
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Music job was not found.".into()))
 }
 
+/// Songs appended to a playlist, each once.
+fn add_to_playlist(library: &library::Library, playlist_id: &str, songs: impl Iterator<Item = String>) -> anyhow::Result<()> {
+    let playlist = library.get_playlist(playlist_id)?.with_context(|| format!("no playlist {playlist_id}"))?;
+    let mut song_ids = playlist.song_ids;
+    for song in songs {
+        if !song_ids.contains(&song) {
+            song_ids.push(song);
+        }
+    }
+    library.update_playlist(playlist_id, library::PlaylistInput { name: playlist.name, description: playlist.description, song_ids })?;
+    Ok(())
+}
+
 /// Follows one engine job to its end and imports what it made.
 ///
 /// The service owns this, not the window: a track finished while the
@@ -6192,8 +6213,13 @@ fn spawn_job_watcher(state: AppState, job_id: String) {
                         job.status = MusicJobStatus::Completed;
                         job.phase = MusicJobPhase::Completed;
                         job.song = songs.first().cloned();
-                        job.songs = songs;
                         job.message = "The engine finished this job and its tracks were imported into the library.".into();
+                        if let Some(playlist) = existing.playlist_id.as_deref() {
+                            if let Err(error) = add_to_playlist(&state.library, playlist, songs.iter().map(|song| song.id.clone())) {
+                                job.message = format!("{} They could not be added to the playlist: {error:#}", job.message);
+                            }
+                        }
+                        job.songs = songs;
                     }
                     Err(error) => {
                         job.status = MusicJobStatus::Failed;
@@ -6889,6 +6915,7 @@ fn queued_not_configured_job(request: CreateMusicJobRequest, engine_id: String) 
         song: None,
         songs: vec![],
         message: "The selected local music engine is not configured; this job remains queued and no inference has started.".into(),
+        playlist_id: None,
     }
 }
 
@@ -6910,6 +6937,7 @@ fn failed_request_job(request: CreateMusicJobRequest, engine_id: String, error: 
         song: None,
         songs: vec![],
         message: error,
+        playlist_id: None,
     }
 }
 
