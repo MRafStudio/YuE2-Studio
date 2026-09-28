@@ -41,6 +41,13 @@ Windows build.
 
 ### Fixed
 
+- **The library keeps up**: stems, processed versions, a song an agent made and a song
+  deleted in another window show up at once, without reopening the page.
+- **Cancel all stops everything**: the song still on its way to the engine too, and "Without
+  stopping" switches off instead of starting the next one.
+- Stem separation starts on Auto: the card when its runtime is installed, the processor
+  otherwise, instead of showing the card chosen and quietly running on the processor.
+- A playlist names each song's artist as the player does.
 - **Preparation without an assistant** no longer fails every song: it says an assistant writes
   the lyrics layout and the style, with "Set up the assistant" and "Take as they are". (#23)
 - **The writing wand** explains why it opens the assistant settings: music models do not write
