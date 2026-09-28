@@ -152,8 +152,35 @@ fn quiet(program: &str) -> Command {
     command
 }
 
+/// The card the studio was pointed at (`apply_saved_gpu`), as nvidia-smi's
+/// `-i` takes it: the same PCI order CUDA_DEVICE_ORDER=PCI_BUS_ID gives CUDA.
+pub(crate) fn chosen_card() -> Vec<String> {
+    match std::env::var("CUDA_VISIBLE_DEVICES").ok().and_then(|value| value.trim().parse::<u32>().ok()) {
+        Some(index) => vec!["-i".into(), index.to_string()],
+        None => Vec::new(),
+    }
+}
+
+/// Every NVIDIA card: its nvidia-smi index, name and memory in GB.
+pub fn nvidia_cards() -> Vec<(u32, String, f64)> {
+    let Ok(output) = quiet("nvidia-smi").args(["--query-gpu=index,name,memory.total", "--format=csv,noheader,nounits"]).output() else { return Vec::new() };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split(',').map(str::trim);
+            let index = fields.next()?.parse().ok()?;
+            let name = fields.next()?.to_string();
+            let memory = fields.next()?.parse::<f64>().ok()? / 1024.0;
+            Some((index, name, memory))
+        })
+        .collect()
+}
+
 fn nvidia_smi() -> Option<(String, f64)> {
-    let output = quiet("nvidia-smi").args(["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]).output().ok()?;
+    let output = quiet("nvidia-smi").args(chosen_card()).args(["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]).output().ok()?;
     if !output.status.success() {
         return None;
     }
@@ -165,7 +192,7 @@ fn nvidia_smi() -> Option<(String, f64)> {
 /// Asked apart from the name and memory: a driver too old to know
 /// `compute_cap` fails the whole query, and such a driver runs neither build.
 fn nvidia_cuda_device() -> Option<((u32, u32), u32)> {
-    let output = quiet("nvidia-smi").args(["--query-gpu=compute_cap,driver_version", "--format=csv,noheader"]).output().ok()?;
+    let output = quiet("nvidia-smi").args(chosen_card()).args(["--query-gpu=compute_cap,driver_version", "--format=csv,noheader"]).output().ok()?;
     if !output.status.success() {
         return None;
     }

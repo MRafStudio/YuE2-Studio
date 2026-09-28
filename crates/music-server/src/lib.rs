@@ -437,6 +437,9 @@ struct EngineOptions {
     vae_halo: Option<u32>,
     disable_flash_attention: bool,
     clamp_fp16: bool,
+    /// The NVIDIA card, by its nvidia-smi index, that every CUDA process of
+    /// the studio computes on. None: the first. Taken at the studio's start.
+    gpu: Option<u32>,
 }
 
 impl EngineOptions {
@@ -800,6 +803,8 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/training/datasets/{id}/items/{item}/files", get(dataset_song_files))
         .route("/v1/training/prepare/cancel", post(prepare::cancel))
         .route("/v1/training/datasets/{id}/take-as-is", post(prepare::take_as_is))
+        .route("/v1/library/songs/{id}/describe-style", post(prepare::describe_song_style))
+        .route("/v1/system/gpus", get(system_gpus))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -3818,6 +3823,33 @@ pub fn studio_data_root() -> Option<PathBuf> {
     }
 
     None
+}
+
+/// Points every CUDA process of the studio - the engine, the trainer, the
+/// assistant, the captioner, and ONNX Runtime inside the service - at the card
+/// chosen in the engine settings, numbered as nvidia-smi numbers them. Called
+/// by the desktop shell and the standalone service before anything starts.
+pub fn apply_saved_gpu() {
+    let Some(index) = load_studio_settings(&studio_settings_path()).and_then(|settings| settings.engine_options.gpu) else { return };
+    // SAFETY: called first thing in the process, before the service and its
+    // runtimes read the environment; on Windows the variables are set through
+    // SetEnvironmentVariableW, which is thread safe.
+    unsafe {
+        env::set_var("CUDA_DEVICE_ORDER", "PCI_BUS_ID");
+        env::set_var("CUDA_VISIBLE_DEVICES", index.to_string());
+    }
+}
+
+/// The NVIDIA cards nvidia-smi lists, and which one the studio runs on.
+async fn system_gpus(State(state): State<AppState>) -> Json<Value> {
+    let cards = tokio::task::spawn_blocking(hardware::nvidia_cards).await.unwrap_or_default();
+    let chosen = state.engine_options.read().await.gpu;
+    let running = env::var("CUDA_VISIBLE_DEVICES").ok().and_then(|value| value.trim().parse::<u32>().ok());
+    Json(serde_json::json!({
+        "cards": cards.iter().map(|(index, name, gigabytes)| serde_json::json!({ "index": index, "name": name, "memory_gb": gigabytes })).collect::<Vec<_>>(),
+        "chosen": chosen,
+        "running": running,
+    }))
 }
 
 /// The saved proxy, for the desktop shell to hand the window's browser before

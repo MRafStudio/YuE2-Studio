@@ -2,7 +2,7 @@ import { loadNativePlaylists } from '../services/nativeLibrary';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { karaokeReason } from '../services/karaoke';
 import {
-  AlertTriangle, AudioLines, ChevronDown, CircleAlert, Dices, Eye, EyeOff, FileMusic, FolderOpen, Loader2,
+  AlertTriangle, AudioLines, ChevronDown, CircleAlert, Dices, Ear, Eye, EyeOff, FileMusic, FolderOpen, Loader2,
   Music2, Pause, Play, RotateCcw, Save, Sparkles, Square, Tags, Upload, Wand2, Settings2, X,
 } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
@@ -777,6 +777,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     }
   };
 
+  // A cover of a recording that came without a style: MOSS-Music hears the
+  // source and the style is written from that.
+  const [describing, setDescribing] = useState(false);
+  const describeByEar = async () => {
+    if (!coverSongId) return;
+    setDescribing(true);
+    setError(null);
+    try {
+      const response = await fetch(`/v1/library/songs/${encodeURIComponent(coverSongId)}/describe-style`, { method: 'POST' });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || typeof body?.style !== 'string') throw new Error(body?.error || `HTTP ${response.status}`);
+      setStyle(body.style);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setDescribing(false);
+    }
+  };
+
   // The playlist new songs go into, kept between sessions: the project the
   // user is working on, so a day's takes do not mix with the others.
   const [playlistId, setPlaylistId] = useState(() => {
@@ -1176,6 +1195,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               className={`${CONTROL} mt-3 resize-none overflow-y-auto leading-5 custom-scrollbar`}
             />
             <p className="mt-2 text-[11px] leading-4 text-zinc-500">{tt('styleHint')}</p>
+            {mode === 'cover' && coverSongId && (
+              <button type="button" onClick={() => void describeByEar()} disabled={describing} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-medium text-zinc-600 transition-colors hover:border-pink-400 hover:text-pink-600 disabled:opacity-50 dark:border-white/10 dark:text-zinc-300" title={tt('describeByEarHint')}>
+                {describing ? <Loader2 size={12} className="animate-spin" /> : <Ear size={12} />}{tt('describeByEar')}
+              </button>
+            )}
           </Card>
 
           <Card

@@ -294,6 +294,55 @@ pub async fn set_train_after(State(state): State<AppState>, Json(request): Json<
     Json(serde_json::json!({ "train_after": on }))
 }
 
+/// A library song's style, by ear: MOSS-Music hears it, the tempo is
+/// measured, and the assistant writes the style line from both - or, with no
+/// assistant, the style is what MOSS heard. For a cover of a song that came
+/// without one, an imported recording.
+pub async fn describe_song_style(State(state): State<AppState>, Path(song_id): Path<String>) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiError>)> {
+    if !state.training.listen_ready() {
+        return Err(api_error(StatusCode::CONFLICT, "auto-describe (MOSS-Music) is not installed; install it on the training page".into()));
+    }
+    if state.training.active_run().await.is_some() || state.prepare.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).as_ref().is_some_and(|job| !job.finished) {
+        return Err(api_error(StatusCode::CONFLICT, "the card is training or preparing songs; describe once it is free".into()));
+    }
+    let song = state.library.get_song(&song_id).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, format!("{error:#}")))?
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, format!("no library song {song_id}")))?;
+    let audio = state.library.media_path_for_song(&song).ok_or_else(|| api_error(StatusCode::BAD_REQUEST, format!("{} has no audio", song.title)))?;
+
+    let hooks = crate::card_hooks(&state).await;
+    (hooks.take)().await;
+    crate::release_assistant_unless_kept(&state).await;
+    let heard = async {
+        if crate::hardware::hardware().cuda == Some(crate::hardware::CudaBuild::Cuda13) {
+            state.engine_runtime.install_missing(Some(crate::hardware::CudaBuild::Cuda13)).await.context("install cuBLAS for the captioner")?;
+        }
+        let (captioner, moss, facts_dir, libraries) = (state.training.captioner(), state.training.moss_dir(), state.training.audio_facts_dir(), crate::engine_bundle_root());
+        tokio::task::spawn_blocking(move || -> anyhow::Result<(listen::Heard, audio_facts::Facts)> {
+            let facts = audio_facts::Measurer::load(&facts_dir, true)?.measure_mono(&audio_facts::decode(&audio)?)?;
+            let cancel = AtomicBool::new(false);
+            let mut caption: Option<anyhow::Result<String>> = None;
+            listen::hear_batch(&captioner, &moss, Some(&libraries), std::slice::from_ref(&audio), &cancel, |_, heard| caption = Some(heard))?;
+            let caption = caption.context("MOSS-Music wrote nothing for the song")??;
+            Ok((listen::heard(&caption, &facts)?, facts))
+        })
+        .await?
+    }
+    .await;
+    (hooks.give_back)().await;
+    let (heard, facts) = heard.map_err(|error| api_error(StatusCode::BAD_GATEWAY, format!("{error:#}")))?;
+
+    let note = training::HeardNote { genre: heard.genre.clone(), caption: heard.caption.clone(), bpm: facts.bpm };
+    let style = if state.assistant.read().await.available() {
+        let instrumental = song.lyrics.trim().is_empty();
+        let written = write_style(&state, &heard, &facts, &song.lyrics, instrumental).await;
+        crate::release_assistant_unless_kept(&state).await;
+        written.map_err(|error| api_error(StatusCode::BAD_GATEWAY, error))?
+    } else {
+        heard_style(&note)
+    };
+    Ok(Json(serde_json::json!({ "style": style, "heard": { "genre": note.genre, "caption": note.caption, "bpm": note.bpm } })))
+}
+
 /// The notice of a preparation that found songs to write and no assistant.
 const ASSISTANT_MISSING: &str = "assistant_missing";
 
@@ -983,7 +1032,12 @@ pub(crate) async fn lay_out_lyrics(state: &AppState, transcript: &str, target: a
 /// The style sentence YuE2 is prompted with, from what MOSS heard. HOT-Step
 /// asks once more with the problems listed, and keeps the better answer.
 async fn describe(state: &AppState, heard: &listen::Heard, facts: &audio_facts::Facts, song: &training::DatasetItem) -> Result<String, String> {
-    let request = listen::yue2_request(heard, facts, "", &song.lyrics, song.instrumental);
+    write_style(state, heard, facts, &song.lyrics, song.instrumental).await
+}
+
+/// The style line the assistant writes from what was heard and the lyrics.
+async fn write_style(state: &AppState, heard: &listen::Heard, facts: &audio_facts::Facts, lyrics: &str, instrumental: bool) -> Result<String, String> {
+    let request = listen::yue2_request(heard, facts, "", lyrics, instrumental);
     let mut best: Option<(usize, String)> = None;
     let mut prompt = request.clone();
     for _ in 0..2 {

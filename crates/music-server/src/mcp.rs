@@ -1917,6 +1917,12 @@ fn tools() -> &'static [Tool] {
                 call: |args| post(format!("/v1/training/datasets/{}/prepare", segment(&text(args, "dataset_id")?)), body_without(args, &["dataset_id"])),
             },
             Tool {
+                name: "library_song_describe_style",
+                description: "Describe a library song's style by ear, for a cover of a recording that came without one: MOSS-Music hears it and the tempo is measured; with a writing assistant the answer is a YuE2 style line, without one what MOSS heard. Needs auto-describe installed; holds the card for a minute.",
+                schema: || object(json!({ "song_id": { "type": "string" } }), &["song_id"]),
+                call: |args| post(format!("/v1/library/songs/{}/describe-style", segment(&text(args, "song_id")?)), json!({})),
+            },
+            Tool {
                 name: "dataset_take_as_is",
                 description: "Without a writing assistant: keep the found lyrics as they are (no section tags) and the heard style as MOSS-Music described it, and mark those songs ready. items: song ids, all songs when left out.",
                 schema: || object(json!({ "dataset_id": { "type": "string" }, "items": { "type": "array", "items": { "type": "string" } } }), &["dataset_id"]),

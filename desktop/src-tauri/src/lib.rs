@@ -461,6 +461,8 @@ pub fn run() {
     }
 
     configure_studio_runtime_paths();
+    // the card chosen in the engine settings, for every CUDA process after this
+    music_server::apply_saved_gpu();
 
     // the service names the studio's version to agents, which only the shell knows
     let context = tauri::generate_context!();
