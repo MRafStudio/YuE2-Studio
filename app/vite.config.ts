@@ -1,9 +1,10 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { readFileSync } from 'fs';
 
-const appVersion: string = JSON.parse(readFileSync(path.resolve(__dirname, '../desktop/src-tauri/tauri.conf.json'), 'utf8')).version;
+const appVersion: string = JSON.parse(readFileSync(path.resolve(import.meta.dirname, '../desktop/src-tauri/tauri.conf.json'), 'utf8')).version;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
@@ -37,8 +38,8 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         // the visualiser's own window is a second page
         input: {
-          main: path.resolve(__dirname, 'index.html'),
-          visualizer: path.resolve(__dirname, 'visualizer.html'),
+          main: path.resolve(import.meta.dirname, 'index.html'),
+          visualizer: path.resolve(import.meta.dirname, 'visualizer.html'),
         },
       },
     },
@@ -48,10 +49,10 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),
     },
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       }
     }
   };

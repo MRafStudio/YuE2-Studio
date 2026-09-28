@@ -52,13 +52,13 @@ import {
  * straight to the LoRA library.
  */
 
-const CARD = 'rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]';
+const CARD = 'rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/3';
 const CONTROL =
-  'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-pink-500 disabled:opacity-50 dark:border-white/10 dark:bg-black/30 dark:text-white';
+  'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-hidden focus:border-pink-500 disabled:opacity-50 dark:border-white/10 dark:bg-black/30 dark:text-white';
 const OUTLINE =
   'inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:border-pink-400 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-zinc-200';
 const PRIMARY =
-  'inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50';
 const LABEL = 'text-[11px] font-bold uppercase tracking-wide text-zinc-500';
 
 const HINT = 'mt-1 text-[11px] leading-4 text-zinc-500';
@@ -218,7 +218,7 @@ const PackCard: React.FC<{ state: TrainingState; onError: (message: string) => v
             <span className="tabular-nums">{gigabytes(download.downloaded_bytes)} / {gigabytes(download.total_bytes)}</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10">
-            <div className="h-full bg-gradient-to-r from-orange-500 to-pink-600 transition-[width]" style={{ width: `${percent}%` }} />
+            <div className="h-full bg-linear-to-r from-orange-500 to-pink-600 transition-[width]" style={{ width: `${percent}%` }} />
           </div>
           <button type="button" onClick={() => void cancelTrainingPack().then(onChanged)} className={`${OUTLINE} mt-3`}><X size={13} />{t('adaptersCancel')}</button>
         </div>
@@ -264,7 +264,7 @@ const ListenCard: React.FC<{ state: TrainingState; onError: (message: string) =>
             <span className="tabular-nums">{gigabytes(download.downloaded_bytes)} / {gigabytes(download.total_bytes)}</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10">
-            <div className="h-full bg-gradient-to-r from-orange-500 to-pink-600 transition-[width]" style={{ width: `${percent}%` }} />
+            <div className="h-full bg-linear-to-r from-orange-500 to-pink-600 transition-[width]" style={{ width: `${percent}%` }} />
           </div>
           <button type="button" onClick={() => void cancelTrainingPack().then(onChanged)} className={`${OUTLINE} mt-3`}><X size={13} />{t('adaptersCancel')}</button>
         </div>
@@ -642,7 +642,7 @@ const SongsStep: React.FC<{
         {(working || adding) && (
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10">
             <div
-              className="h-full bg-gradient-to-r from-orange-500 to-pink-600 transition-[width]"
+              className="h-full bg-linear-to-r from-orange-500 to-pink-600 transition-[width]"
               style={{ width: `${adding ? (100 * adding.done) / Math.max(1, adding.total) : stage ? (100 * stage.done) / Math.max(1, stage.total) : 0}%` }}
             />
           </div>
@@ -702,7 +702,7 @@ const SongsStep: React.FC<{
         </div>
       </section>
 
-      <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-zinc-200 bg-white/90 p-3 backdrop-blur dark:border-white/10 dark:bg-zinc-950/90">
+      <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-zinc-200 bg-white/90 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/90">
         {working && (
           <label className="mr-auto flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-200">
             <input type="checkbox" checked={Boolean(mine?.train_after)} disabled={!state.pack_ready} onChange={event => onTrainAfter(event.target.checked)} className="accent-pink-500" />
@@ -889,7 +889,7 @@ const ContinueRun: React.FC<{ run: TrainingRun; onChanged: () => void; onError: 
             placeholder={String(suggested)}
             inputMode="numeric"
             aria-label={t('trainingContinueTo')}
-            className="w-24 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs tabular-nums text-zinc-900 outline-none focus:border-pink-500 dark:border-white/10 dark:bg-black/30 dark:text-white"
+            className="w-24 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs tabular-nums text-zinc-900 outline-hidden focus:border-pink-500 dark:border-white/10 dark:bg-black/30 dark:text-white"
           />
         </label>
       </div>
@@ -968,7 +968,7 @@ const RunCard: React.FC<{ run: TrainingRun; onChanged: () => void; onError: (mes
             {running && left > 0 && <span>{clock(left)} {t('trainingLeft')}</span>}
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10">
-            <div className="h-full bg-gradient-to-r from-orange-500 to-pink-600 transition-[width]" style={{ width: `${percent}%` }} />
+            <div className="h-full bg-linear-to-r from-orange-500 to-pink-600 transition-[width]" style={{ width: `${percent}%` }} />
           </div>
           <LossLine steps={run.steps} />
         </>

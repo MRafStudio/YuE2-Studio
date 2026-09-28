@@ -90,7 +90,7 @@ const PROFILE_LABEL: Record<string, string> = {
 };
 
 const CONTROL =
-  'w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-pink-500 disabled:opacity-50 dark:border-white/10 dark:bg-black/25 dark:text-white';
+  'w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-hidden transition-colors focus:border-pink-500 disabled:opacity-50 dark:border-white/10 dark:bg-black/25 dark:text-white';
 const LABEL = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400';
 const ICON =
   'rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-black dark:hover:bg-white/10 dark:hover:text-white disabled:opacity-40';
@@ -147,7 +147,7 @@ const Switch: React.FC<{ checked: boolean; onChange: (value: boolean) => void; l
       onClick={() => onChange(!checked)}
       className={`relative h-5 w-10 shrink-0 rounded-full transition-colors ${checked ? 'bg-pink-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
     >
-      <span className={`absolute top-[2px] h-4 w-4 rounded-full bg-white shadow-sm transition-all ${checked ? 'left-[22px]' : 'left-[2px]'}`} />
+      <span className={`absolute top-[2px] h-4 w-4 rounded-full bg-white shadow-xs transition-all ${checked ? 'left-[22px]' : 'left-[2px]'}`} />
     </button>
   </div>
 );
@@ -954,7 +954,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 role="tab"
                 aria-selected={mode === value}
                 onClick={() => setMode(value)}
-                className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${mode === value ? 'bg-white text-black shadow-sm dark:bg-zinc-800 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
+                className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${mode === value ? 'bg-white text-black shadow-xs dark:bg-zinc-800 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
               >
                 {value === 'studio' ? t('studioMode') : value === 'cover' ? tt('coverMode') : t('simpleMode')}
               </button>
@@ -990,7 +990,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 type="button"
                 onClick={() => void askAssistant('all')}
                 disabled={assisting !== null || !assistInstruction.trim()}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 py-2.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 py-2.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50"
               >
                 {assisting === 'all' ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
                 {assisting === 'all' ? `${t('assistantWriting')} · ${assistSeconds} ${t('secondsShort')}` : t('writeEverything')}
@@ -1045,14 +1045,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 type="button"
                 onClick={() => audioFile.current?.click()}
                 disabled={!transcriberReady || transcribing !== null}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 py-2.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 py-2.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50"
               >
                 {transcribing !== null ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                 {transcribing !== null ? `${tt('transcribing')} · ${transcribing}` : tt('coverPickRecording')}
               </button>
               <p className="mt-2 text-[11px] leading-4 text-zinc-500">{tt('coverFromLibraryHint')}</p>
               {coverAudio && (
-                <div className="mt-3 flex items-center gap-3 rounded-lg border border-zinc-100 bg-zinc-50 p-2 dark:border-white/5 dark:bg-white/[0.03]">
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-zinc-100 bg-zinc-50 p-2 dark:border-white/5 dark:bg-white/3">
                   <audio
                     key={coverAudio}
                     ref={coverPlayer}
@@ -1068,7 +1068,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     type="button"
                     onClick={() => { const player = coverPlayer.current; if (player) void (player.paused ? player.play() : player.pause()); }}
                     title={tt('coverListen')}
-                    className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/20 transition-transform hover:scale-105"
+                    className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-pink-500/20 transition-transform hover:scale-105"
                   >
                     {coverPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
                   </button>
@@ -1118,7 +1118,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </div>
               {assistModel && <p className="mt-1 truncate text-[11px] text-zinc-500">{assistModel}</p>}
               {assistDraft && (
-                <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-zinc-50 p-2 font-mono text-[11px] leading-4 text-zinc-600 dark:bg-black/30 dark:text-zinc-300">
+                <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap wrap-break-word rounded-lg bg-zinc-50 p-2 font-mono text-[11px] leading-4 text-zinc-600 dark:bg-black/30 dark:text-zinc-300">
                   {assistDraft.slice(-1200)}
                 </pre>
               )}
@@ -1171,7 +1171,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                       className="truncate rounded-md px-2 py-1 text-left text-[11px] text-zinc-600 transition-colors hover:bg-white hover:text-black dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
                       title={example.style}
                     >
-                      {example.cover && <span className="mr-1 rounded bg-pink-500/15 px-1 text-[9px] font-bold uppercase text-pink-600 dark:text-pink-300">{tt('coverBadge')}</span>}
+                      {example.cover && <span className="mr-1 rounded-sm bg-pink-500/15 px-1 text-[9px] font-bold uppercase text-pink-600 dark:text-pink-300">{tt('coverBadge')}</span>}
                       {example.title}
                     </button>
                   ))}
@@ -1183,7 +1183,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               onChange={event => setName(event.target.value)}
               placeholder={t('untitled')}
               aria-label={t('untitled')}
-              className="w-full border-0 bg-transparent p-0 text-lg font-bold text-zinc-900 outline-none placeholder:text-zinc-300 dark:text-white dark:placeholder:text-zinc-600"
+              className="w-full border-0 bg-transparent p-0 text-lg font-bold text-zinc-900 outline-hidden placeholder:text-zinc-300 dark:text-white dark:placeholder:text-zinc-600"
             />
             <AutoTextarea
               value={style}
@@ -1263,7 +1263,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   role="radio"
                   aria-checked={effectiveCot === value}
                   onClick={() => setCot(value)}
-                  className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition-all ${effectiveCot === value ? 'bg-white text-black shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
+                  className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition-all ${effectiveCot === value ? 'bg-white text-black shadow-xs dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
                 >
                   {tt(value === 'full' ? 'cotFull' : value === 'melody' ? 'cotMelody' : 'cotOff')}
                 </button>
@@ -1509,7 +1509,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         </div>
       </div>
 
-      <footer className="shrink-0 border-t border-zinc-200 bg-zinc-50/95 p-4 backdrop-blur dark:border-white/5 dark:bg-suno-panel/95">
+      <footer className="shrink-0 border-t border-zinc-200 bg-zinc-50/95 p-4 backdrop-blur-sm dark:border-white/5 dark:bg-suno-panel/95">
         {takeChoiceOpen && (
           <div role="dialog" aria-label={tt('takeTitle')} className="mb-3 rounded-xl border border-pink-300/50 bg-pink-50 p-3 text-xs leading-5 text-zinc-700 dark:border-pink-500/25 dark:bg-pink-500/10 dark:text-zinc-200">
             <p className="font-semibold text-zinc-900 dark:text-white">{tt('takeTitle')}</p>
@@ -1537,7 +1537,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         <button
           type="button"
           onClick={submit}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-orange-500 to-pink-600 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isGenerating ? <Square size={18} /> : <Sparkles size={18} />}
           {t('create')}
