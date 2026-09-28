@@ -12,11 +12,12 @@
 //! A fused module takes one adapter, so the separate q, k, v adapters are
 //! written as one LoRA whose factors are the separate ones stacked: `up` block
 //! diagonal, `down` stacked, the delta of each block exactly its own. A LoKr
-//! site kron(w1, A B) is the LoRA kron(I_a, A) . kron(w1, B) by the mixed
-//! product rule, exact, of rank a * dim where `a` is w1's row count. Modules
-//! that are not fused keep their LoKr or LoRA as they are. The strength of
-//! every fused block is folded into its `down`, so the file needs no alpha
-//! there and ComfyUI's scale is one.
+//! site kron(w1, A B) is the LoRA kron(I_a, A) . kron(w1, B) or
+//! kron(w1, A) . kron(I_b, B) by the mixed product rule, exact, of rank
+//! min(a, b) * dim for w1 of a rows and b columns. Every module is written as
+//! a plain LoRA, the unfused ones too: ComfyUI's YuE2 LoRA node takes only
+//! `lora_up`/`lora_down`. The strength is folded into `down`, so the file
+//! carries no alpha and ComfyUI's scale is one.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -141,8 +142,8 @@ fn f32_to_bf16(value: f32) -> u16 {
 enum Site {
     /// LoRA: delta = scale * up @ down.
     Lora { up: Tensor, down: Tensor, scale: f32 },
-    /// LoKr: delta = scale * kron(w1, a @ b), with its alpha kept for ComfyUI.
-    Lokr { w1: Tensor, a: Tensor, b: Tensor, scale: f32, alpha: Option<Tensor> },
+    /// LoKr: delta = scale * kron(w1, a @ b).
+    Lokr { w1: Tensor, a: Tensor, b: Tensor, scale: f32 },
 }
 
 impl Site {
@@ -151,33 +152,58 @@ impl Site {
     fn as_lora(&self) -> (Tensor, Tensor) {
         match self {
             Site::Lora { up, down, scale } => (up.clone(), scaled(down, *scale)),
-            Site::Lokr { w1, a, b, scale, .. } => {
-                // kron(w1, A B) = kron(I_a, A) . kron(w1, B)
+            Site::Lokr { w1, a, b, scale } => {
                 let (rows_w1, cols_w1) = (w1.rows(), w1.cols());
                 let (p, dim) = (a.rows(), a.cols());
                 let q = b.cols();
-                let rank = rows_w1 * dim;
-                let mut up = vec![0.0f32; rows_w1 * p * rank];
-                for block in 0..rows_w1 {
-                    for row in 0..p {
-                        for col in 0..dim {
-                            up[(block * p + row) * rank + block * dim + col] = a.at(row, col);
-                        }
-                    }
-                }
-                let width = cols_w1 * q;
-                let mut down = vec![0.0f32; rank * width];
-                for i in 0..rows_w1 {
-                    for j in 0..cols_w1 {
-                        let factor = w1.at(i, j) * scale;
-                        for row in 0..dim {
-                            for col in 0..q {
-                                down[(i * dim + row) * width + j * q + col] = factor * b.at(row, col);
+                let (height, width) = (rows_w1 * p, cols_w1 * q);
+                if rows_w1 <= cols_w1 {
+                    // kron(w1, A B) = kron(I_a, A) . kron(w1, B), rank a * dim
+                    let rank = rows_w1 * dim;
+                    let mut up = vec![0.0f32; height * rank];
+                    for block in 0..rows_w1 {
+                        for row in 0..p {
+                            for col in 0..dim {
+                                up[(block * p + row) * rank + block * dim + col] = a.at(row, col);
                             }
                         }
                     }
+                    let mut down = vec![0.0f32; rank * width];
+                    for i in 0..rows_w1 {
+                        for j in 0..cols_w1 {
+                            let factor = w1.at(i, j) * scale;
+                            for row in 0..dim {
+                                for col in 0..q {
+                                    down[(i * dim + row) * width + j * q + col] = factor * b.at(row, col);
+                                }
+                            }
+                        }
+                    }
+                    (Tensor { shape: vec![height, rank], data: up }, Tensor { shape: vec![rank, width], data: down })
+                } else {
+                    // kron(w1, A B) = kron(w1, A) . kron(I_b, B), rank b * dim
+                    let rank = cols_w1 * dim;
+                    let mut up = vec![0.0f32; height * rank];
+                    for i in 0..rows_w1 {
+                        for j in 0..cols_w1 {
+                            let factor = w1.at(i, j);
+                            for row in 0..p {
+                                for col in 0..dim {
+                                    up[(i * p + row) * rank + j * dim + col] = factor * a.at(row, col);
+                                }
+                            }
+                        }
+                    }
+                    let mut down = vec![0.0f32; rank * width];
+                    for block in 0..cols_w1 {
+                        for row in 0..dim {
+                            for col in 0..q {
+                                down[(block * dim + row) * width + block * q + col] = scale * b.at(row, col);
+                            }
+                        }
+                    }
+                    (Tensor { shape: vec![height, rank], data: up }, Tensor { shape: vec![rank, width], data: down })
                 }
-                (Tensor { shape: vec![rows_w1 * p, rank], data: up }, Tensor { shape: vec![rank, width], data: down })
             }
         }
     }
@@ -240,7 +266,7 @@ fn sites(file: &SafeTensors, strength: f32) -> Result<BTreeMap<(usize, String), 
         let entry = if let (Some(w1), Some(a), Some(b)) = (parts.remove("lokr_w1"), parts.remove("lokr_w2_a"), parts.remove("lokr_w2_b")) {
             let dim = lokr_dim.unwrap_or(a.cols() as f32);
             let scale = strength * alpha.map_or(1.0, |alpha| alpha / dim);
-            Site::Lokr { w1, a, b, scale, alpha: alpha_tensor.or_else(|| alpha.map(|alpha| Tensor { shape: vec![], data: vec![alpha] })) }
+            Site::Lokr { w1, a, b, scale }
         } else if let (Some(down), Some(up)) = (parts.remove("lora_A").or_else(|| parts.remove("lora_down")), parts.remove("lora_B").or_else(|| parts.remove("lora_up"))) {
             let rank = down.rows() as f32;
             Site::Lora { up, down, scale: strength * alpha.map_or(1.0, |alpha| alpha / rank) }
@@ -289,21 +315,10 @@ fn half(sites: &BTreeMap<(usize, String), Site>, prefix: &str, rows: &BTreeMap<S
             }
         }
         for (site, module) in [("attn_output", "self_attn.o_proj"), ("ffn_down", "mlp.down_proj")] {
-            match at(site) {
-                Some(Site::Lokr { w1, a, b, alpha, .. }) => {
-                    out.insert(format!("{prefix}.{block}.{module}.lokr_w1"), w1.clone());
-                    out.insert(format!("{prefix}.{block}.{module}.lokr_w2_a"), a.clone());
-                    out.insert(format!("{prefix}.{block}.{module}.lokr_w2_b"), b.clone());
-                    if let Some(alpha) = alpha {
-                        out.insert(format!("{prefix}.{block}.{module}.alpha"), alpha.clone());
-                    }
-                }
-                Some(lora @ Site::Lora { .. }) => {
-                    let (up, down) = lora.as_lora();
-                    out.insert(format!("{prefix}.{block}.{module}.lora_up.weight"), up);
-                    out.insert(format!("{prefix}.{block}.{module}.lora_down.weight"), down);
-                }
-                None => {}
+            if let Some(found) = at(site) {
+                let (up, down) = found.as_lora();
+                out.insert(format!("{prefix}.{block}.{module}.lora_up.weight"), up);
+                out.insert(format!("{prefix}.{block}.{module}.lora_down.weight"), down);
             }
         }
         for site in sites.keys().filter(|(b, _)| *b == block).map(|(_, site)| site.as_str()) {
@@ -391,18 +406,22 @@ mod tests {
 
     #[test]
     fn a_lokr_written_as_lora_has_the_same_delta() {
-        let (w1, a, b) = (tensor(&[2, 4], 1), tensor(&[6, 3], 2), tensor(&[3, 5], 3));
-        let site = Site::Lokr { w1: w1.clone(), a: a.clone(), b: b.clone(), scale: 1.5, alpha: None };
-        let (up, down) = site.as_lora();
-        let product = matmul(&up, &down);
-        let w2 = Tensor { shape: vec![6, 5], data: matmul(&a, &b) };
-        for i in 0..2 {
-            for j in 0..4 {
-                for r in 0..6 {
-                    for c in 0..5 {
-                        let expected = 1.5 * w1.at(i, j) * w2.at(r, c);
-                        let got = product[(i * 6 + r) * 20 + j * 5 + c];
-                        assert!((expected - got).abs() < 1e-5, "{expected} {got}");
+        // w1 wider than tall and taller than wide take the two factorings
+        for (rows, cols) in [(2, 4), (4, 2)] {
+            let (w1, a, b) = (tensor(&[rows, cols], 1), tensor(&[6, 3], 2), tensor(&[3, 5], 3));
+            let site = Site::Lokr { w1: w1.clone(), a: a.clone(), b: b.clone(), scale: 1.5 };
+            let (up, down) = site.as_lora();
+            assert_eq!(up.cols(), rows.min(cols) * 3, "rank of the {rows}x{cols} factoring");
+            let product = matmul(&up, &down);
+            let w2 = Tensor { shape: vec![6, 5], data: matmul(&a, &b) };
+            for i in 0..rows {
+                for j in 0..cols {
+                    for r in 0..6 {
+                        for c in 0..5 {
+                            let expected = 1.5 * w1.at(i, j) * w2.at(r, c);
+                            let got = product[(i * 6 + r) * (cols * 5) + j * 5 + c];
+                            assert!((expected - got).abs() < 1e-5, "{rows}x{cols}: {expected} {got}");
+                        }
                     }
                 }
             }
