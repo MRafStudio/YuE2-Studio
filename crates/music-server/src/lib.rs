@@ -1322,7 +1322,7 @@ async fn assistant_runtime_remove(
     // is on disk, and the model that was chosen with it.
     let ids: Vec<String> = if request.asset_id == "managed" || request.asset_id == "cuda" || request.asset_id == "cpu" {
         let chosen = state.assistant.read().await.managed_model.clone();
-        ["llama-cuda", "llama-cuda-runtime", "llama-cpu"].iter().map(|id| id.to_string()).chain(chosen).collect()
+        ["llama-cuda", "llama-cuda-runtime", "llama-cuda12", "llama-cuda12-runtime", "llama-cpu"].iter().map(|id| id.to_string()).chain(chosen).collect()
     } else {
         vec![request.asset_id.clone()]
     };
@@ -4256,6 +4256,7 @@ async fn assistant_runtime_status(State(state): State<AppState>) -> Json<Value> 
 fn assistant_set(device: &str) -> Vec<&'static str> {
     match device {
         "cpu" => vec!["llama-cpu"],
+        _ if assistant_runtime::cuda_flavour() == "cuda12" => vec!["llama-cuda12", "llama-cuda12-runtime"],
         _ => vec!["llama-cuda", "llama-cuda-runtime"],
     }
 }
