@@ -7379,6 +7379,7 @@ mod tests {
             cover_templates: Some(cover_prompt::default_templates()),
             cover_auto: Some(true),
             proxy: None,
+            network: None,
             separation: Some(separation::SeparationConfig::default()),
             cover_template_default: Some("photographic".into()),
         };
