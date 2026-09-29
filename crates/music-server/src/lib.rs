@@ -1240,7 +1240,7 @@ async fn separation_assets(State(state): State<AppState>) -> Json<Value> {
     let config = state.separation_config.read().await.clone();
     let mut set: Vec<&'static lyrics_sync::Asset> = Vec::new();
     if let Some(asset) = lyrics_sync::asset("onnxruntime") { set.push(asset); }
-    if !matches!(config.runtime, lyrics_sync::OnnxFlavour::Cpu) {
+    if config.runtime.uses_cuda() {
         set.extend(CARD_ASSETS.iter().filter_map(|id| lyrics_sync::asset(id)));
     }
     let runtime_progress = set_progress(state.lyrics_sync.downloader(), &set);
@@ -1357,7 +1357,7 @@ async fn install_separation_asset(
     // for the card - the CUDA provider. Six rows of file names asked the user
     // to work out which of them belong together.
     if matches!(request.asset_id.as_str(), "auto" | "cuda" | "cpu") {
-        let card = !matches!(request.asset_id.as_str(), "cpu");
+        let card = request.asset_id != "cpu" && lyrics_sync::OnnxFlavour::Auto.uses_cuda();
         let separator = state.separator.clone();
         let sync = state.lyrics_sync.clone();
         let mut runtime: Vec<&'static lyrics_sync::Asset> = Vec::new();
@@ -1450,12 +1450,18 @@ async fn separation_status(State(state): State<AppState>) -> Json<Value> {
         },
         "runtime_installed": runtime.is_some(),
         "cuda_runtime_installed": state.lyrics_sync.has_cuda_libraries(),
-        "card_missing_bytes": CARD_ASSETS
-            .iter()
-            .filter_map(|id| lyrics_sync::asset(id))
-            .filter(|asset| !state.lyrics_sync.downloader().is_installed(asset))
-            .map(|asset| asset.bytes)
-            .sum::<u64>(),
+        "cuda_card": lyrics_sync::OnnxFlavour::Auto.uses_cuda(),
+        // nothing is missing for a card that does not run CUDA: it never uses these
+        "card_missing_bytes": if lyrics_sync::OnnxFlavour::Auto.uses_cuda() {
+            CARD_ASSETS
+                .iter()
+                .filter_map(|id| lyrics_sync::asset(id))
+                .filter(|asset| !state.lyrics_sync.downloader().is_installed(asset))
+                .map(|asset| asset.bytes)
+                .sum::<u64>()
+        } else {
+            0
+        },
         "ready": state.separator.ready(runtime.as_deref()),
         "stems": separation::STEMS,
         // Either downloader may be the busy one: the model has its own, the
@@ -1971,7 +1977,7 @@ async fn vocal_separator(state: &AppState) -> Option<Arc<dyn training::VocalSepa
         model: state.separator.model_path(),
         runtime,
         overlap: config.sane_overlap(),
-        on_gpu: !matches!(config.runtime, lyrics_sync::OnnxFlavour::Cpu) && state.lyrics_sync.has_cuda_libraries(),
+        on_gpu: config.runtime.uses_cuda() && state.lyrics_sync.has_cuda_libraries(),
         loaded: std::sync::Mutex::new(None),
     }))
 }
@@ -1979,7 +1985,7 @@ async fn vocal_separator(state: &AppState) -> Option<Arc<dyn training::VocalSepa
 /// Everything the separator still lacks, through the same downloaders the
 /// separator's own panel uses; the card path unless the processor was chosen.
 async fn install_separator(state: &AppState) {
-    let card = !matches!(state.separation_config.read().await.runtime, lyrics_sync::OnnxFlavour::Cpu);
+    let card = state.separation_config.read().await.runtime.uses_cuda();
     let separator = state.separator.clone();
     let sync = state.lyrics_sync.clone();
     let mut runtime: Vec<&'static lyrics_sync::Asset> = Vec::new();
@@ -2533,8 +2539,7 @@ async fn start_separation(
         .ok_or_else(|| api_error(StatusCode::BAD_REQUEST, "the ONNX Runtime is not installed yet".into()))?;
     // The card is only really available when every CUDA library the provider
     // links against is beside it.
-    let on_gpu = !matches!(wanted_runtime, lyrics_sync::OnnxFlavour::Cpu)
-        && state.lyrics_sync.has_cuda_libraries();
+    let on_gpu = wanted_runtime.uses_cuda() && state.lyrics_sync.has_cuda_libraries();
     if !state.separator.is_installed() {
         return Err(api_error(StatusCode::BAD_REQUEST, "the separation model is not installed yet".into()));
     }
@@ -4447,7 +4452,7 @@ fn karaoke_set(name: &str, device: lyrics_sync::OnnxFlavour, whisper_model: Opti
     match name {
         "parakeet" => {
             wanted.push("onnxruntime".into());
-            if !matches!(device, lyrics_sync::OnnxFlavour::Cpu) {
+            if device.uses_cuda() {
                 wanted.extend(CARD_ASSETS.map(String::from));
             }
             // The precision is chosen the same way a Whisper model is: through
@@ -4463,7 +4468,7 @@ fn karaoke_set(name: &str, device: lyrics_sync::OnnxFlavour, whisper_model: Opti
             // libraries beside it, and without them CTranslate2 silently uses
             // the processor instead of saying so.
             wanted.push("whisper-engine".into());
-            if !matches!(device, lyrics_sync::OnnxFlavour::Cpu) {
+            if device.uses_cuda() {
                 wanted.push("whisper-cublas".into());
                 wanted.push("whisper-cudnn".into());
             }

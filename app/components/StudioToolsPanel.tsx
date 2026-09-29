@@ -36,6 +36,8 @@ interface SeparationStatus {
   stems: string[];
   download: { downloaded_bytes: number; total_bytes: number; done: boolean } | null;
   cuda_runtime_installed: boolean;
+  /** An NVIDIA card whose driver runs CUDA; any other card separates on the processor. */
+  cuda_card: boolean;
   card_missing_bytes: number;
   settings: { stems: string[]; overlap: number; runtime: 'auto' | 'cuda' | 'cpu' };
   run: { song_id: string; progress: number; done: boolean; error: string | null; stems: string[] } | null;
@@ -284,13 +286,13 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
                 <DevicePicker
                   value={settings.runtime}
                   onChange={choice => void saveSettings({ ...settings, runtime: choice })}
-                  cudaAvailable={Boolean(status?.cuda_runtime_installed)}
+                  cudaAvailable={Boolean(status?.cuda_card && status?.cuda_runtime_installed)}
                 />
               </div>
               {/* Where a capability is installed is one place: the models
                   panel. This tool used to install the card runtime itself, with
                   its own button and its own progress, and disagree with it. */}
-              {!status?.cuda_runtime_installed && (
+              {status?.cuda_card && !status?.cuda_runtime_installed && (
                 <p className="mt-2 text-[11px] leading-4 text-amber-600 dark:text-amber-300">
                   {t('separationInstallGpu')}
                   {status?.card_missing_bytes ? ` · ${megabytes(status.card_missing_bytes)}` : ''}

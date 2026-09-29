@@ -743,6 +743,16 @@ pub enum OnnxFlavour {
     Cpu,
 }
 
+impl OnnxFlavour {
+    /// Whether work runs on the graphics card: only an NVIDIA card with a
+    /// driver that runs CUDA has one here. On any other machine every choice
+    /// is the processor, and the gigabytes of CUDA libraries are neither
+    /// offered nor loaded; an AMD card was sent to the CUDA provider and failed.
+    pub fn uses_cuda(self) -> bool {
+        !matches!(self, OnnxFlavour::Cpu) && crate::hardware::hardware().cuda.is_some()
+    }
+}
+
 /// Every Parakeet file, because the model is useless without all of them.
 pub const PARAKEET_ASSET_IDS: [&str; 5] =
     ["parakeet-tdt-int8", "parakeet-decoder", "parakeet-features", "parakeet-vocab", "parakeet-config"];
@@ -1074,7 +1084,7 @@ impl LyricsSync {
                 heard(index, if words.is_empty() { Err(anyhow!(NO_WORDS)) } else { Ok(words) });
             }
         };
-        let on_card = !matches!(config.runtime, OnnxFlavour::Cpu);
+        let on_card = config.runtime.uses_cuda();
         let all: Vec<PathBuf> = wavs.iter().map(|(_, wav)| wav.clone()).collect();
         let mut outcome = self.run_whisper_many(&binary, size, &all, &out_dir, language, on_card, &mut || take(&mut answered), cancel);
         let mut recognised = Recognised::OnDevice;
@@ -1132,7 +1142,7 @@ impl LyricsSync {
         fs::remove_dir_all(&out_dir).ok();
         fs::create_dir_all(&out_dir).with_context(|| format!("create {}", out_dir.display()))?;
 
-        let on_card = !matches!(config.runtime, OnnxFlavour::Cpu);
+        let on_card = config.runtime.uses_cuda();
         let mut outcome = self.run_whisper(&binary, size, &wav, &out_dir, language, on_card);
         // CTranslate2 fails inside itself on a machine without usable CUDA, so
         // the card is tried and the processor is the answer to its refusal -
