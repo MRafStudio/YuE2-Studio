@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { libraryChanged, useActivity, useAssistantStatus, useSetupStatus, type ActivityEntry } from '../services/studioQueries';
 import { karaokeReason } from '../services/karaoke';
 import {
   AlertTriangle, AudioLines, ChevronDown, CircleAlert, Dices, Ear, Eye, EyeOff, FileMusic, FolderOpen, Loader2,
@@ -36,7 +37,7 @@ export type CreateRequest =
   | { id: number; kind: 'score'; abc: string; cot?: YueCot; lyrics?: string; title?: string };
 
 interface CreatePanelProps {
-  onGenerate: (request: YueRequest & { _tempId?: string }) => void;
+  onGenerate: (request: YueRequest) => void;
   isGenerating: boolean;
   activeJobCount?: number;
   initialData?: { song: Song; timestamp: number } | null;
@@ -255,6 +256,8 @@ const SamplingGrid: React.FC<{ value: SamplingText; defaults?: YueSampling; onCh
   );
 };
 
+const NO_ACTIVITY: ActivityEntry[] = [];
+
 export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, activeJobCount = 0, initialData, request, playlists, onCreatePlaylist }) => {
   const { t } = useI18n();
   const tt = t as unknown as (key: string) => string;
@@ -267,7 +270,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [showNotation, setShowNotation] = useState(true);
 
   // Strings, so an empty field can mean "engine default".
-  const [duration, setDuration] = useState(String(DEFAULT_DURATION_SECONDS));
+  // The ceiling last set by hand, kept between sessions like the playlist:
+  // a song made longer once is not cut at 2:10 after the next start.
+  const [duration, setDuration] = useState(() => {
+    try {
+      const kept = Number(window.localStorage.getItem('studio.createDuration'));
+      return kept >= 10 && kept <= MAX_DURATION_SECONDS ? String(kept) : String(DEFAULT_DURATION_SECONDS);
+    } catch { return String(DEFAULT_DURATION_SECONDS); }
+  });
+  const chooseDuration = (value: string) => {
+    setDuration(value);
+    try { window.localStorage.setItem('studio.createDuration', value); } catch { /* kept until a reload */ }
+  };
   const [lmBatch, setLmBatch] = useState('');
   const [synthBatch, setSynthBatch] = useState('');
   const [steps, setSteps] = useState('');
@@ -285,10 +299,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [mp3Bitrate, setMp3Bitrate] = useState('320');
   const [format, setFormat] = useState<YueOutputFormat>('mp3');
 
-  const [setup, setSetup] = useState<SetupStatus | null>(null);
-  const [serviceDown, setServiceDown] = useState(false);
+  const setupQuery = useSetupStatus<SetupStatus>();
+  const setup = setupQuery.isError ? null : setupQuery.data ?? null;
+  const serviceDown = setupQuery.isError;
   const [catalog, setCatalog] = useState<EngineCatalog | null>(null);
-  const [assistantReady, setAssistantReady] = useState(false);
+  const assistantQuery = useAssistantStatus<{ available?: boolean }>();
+  const assistantReady = !assistantQuery.isError && assistantQuery.data?.available === true;
   const [assisting, setAssisting] = useState<'all' | 'lyrics' | 'style' | 'score' | 'sections' | null>(null);
   const [assistStage, setAssistStage] = useState<string | null>(null);
   const [assistModel, setAssistModel] = useState<string | null>(null);
@@ -307,7 +323,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       return has ? parts.filter(part => part.toLowerCase() !== word.toLowerCase()).join(', ') : current;
     });
   }, []);
-  const [activity, setActivity] = useState<Array<{ song_id: string; title: string; kind: string; state: string; detail?: string }>>([]);
+  const activityQuery = useActivity();
+  const activity = activityQuery.data ?? NO_ACTIVITY;
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [mode, setMode] = useState<'studio' | 'simple' | 'cover'>('studio');
   const [assistInstruction, setAssistInstruction] = useState('');
@@ -345,41 +362,33 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     return id ? PROFILE_LABEL[id] ?? id : '—';
   }, [setup, t]);
 
+  // A cover or a lyric timing finished: the library is read again for it.
+  // What was finished before the page opened is in the library already.
+  const finishedWork = useRef<string | null>(null);
+  // Failures already on the server when the page opened are old news; only
+  // one that happens while the studio is open is told, once, as a toast.
+  const reportedFailures = useRef<Set<string> | null>(null);
   useEffect(() => {
-    let finished = '';
-    // Failures already on the server when the page opened are old news; only
-    // one that happens while the studio is open is told, once, as a toast.
-    let reported: Set<string> | null = null;
-    const read = () => void fetch('/v1/activity')
-      .then(response => response.json())
-      .then((body: { activity?: typeof activity }) => {
-        const entries = body.activity ?? [];
-        const done = entries.filter(entry => entry.state === 'done').map(entry => `${entry.song_id}:${entry.kind}`).join(',');
-        if (done !== finished) {
-          finished = done;
-          window.dispatchEvent(new CustomEvent('yue:library-changed'));
-        }
-        const failed = entries.filter(entry => entry.state === 'failed');
-        const keyOf = (entry: (typeof entries)[number]) => `${entry.song_id}:${entry.kind}:${entry.detail ?? ''}`;
-        if (reported === null) {
-          reported = new Set(failed.map(keyOf));
-        } else {
-          for (const entry of failed) {
-            const key = keyOf(entry);
-            if (reported.has(key)) continue;
-            reported.add(key);
-            const what = entry.kind === 'cover' ? t('coverArt') : t('karaokeSection');
-            const why = karaokeReason(tt, entry.detail) ?? '';
-            window.dispatchEvent(new CustomEvent('yue:toast', { detail: { message: `${what} · ${entry.title}: ${why}`, type: 'info' } }));
-          }
-        }
-        setActivity(entries);
-      })
-      .catch(() => undefined);
-    read();
-    const timer = window.setInterval(read, 2000);
-    return () => window.clearInterval(timer);
-  }, []);
+    const entries = activityQuery.data;
+    if (!entries) return;
+    const done = entries.filter(entry => entry.state === 'done').map(entry => `${entry.song_id}:${entry.kind}`).join(',');
+    if (finishedWork.current !== null && done !== finishedWork.current) libraryChanged();
+    finishedWork.current = done;
+    const failed = entries.filter(entry => entry.state === 'failed');
+    const keyOf = (entry: ActivityEntry) => `${entry.song_id}:${entry.kind}:${entry.detail ?? ''}`;
+    if (reportedFailures.current === null) {
+      reportedFailures.current = new Set(failed.map(keyOf));
+      return;
+    }
+    for (const entry of failed) {
+      const key = keyOf(entry);
+      if (reportedFailures.current.has(key)) continue;
+      reportedFailures.current.add(key);
+      const what = entry.kind === 'cover' ? t('coverArt') : t('karaokeSection');
+      const why = karaokeReason(tt, entry.detail) ?? '';
+      window.dispatchEvent(new CustomEvent('yue:toast', { detail: { message: `${what} · ${entry.title}: ${why}`, type: 'info' } }));
+    }
+  }, [activityQuery.data, t, tt]);
 
   useEffect(() => {
     if (!assisting) return;
@@ -389,19 +398,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     return () => window.clearInterval(timer);
   }, [assisting]);
 
-  const refreshSetup = useCallback(async () => {
-    const response = await fetch('/setup/status');
-    if (!response.ok) throw new Error(String(response.status));
-    setSetup(await response.json());
-    setServiceDown(false);
-  }, []);
-
-  useEffect(() => {
-    const poll = () => void refreshSetup().catch(() => { setSetup(null); setServiceDown(true); });
-    poll();
-    const timer = window.setInterval(poll, 5000);
-    return () => window.clearInterval(timer);
-  }, [refreshSetup]);
 
   useEffect(() => {
     void fetch('/v1/local-models/music')
@@ -410,19 +406,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       .catch(() => setCatalog(null));
   }, [setup?.engine_ready, setup?.selected_profile_id]);
 
-  useEffect(() => {
-    const read = () => void fetch('/v1/assistant/status')
-      .then(response => (response.ok ? response.json() : Promise.reject(new Error())))
-      .then((body: { available?: boolean }) => setAssistantReady(body.available === true))
-      .catch(() => setAssistantReady(false));
-    read();
-    const timer = window.setInterval(read, 5000);
-    window.addEventListener('yue:settings-changed', read);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('yue:settings-changed', read);
-    };
-  }, []);
 
   /** Fills the form from a stored request: a reused track, a file, an example. */
   const applyRequest = useCallback((request: Record<string, unknown>, title?: string) => {
@@ -507,7 +490,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   };
 
   const resetParameters = () => {
-    setDuration(String(DEFAULT_DURATION_SECONDS)); setLmBatch(''); setSynthBatch(''); setSteps(''); setCfgScale('');
+    chooseDuration(String(DEFAULT_DURATION_SECONDS)); setLmBatch(''); setSynthBatch(''); setSteps(''); setCfgScale('');
     setRandomizeSeed(true); setLmSeed(''); setSeed(''); setSemanticTokens('');
     setAbcSampling(emptySampling()); setSemanticSampling(emptySampling());
     setPeakClip(''); setMp3Bitrate('320'); setFormat('mp3');
@@ -818,13 +801,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   // again with new seeds whenever the queue runs low, until switched off. A
   // snapshot, so editing the form meanwhile does not change the next songs.
   const [forever, setForever] = useState(false);
-  const foreverRequest = useRef<(YueRequest & { _tempId?: string }) | null>(null);
+  const foreverRequest = useRef<YueRequest | null>(null);
   useEffect(() => {
     const stop = () => setForever(false);
     window.addEventListener('yue:cancel-all', stop);
     return () => window.removeEventListener('yue:cancel-all', stop);
   }, []);
-  const generate = (request: YueRequest & { _tempId?: string }) => {
+  const generate = (request: YueRequest) => {
     if (forever) foreverRequest.current = { ...request };
     onGenerate(request);
   };
@@ -1364,7 +1347,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 min={10}
                 max={MAX_DURATION_SECONDS}
                 step={5}
-                onChange={setDuration}
+                onChange={chooseDuration}
                 format={formatDuration}
               />
               <p className="text-[11px] leading-4 text-zinc-500">{tt('maxDurationHintYue')}</p>

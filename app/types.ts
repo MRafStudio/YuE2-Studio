@@ -9,7 +9,12 @@ export interface Song {
   duration: string;
   createdAt: Date;
   isGenerating?: boolean;
-  jobId?: string; // Active generation job ID for cancel
+  /** The engine job a generation's row follows. */
+  jobId?: string;
+  /** The job that made a library song; its row becomes this song. */
+  madeByJob?: string;
+  /** The list row this item is drawn in, when it took over another item's row. */
+  viewKey?: string;
   queuePosition?: number; // Position in queue (undefined = actively generating, number = waiting in queue)
   progress?: number;
   stage?: string;
@@ -124,15 +129,36 @@ export interface YueRequest {
   playlist_id?: string;
 }
 
+/** A song as the library stores and lists it. */
+export interface NativeLibrarySong {
+  id: string;
+  title: string;
+  audio_path?: string | null;
+  caption: string;
+  lyrics: string;
+  metadata?: Record<string, unknown> | null;
+  generation_settings?: Record<string, unknown> | null;
+  engine_id: string;
+  profile_id?: string | null;
+  replay_request?: unknown | null;
+  audio_codes?: unknown | null;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface YueJobSong {
   id: string;
   audio_url: string;
+  /** The library's record of the song, as the library lists it. */
+  song: NativeLibrarySong;
 }
 
 export interface YueJob {
   id: string;
   /** The mark this window gave the request; an agent's job has none. */
   client_ref?: string;
+  /** When the service took the request, in Unix milliseconds. */
+  submitted_at: number;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   phase: string;
   message: string;
@@ -141,6 +167,7 @@ export interface YueJob {
   lyrics: string;
   duration_seconds: number;
   generation_settings: Record<string, unknown>;
+  playlist_id?: string;
   song?: YueJobSong;
   songs?: YueJobSong[];
 }

@@ -53,38 +53,42 @@ fn band((start, end): (f64, f64), fraction: f64) -> f64 {
     start + (end - start) * fraction.clamp(0.0, 1.0)
 }
 
+/// The progress after one more line of the engine log: a counter moves it, the
+/// end of a job clears it, any other line leaves it as it was.
+pub fn step(current: Option<Progress>, line: &str) -> Option<Progress> {
+    let line = line.trim();
+    if line.starts_with("[Pipeline] Done")
+        || line.starts_with("[SheetSage] Transcribed")
+        || line.contains("Cancelled at")
+        || line.contains("FATAL")
+    {
+        None
+    } else if let Some((done, total)) = counter(line, "[AR] Score") {
+        let fraction = (done / TYPICAL_SCORE_TOKENS.min(total)).min(0.95);
+        Some(Progress { stage: Stage::Score, fraction: band(SCORE, fraction), detail: format!("{done}") })
+    } else if line.starts_with("[AR] Score:") {
+        Some(Progress { stage: Stage::Score, fraction: SCORE.1, detail: String::new() })
+    } else if let Some((done, total)) = counter(line, "[AR] Semantic") {
+        Some(Progress { stage: Stage::Semantic, fraction: band(SEMANTIC, done / total), detail: format!("{done}/{total}") })
+    } else if line.starts_with("[AR] Semantic:") || line.starts_with("[Pipeline] Replay") {
+        Some(Progress { stage: Stage::Semantic, fraction: SEMANTIC.1, detail: String::new() })
+    } else if let Some((done, total)) = counter(line, "[NAR] Step") {
+        Some(Progress { stage: Stage::Acoustic, fraction: band(ACOUSTIC, done / total), detail: format!("{done}/{total}") })
+    } else if let Some((done, total)) = counter(line, "[VAE] Track") {
+        Some(Progress { stage: Stage::Decode, fraction: band(DECODE, (done - 1.0) / total), detail: format!("{done}/{total}") })
+    } else if let Some((done, total)) = counter(line, "[SheetSage] Decoding") {
+        Some(Progress { stage: Stage::Transcribe, fraction: (done / total).min(0.99), detail: format!("{done}") })
+    } else if line.starts_with("[SheetSage] Window") {
+        Some(Progress { stage: Stage::Transcribe, fraction: 0.05, detail: String::new() })
+    } else {
+        current
+    }
+}
+
 /// The progress of the job the engine is running now, or `None` when the last
 /// thing the log says is that it finished, failed or was cancelled.
 pub fn from_log(lines: &[String]) -> Option<Progress> {
-    let mut current: Option<Progress> = None;
-    for line in lines {
-        let line = line.trim();
-        if line.starts_with("[Pipeline] Done")
-            || line.starts_with("[SheetSage] Transcribed")
-            || line.contains("Cancelled at")
-            || line.contains("FATAL")
-        {
-            current = None;
-        } else if let Some((done, total)) = counter(line, "[AR] Score") {
-            let fraction = (done / TYPICAL_SCORE_TOKENS.min(total)).min(0.95);
-            current = Some(Progress { stage: Stage::Score, fraction: band(SCORE, fraction), detail: format!("{done}") });
-        } else if line.starts_with("[AR] Score:") {
-            current = Some(Progress { stage: Stage::Score, fraction: SCORE.1, detail: String::new() });
-        } else if let Some((done, total)) = counter(line, "[AR] Semantic") {
-            current = Some(Progress { stage: Stage::Semantic, fraction: band(SEMANTIC, done / total), detail: format!("{done}/{total}") });
-        } else if line.starts_with("[AR] Semantic:") || line.starts_with("[Pipeline] Replay") {
-            current = Some(Progress { stage: Stage::Semantic, fraction: SEMANTIC.1, detail: String::new() });
-        } else if let Some((done, total)) = counter(line, "[NAR] Step") {
-            current = Some(Progress { stage: Stage::Acoustic, fraction: band(ACOUSTIC, done / total), detail: format!("{done}/{total}") });
-        } else if let Some((done, total)) = counter(line, "[VAE] Track") {
-            current = Some(Progress { stage: Stage::Decode, fraction: band(DECODE, (done - 1.0) / total), detail: format!("{done}/{total}") });
-        } else if let Some((done, total)) = counter(line, "[SheetSage] Decoding") {
-            current = Some(Progress { stage: Stage::Transcribe, fraction: (done / total).min(0.99), detail: format!("{done}") });
-        } else if line.starts_with("[SheetSage] Window") {
-            current = Some(Progress { stage: Stage::Transcribe, fraction: 0.05, detail: String::new() });
-        }
-    }
-    current
+    lines.iter().fold(None, |current, line| step(current, line))
 }
 
 #[cfg(test)]

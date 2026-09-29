@@ -1,21 +1,5 @@
 import { apiUrl } from './apiBase';
-import { Song } from '../types';
-
-interface NativeLibrarySong {
-  id: string;
-  title: string;
-  audio_path?: string | null;
-  caption: string;
-  lyrics: string;
-  metadata?: Record<string, unknown> | null;
-  generation_settings?: Record<string, unknown> | null;
-  engine_id: string;
-  profile_id?: string | null;
-  replay_request?: unknown | null;
-  audio_codes?: unknown | null;
-  created_at: string;
-  updated_at?: string;
-}
+import type { NativeLibrarySong, Song } from '../types';
 
 function audioVersions(metadata: Record<string, unknown>): import('../types').SongVersion[] | undefined {
   const list = metadata.audio_versions;
@@ -94,6 +78,7 @@ export function mapNativeLibrarySong(song: NativeLibrarySong): Song {
       return seconds && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}` : '0:00';
     })(),
     createdAt: nativeDate(song.created_at),
+    madeByJob: stringMetadata(metadata, 'job_id'),
     tags,
     derived: (() => {
       const derived = metadata.derived as { from?: unknown; from_title?: unknown; tool?: unknown; settings?: unknown } | null | undefined;

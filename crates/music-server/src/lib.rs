@@ -39,15 +39,20 @@ mod skill;
 mod library;
 mod engine_result;
 mod progress;
+mod engine_log;
 
 use std::{collections::HashMap, env, fs, net::SocketAddr, path::PathBuf, sync::Arc};
 use anyhow::Context;
 use futures_util::StreamExt;
 
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, Request, State},
     body::Body,
-    http::{header, HeaderMap, StatusCode},
+    http::{header, StatusCode},
+    response::{
+        IntoResponse,
+        sse::{Event, KeepAlive, Sse},
+    },
     routing::{get, post},
     Json, Router,
 };
@@ -56,7 +61,8 @@ use model_manager::{InstallRequest, ModelManager};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::RwLock;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower::ServiceExt;
+use tower_http::{cors::CorsLayer, services::ServeFile, set_header::SetResponseHeaderLayer, trace::TraceLayer};
 
 const PRIMARY_MUSIC_ENGINE_ID: &str = model_manager::ENGINE_ID;
 
@@ -65,6 +71,9 @@ struct AppState {
     configuration: Arc<RwLock<StudioConfiguration>>,
     jobs: Arc<RwLock<HashMap<String, MusicJob>>>,
     music_server: EngineClient,
+    /// The engine's log, followed for the service's life: its recent lines and
+    /// the running job's progress.
+    engine_log: engine_log::EngineLog,
     model_manager: ModelManager,
     selected_profile_id: Arc<RwLock<Option<String>>>,
     selected_component_ids: Arc<RwLock<Option<Vec<String>>>>,
@@ -294,6 +303,9 @@ struct MusicJob {
     /// The mark the submitting window gave the request; absent for an agent's.
     #[serde(skip_serializing_if = "Option::is_none")]
     client_ref: Option<String>,
+    /// When the request came in, in Unix milliseconds: a window opened later
+    /// places the job among the ones it made itself.
+    submitted_at: u64,
     engine_id: String,
     /// What the assistant said this track's cover should show, if anything.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -315,6 +327,10 @@ struct MusicJob {
     /// The playlist the made songs go into, a project the user works in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     playlist_id: Option<String>,
+}
+
+fn unix_millis() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |since| since.as_millis() as u64)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -645,12 +661,15 @@ pub async fn serve() -> anyhow::Result<()> {
             None,
         ),
     };
+    let music_server = EngineClient::from_environment();
+    let engine_log = engine_log::EngineLog::follow(music_server.http.clone(), music_server.url("/logs"));
     let state = AppState {
         configuration: Arc::new(RwLock::new(sanitize_persisted_configuration(
             persisted.as_ref().map(|settings| settings.configuration.clone()).unwrap_or_else(initial_configuration),
         ))),
         jobs: Arc::new(RwLock::new(HashMap::new())),
-        music_server: EngineClient::from_environment(),
+        music_server,
+        engine_log,
         model_manager,
         cover_templates: Arc::new(RwLock::new(
             persisted
@@ -713,6 +732,7 @@ pub async fn serve() -> anyhow::Result<()> {
     processing::clear_workspace(state.library.media_dir());
     state.training.recover();
     prepare::resume(&state);
+    tokio::spawn(tag_untagged_songs(state.clone()));
 
     let app = Router::new()
         .route("/health", get(health))
@@ -721,6 +741,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/engine/options", get(engine_options).put(update_engine_options))
         .route("/engine/restart", post(restart_local_engine))
         .route("/v1/engine/logs", get(engine_logs))
+        .route("/v1/engine/progress", get(engine_progress))
         .route("/v1/system/resources", get(system_resources))
         .route("/v1/proxy/image", get(proxy_image))
         .route("/v1/openrouter/settings", get(openrouter_settings).put(update_openrouter_settings))
@@ -873,6 +894,10 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/mcp/window/result", post(mcp::window_result))
         .fallback(remote::interface)
         .layer(axum::middleware::from_fn(remote::guard))
+        // Everything here is live state or a local file: nothing is worth a
+        // browser cache, and Chrome holds a second request for a URL until a
+        // cacheable first one finishes - a song asked for twice waited 20 s.
+        .layer(SetResponseHeaderLayer::if_not_present(header::CACHE_CONTROL, header::HeaderValue::from_static("no-store")))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 
@@ -953,75 +978,24 @@ pub async fn serve() -> anyhow::Result<()> {
 
 async fn library_songs(State(state): State<AppState>) -> Result<Json<Vec<library::Song>>, (StatusCode, Json<ApiError>)> { state.library.list_songs().map(Json).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string())) }
 async fn library_song(State(state): State<AppState>,Path(id):Path<String>)->Result<Json<library::Song>,(StatusCode,Json<ApiError>)>{state.library.get_song(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Song not found".into()))}
-async fn library_media(State(state): State<AppState>, Path(song_id): Path<String>, headers: HeaderMap) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
+async fn library_media(State(state): State<AppState>, Path(song_id): Path<String>, request: Request) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
     let song = state.library.get_song(&song_id).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?.ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Song not found".into()))?;
     let path = state.library.media_path_for_song(&song).ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Song audio is not available in the studio media library".into()))?;
-    // Tracks made before the studio tagged anything have no ID3 at all, and a
-    // download of one lands in a player as an untitled file. Tag it on the way
-    // out, once: the check is three bytes.
-    if path.extension().and_then(|value| value.to_str()).map(str::to_ascii_lowercase).as_deref() == Some("mp3")
-        && tokio::fs::read(&path).await.map(|bytes| bytes.get(..3) != Some(b"ID3")).unwrap_or(false)
-    {
-        tag_stored_song(&state, &song_id).await;
-    }
-    serve_audio_file(&path, &headers).await
+    Ok(serve_audio_file(&path, request).await)
 }
 
 /// A dataset song's recording, to listen to while its style is checked.
-async fn training_item_audio(State(state): State<AppState>, Path((id, item)): Path<(String, String)>, headers: HeaderMap) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
+async fn training_item_audio(State(state): State<AppState>, Path((id, item)): Path<(String, String)>, request: Request) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
     let path = state.training.item_audio(&id, &item).map_err(training_error)?;
-    serve_audio_file(&path, &headers).await
+    Ok(serve_audio_file(&path, request).await)
 }
 
-/// An audio file with single byte-range support, which `<audio>` seeking needs.
-async fn serve_audio_file(path: &std::path::Path, headers: &HeaderMap) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
-    let bytes = tokio::fs::read(path).await.map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, format!("read song audio: {error}")))?;
-    let content_type = match path.extension().and_then(|extension| extension.to_str()).map(|extension| extension.to_ascii_lowercase()).as_deref() {
-        Some("mp3") => "audio/mpeg",
-        Some("wav") => "audio/wav",
-        _ => return Err(api_error(StatusCode::UNSUPPORTED_MEDIA_TYPE, "Stored song has an unsupported audio extension".into())),
-    };
-    let total = bytes.len();
-    let range = headers.get(header::RANGE).and_then(|value| value.to_str().ok()).and_then(|value| parse_single_byte_range(value, total));
-    let response = if let Some((start, end)) = range {
-        axum::response::Response::builder()
-            .status(StatusCode::PARTIAL_CONTENT)
-            .header(header::CONTENT_RANGE, format!("bytes {start}-{end}/{total}"))
-            .header(header::CONTENT_LENGTH, end - start + 1)
-            .header(header::ACCEPT_RANGES, "bytes")
-            .header(header::CONTENT_TYPE, content_type)
-            .body(Body::from(bytes[start..=end].to_vec()))
-    } else if headers.contains_key(header::RANGE) {
-        axum::response::Response::builder()
-            .status(StatusCode::RANGE_NOT_SATISFIABLE)
-            .header(header::CONTENT_RANGE, format!("bytes */{total}"))
-            .body(Body::empty())
-    } else {
-        axum::response::Response::builder()
-            .header(header::CONTENT_TYPE, content_type)
-            .header(header::CONTENT_LENGTH, total)
-            .header(header::ACCEPT_RANGES, "bytes")
-            .body(Body::from(bytes))
-    };
-    Ok(response.expect("valid audio response"))
+/// An audio file as `<audio>` needs it: byte ranges for seeking, streamed from
+/// disk instead of read whole for every range.
+async fn serve_audio_file(path: &std::path::Path, request: Request) -> axum::response::Response {
+    ServeFile::new(path).oneshot(request).await.into_response()
 }
 
-/// Parses the one byte-range form used by HTMLAudioElement. Multiple ranges are
-/// intentionally declined; a single 206 keeps native seeking interoperable.
-fn parse_single_byte_range(value: &str, total: usize) -> Option<(usize, usize)> {
-    let value = value.strip_prefix("bytes=")?;
-    if value.contains(',') || total == 0 { return None; }
-    let (start, end) = value.split_once('-')?;
-    if start.is_empty() {
-        let suffix = end.parse::<usize>().ok()?;
-        if suffix == 0 { return None; }
-        return Some((total.saturating_sub(suffix), total - 1));
-    }
-    let start = start.parse::<usize>().ok()?;
-    if start >= total { return None; }
-    let end = if end.is_empty() { total - 1 } else { end.parse::<usize>().ok()?.min(total - 1) };
-    (end >= start).then_some((start, end))
-}
 #[derive(Debug, Deserialize)]
 struct StoreCoverRequest {
     /// Raw base64 image bytes, without a data-URL prefix.
@@ -1771,12 +1745,12 @@ async fn read_processing(State(state): State<AppState>) -> Json<Value> {
     Json(serde_json::json!({ "run": state.processing_run.read().await.clone() }))
 }
 
-async fn processing_preview(State(state): State<AppState>, headers: HeaderMap) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
+async fn processing_preview(State(state): State<AppState>, request: Request) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
     let name = state.processing_run.read().await.as_ref().and_then(|run| run.preview.clone());
     let path = name
         .and_then(|name| processing::workspace_file(state.library.media_dir(), &name))
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "there is no processed preview".into()))?;
-    serve_audio_file(&path, &headers).await
+    Ok(serve_audio_file(&path, request).await)
 }
 
 #[derive(Debug, Deserialize)]
@@ -2548,40 +2522,19 @@ async fn read_stems(State(state): State<AppState>, Path(id): Path<String>) -> Re
 async fn read_stem_audio(
     State(state): State<AppState>,
     Path((id, stem)): Path<(String, String)>,
-    headers: HeaderMap,
+    request: Request,
 ) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
     if !separation::STEMS.contains(&stem.as_str()) {
         return Err(api_error(StatusCode::BAD_REQUEST, format!("unknown stem {stem}")));
     }
     let path = stem_path(&state, &id, &stem);
-    let bytes = tokio::fs::read(&path)
+    let exists = tokio::fs::try_exists(&path)
         .await
-        .map_err(|_| api_error(StatusCode::NOT_FOUND, "this track has no such stem yet".into()))?;
-    // Without range support a player cannot seek: it can only start at zero and
-    // wait. The library's own audio has answered ranges from the beginning;
-    // stems were served whole, which is why dragging their position did
-    // nothing.
-    let total = bytes.len();
-    let range = headers
-        .get(header::RANGE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| parse_single_byte_range(value, total));
-    let response = if let Some((start, end)) = range {
-        axum::response::Response::builder()
-            .status(StatusCode::PARTIAL_CONTENT)
-            .header(header::CONTENT_TYPE, "audio/wav")
-            .header(header::ACCEPT_RANGES, "bytes")
-            .header(header::CONTENT_RANGE, format!("bytes {start}-{end}/{total}"))
-            .header(header::CONTENT_LENGTH, end - start + 1)
-            .body(Body::from(bytes[start..=end].to_vec()))
-    } else {
-        axum::response::Response::builder()
-            .header(header::CONTENT_TYPE, "audio/wav")
-            .header(header::ACCEPT_RANGES, "bytes")
-            .header(header::CONTENT_LENGTH, total)
-            .body(Body::from(bytes))
-    };
-    Ok(response.expect("valid stem response"))
+        .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, format!("read stem audio: {error}")))?;
+    if !exists {
+        return Err(api_error(StatusCode::NOT_FOUND, "this track has no such stem yet".into()));
+    }
+    Ok(serve_audio_file(&path, request).await)
 }
 
 /// Separates one track into stems, in the background, reporting progress.
@@ -3049,9 +3002,10 @@ async fn library_cover(State(state): State<AppState>, Path(id): Path<String>) ->
 
 /// Writes ID3 tags onto a stored MP3 from what the library knows about it.
 ///
-/// Called after a track is stored, after its cover changes and after it is
-/// renamed. Failure is logged and never fails the request: an untagged track
-/// still plays, a lost one does not.
+/// Called after a track is stored, after its cover changes, after it is renamed
+/// and once at start for tracks stored before the studio tagged anything.
+/// Failure is logged and never fails the request: an untagged track still
+/// plays, a lost one does not.
 async fn tag_stored_song(state: &AppState, song_id: &str) {
     let Ok(Some(song)) = state.library.get_song(song_id) else { return };
     // `audio_path` is a full path, not a filename: resolve it the way playback
@@ -3060,10 +3014,7 @@ async fn tag_stored_song(state: &AppState, song_id: &str) {
     if audio_path.extension().and_then(|value| value.to_str()).map(str::to_lowercase).as_deref() != Some("mp3") {
         return;
     }
-    let cover = state
-        .library
-        .cover_path_for_song(&song)
-        .and_then(|(path, media_type)| std::fs::read(path).ok().map(|bytes| (media_type.to_string(), bytes)));
+    let cover_file = state.library.cover_path_for_song(&song).map(|(path, media_type)| (path, media_type.to_string()));
     let tags = tagging::TrackTags {
         title: song.title.clone(),
         album: "YuE2 Studio".to_string(),
@@ -3072,10 +3023,48 @@ async fn tag_stored_song(state: &AppState, song_id: &str) {
         genre: tagging::genre_from_caption(&song.caption),
         lyrics: Some(song.lyrics.clone()).filter(|value| !value.trim().is_empty()),
         bpm: tagging::bpm_from_caption(&song.caption),
-        cover,
+        cover: None,
     };
-    if let Err(error) = tagging::write_mp3_tags(&audio_path, &tags) {
-        eprintln!("could not tag {}: {error}", audio_path.display());
+    let shown = audio_path.display().to_string();
+    // reading the cover and rewriting the file are blocking file work
+    let written = tokio::task::spawn_blocking(move || {
+        let cover = cover_file.and_then(|(path, media_type)| std::fs::read(path).ok().map(|bytes| (media_type, bytes)));
+        tagging::write_mp3_tags(&audio_path, &tagging::TrackTags { cover, ..tags })
+    })
+    .await;
+    match written {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => eprintln!("could not tag {shown}: {error}"),
+        Err(error) => eprintln!("could not tag {shown}: the tagging task stopped: {error}"),
+    }
+}
+
+/// Tracks stored before the studio tagged anything carry no ID3, and a download
+/// of one lands in a player as an untitled file: each is tagged once, in the
+/// background, when the service starts. Serving a track never writes to it.
+async fn tag_untagged_songs(state: AppState) {
+    use tokio::io::AsyncReadExt;
+    let songs = match state.library.list_songs() {
+        Ok(songs) => songs,
+        Err(error) => {
+            eprintln!("[ERROR] the library did not list its tracks for tagging: {error:#}");
+            return;
+        }
+    };
+    for song in songs {
+        let Some(path) = state.library.media_path_for_song(&song) else { continue };
+        if !path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("mp3")) {
+            continue;
+        }
+        // the check is the first three bytes, not the whole file
+        let mut head = [0u8; 3];
+        let untagged = match tokio::fs::File::open(&path).await {
+            Ok(mut file) => file.read_exact(&mut head).await.is_ok() && &head != b"ID3",
+            Err(_) => false,
+        };
+        if untagged {
+            tag_stored_song(&state, &song.id).await;
+        }
     }
 }
 
@@ -4045,15 +4034,21 @@ fn is_portable_installation() -> bool {
 /// in the log. While the engine is starting it has no HTTP log yet, so the file
 /// it writes from its first line is what gets shown.
 async fn engine_logs(State(state): State<AppState>) -> Result<Json<Value>, (StatusCode, Json<ApiError>)> {
-    let (lines, source) = match state.music_server.logs_snapshot(std::time::Duration::from_millis(700)).await {
-        Ok(lines) => (lines, "engine"),
-        Err(_) => (music_engine::yue_server::startup_log_tail(120), "startup"),
+    let (lines, source) = match state.engine_log.lines() {
+        Some(lines) => (lines, "engine"),
+        None => (music_engine::yue_server::startup_log_tail(120), "startup"),
     };
     if lines.is_empty() {
         return Err(api_error(StatusCode::SERVICE_UNAVAILABLE, "the engine log is empty: the engine has not started yet".into()));
     }
     let progress = progress::from_log(&lines);
     Ok(Json(serde_json::json!({ "engine_id": PRIMARY_MUSIC_ENGINE_ID, "lines": lines, "source": source, "progress": progress })))
+}
+
+/// The running job's progress as the engine log tells it, pushed to the window
+/// while songs are being made.
+async fn engine_progress(State(state): State<AppState>) -> Sse<impl futures_util::Stream<Item = Result<Event, std::convert::Infallible>>> {
+    Sse::new(state.engine_log.progress_events()).keep_alive(KeepAlive::default())
 }
 
 /// Live machine resources. ACE Studio's resource readout is kept, but every
@@ -6103,6 +6098,7 @@ async fn create_music_job(
                 derived,
                 id: remote.id,
                 client_ref: request.client_ref.clone(),
+                submitted_at: unix_millis(),
                 engine_id,
                 cover_prompt: request.cover_prompt.clone(),
                 title: Some(titled(&request, &state.adapters)),
@@ -6169,6 +6165,7 @@ async fn replay_music_job(
         cover_prompt: None,
         id: remote.id,
         client_ref: request.client_ref.clone(),
+        submitted_at: unix_millis(),
         engine_id: PRIMARY_MUSIC_ENGINE_ID.into(),
         title,
         status: MusicJobStatus::Queued,
@@ -6245,7 +6242,8 @@ async fn list_active_music_jobs(State(state): State<AppState>) -> Json<Vec<Music
         .filter(|job| matches!(job.status, MusicJobStatus::Queued | MusicJobStatus::Running))
         .cloned()
         .collect();
-    active.sort_by(|a, b| a.id.cmp(&b.id));
+    // the engine's ids are random, so the order is when each came in
+    active.sort_by_key(|job| job.submitted_at);
     Json(active)
 }
 
@@ -6518,6 +6516,8 @@ async fn import_completed_result(state: &AppState, job: &MusicJob, job_id: &str)
             "output_format": generation_settings.get("output_format"),
             "cover_prompt": job.cover_prompt.clone(),
             "derived": job.derived.clone(),
+            // the window showing this job's card hands the card to the song
+            "job_id": job_id,
         });
         // Several tracks from one request share its name; number them so the
         // library can tell the takes apart.
@@ -6808,35 +6808,6 @@ impl EngineClient {
 
     async fn props(&self) -> anyhow::Result<Value> {
         self.json_response(self.http.get(self.url("/props")).send().await?).await
-    }
-
-    /// Upstream `GET /logs` is an endless SSE stream that replays its ring and
-    /// then waits; the ring is read until the stream goes quiet.
-    async fn logs_snapshot(&self, quiet_period: std::time::Duration) -> anyhow::Result<Vec<String>> {
-        let response = self.http.get(self.url("/logs")).send().await?;
-        let status = response.status();
-        if !status.is_success() {
-            anyhow::bail!("yue-server returned {status} for /logs");
-        }
-        let mut stream = response.bytes_stream();
-        let mut buffer = Vec::new();
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
-        loop {
-            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-            if remaining.is_zero() {
-                break;
-            }
-            match tokio::time::timeout(quiet_period.min(remaining), stream.next()).await {
-                Ok(Some(chunk)) => buffer.extend_from_slice(&chunk?),
-                Ok(None) | Err(_) => break,
-            }
-        }
-        Ok(String::from_utf8_lossy(&buffer)
-            .lines()
-            .filter_map(|line| line.strip_prefix("data:"))
-            .map(|line| line.trim().to_owned())
-            .filter(|line| !line.is_empty())
-            .collect())
     }
 
     async fn submit(&self, request: Value) -> anyhow::Result<EngineSubmitResponse> {
@@ -7136,6 +7107,7 @@ fn queued_not_configured_job(request: CreateMusicJobRequest, engine_id: String) 
         cover_prompt: None,
         id: format!("unconfigured-{}", uuid_suffix()),
         client_ref: request.client_ref.clone(),
+        submitted_at: unix_millis(),
         engine_id,
         title: request.title.clone(),
         status: MusicJobStatus::Queued,
@@ -7159,6 +7131,7 @@ fn failed_request_job(request: CreateMusicJobRequest, engine_id: String, error: 
         title: request.title.clone(),
         id: format!("rejected-{}", uuid_suffix()),
         client_ref: request.client_ref.clone(),
+        submitted_at: unix_millis(),
         engine_id,
         status: MusicJobStatus::Failed,
         dispatch: MusicJobDispatch::NotConfigured,
