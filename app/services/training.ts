@@ -96,6 +96,8 @@ export interface TrainingState {
   recipe_fields: RecipeField[];
   /** Video memory a run of the default recipe needs, in GB. */
   min_vram_gb: number;
+  /** Whether this machine's card runs the trainer: an NVIDIA card with CUDA. */
+  card_trains: boolean;
   /** What a song's style field holds for this engine: a short style, or a structured caption. */
   item_style: 'style' | 'caption';
   download: { downloaded_bytes: number; total_bytes: number; done: boolean; error?: string | null } | null;
