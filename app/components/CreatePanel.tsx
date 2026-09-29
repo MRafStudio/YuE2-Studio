@@ -1,4 +1,3 @@
-import { loadNativePlaylists } from '../services/nativeLibrary';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { karaokeReason } from '../services/karaoke';
 import {
@@ -6,7 +5,7 @@ import {
   Music2, Pause, Play, RotateCcw, Save, Sparkles, Square, Tags, Upload, Wand2, Settings2, X,
 } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
-import type { Song, YueCot, YueOutputFormat, YueRequest, YueSampling } from '../types';
+import type { Playlist, Song, YueCot, YueOutputFormat, YueRequest, YueSampling } from '../types';
 import { useI18n } from '../context/I18nContext';
 import { saveFile } from '../services/saveFile';
 import { useBridgeCommand } from '../services/mcpBridge';
@@ -16,6 +15,7 @@ import { composeScore, transcribe } from '../services/transcription';
 import { profileLabel as setLabel } from '../services/modelCatalog';
 import { REQUEST_FILE_ACCEPT, parseRequestFile, requestFileTitle, serializeRequest, type RequestFileFormat } from '../services/requestFile';
 import { AdapterPicker } from './AdapterPicker';
+import { CreatePlaylistModal } from './PlaylistModals';
 import { usesFromSettings, type AdapterUse } from '../services/adapters';
 
 /**
@@ -41,6 +41,8 @@ interface CreatePanelProps {
   activeJobCount?: number;
   initialData?: { song: Song; timestamp: number } | null;
   request?: CreateRequest | null;
+  playlists: Playlist[];
+  onCreatePlaylist: (name: string, description: string) => Promise<Playlist | null>;
 }
 
 type EngineDefaults = Partial<Record<string, unknown>> & {
@@ -68,6 +70,9 @@ type EngineCatalog = {
 };
 
 type SamplingText = Record<keyof YueSampling, string>;
+
+/** The select entry that opens the new-playlist dialog instead of choosing. */
+const NEW_PLAYLIST = '__new__';
 
 /** The style as it is sent: a trigger's comma with nothing after it goes. */
 const finishedStyle = (text: string) => text.trim().replace(/,$/, '').trimEnd();
@@ -250,7 +255,7 @@ const SamplingGrid: React.FC<{ value: SamplingText; defaults?: YueSampling; onCh
   );
 };
 
-export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, activeJobCount = 0, initialData, request }) => {
+export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, activeJobCount = 0, initialData, request, playlists, onCreatePlaylist }) => {
   const { t } = useI18n();
   const tt = t as unknown as (key: string) => string;
 
@@ -801,13 +806,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [playlistId, setPlaylistId] = useState(() => {
     try { return window.localStorage.getItem('studio.createPlaylist') ?? ''; } catch { return ''; }
   });
-  const [playlists, setPlaylists] = useState<{ id: string; name: string }[]>([]);
-  useEffect(() => {
-    const load = () => void loadNativePlaylists().then(list => setPlaylists(list.map(entry => ({ id: entry.id, name: entry.name })))).catch(() => undefined);
-    load();
-    window.addEventListener('focus', load);
-    return () => window.removeEventListener('focus', load);
-  }, []);
+  const [newPlaylistOpen, setNewPlaylistOpen] = useState(false);
   const choosePlaylist = (id: string) => {
     setPlaylistId(id);
     try { window.localStorage.setItem('studio.createPlaylist', id); } catch { /* kept until a reload */ }
@@ -1526,15 +1525,19 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             </div>
           </div>
         )}
-        {playlists.length > 0 && (
-          <label className="mb-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-            <span className="shrink-0">{tt('createIntoPlaylist')}</span>
-            <select value={chosenPlaylist} onChange={event => choosePlaylist(event.target.value)} className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-black/20">
-              <option value="">{tt('createIntoNoPlaylist')}</option>
-              {playlists.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-            </select>
-          </label>
-        )}
+        <label className="mb-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+          <span className="shrink-0">{tt('createIntoPlaylist')}</span>
+          <select value={chosenPlaylist} onChange={event => (event.target.value === NEW_PLAYLIST ? setNewPlaylistOpen(true) : choosePlaylist(event.target.value))} className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-black/20">
+            <option value="">{tt('createIntoNoPlaylist')}</option>
+            {playlists.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+            <option value={NEW_PLAYLIST}>{tt('createIntoNewPlaylist')}</option>
+          </select>
+        </label>
+        <CreatePlaylistModal
+          isOpen={newPlaylistOpen}
+          onClose={() => setNewPlaylistOpen(false)}
+          onCreate={(name, description) => void onCreatePlaylist(name, description).then(playlist => { if (playlist) choosePlaylist(playlist.id); })}
+        />
         <label className="mb-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300" title={tt('generateForeverHint')}>
           <input type="checkbox" checked={forever} onChange={event => setForever(event.target.checked)} className="accent-pink-500" />
           {tt('generateForever')}
