@@ -769,6 +769,13 @@ const TrainStep: React.FC<{ state: TrainingState; dataset: Dataset; job: Prepare
           {check(!lyricsProblem, lyricsProblem ?? t('trainingCheckLyrics'))}
           {check(!styleProblem, styleProblem ?? t('trainingCheckStyle'))}
         </ul>
+        {/* the way past found lyrics and heard styles without an assistant,
+            here as well as on the preparation step, where it can be missed */}
+        {(unlaid > 0 || unwritten > 0) && !preparing && (
+          <button type="button" onClick={() => void takeAsIs(dataset.id).then(onChanged).then(onRefresh).catch(problem => onError(errorText(problem)))} className={`${OUTLINE} mt-3`}>
+            <Check size={13} />{t('trainingTakeAsIs')}
+          </button>
+        )}
         <RecipeForm recipe={recipe ?? state.recipe_defaults} defaults={state.recipe_defaults} fields={state.recipe_fields} onChange={setRecipe} only={['stop']} />
         {(recipe ?? state.recipe_defaults).stop === 'epochs' && (
           <p className={HINT}>
