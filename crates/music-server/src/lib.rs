@@ -801,6 +801,9 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/writing/examples", get(writing_examples))
         .route("/v1/library/songs/{id}/files", get(library_song_files))
         .route("/v1/midi", get(midi_status))
+        .route("/v1/midi/runtime", get(midi_runtime))
+        .route("/v1/training/pack/runtime", get(training_pack_runtime))
+        .route("/v1/training/listen/runtime", get(listen_pack_runtime))
         .route("/v1/midi/notes", get(midi_live_notes))
         .route("/v1/midi/install", post(install_midi))
         .route("/v1/midi/remove", post(remove_midi_model))
@@ -2027,21 +2030,7 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
             value
         })
         .collect();
-    // Lyric timing is aligned on the vocals, so a recipe with it needs the
-    // separator too; its files come through its own downloaders.
-    let separator_ready = vocal_separator(&state).await.is_some();
-    let separator_download = match state.separator.downloader().active_for("separation").await {
-        Some(active) if !active.done => Some(active),
-        other => state.lyrics_sync.downloader().active_for("separation").await.filter(|active| !active.done).or(other),
-    };
-    let mut pack = training.pack_status();
-    pack.push(serde_json::json!({
-        "id": "vocal-separator",
-        "label": separation::MODEL.label,
-        "bytes": separation::MODEL.bytes,
-        "installed": separator_ready,
-    }));
-    let training_download = training.downloader().active_for(training::SCOPE).await;
+    let (pack, separator_ready) = training_pack_files(&state).await;
     let listen_download = training.downloader().active_for(training::LISTEN_SCOPE).await.filter(|active| !active.done);
     Json(serde_json::json!({
         "pack": pack,
@@ -2053,10 +2042,7 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
         // the trainer computes on CUDA only
         "card_trains": hardware::hardware().cuda.is_some(),
         "item_style": "style",
-        "download": match training_download {
-            Some(active) if !active.done => Some(active),
-            other => separator_download.or(other),
-        },
+        "download": training_pack_download(&state).await,
         "listen": {
             "pack": training.listen_status(),
             "ready": training.listen_ready() && state.lyrics_sync.onnxruntime_library().is_some(),
@@ -2066,6 +2052,94 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
         "datasets": training.datasets(),
         "runs": runs,
         "active": active,
+    }))
+}
+
+
+/// The training pack's files as the training page lists them: the trainer's
+/// own, and the vocal separator a recipe's lyric timing needs. Says whether
+/// the separator is ready too.
+async fn training_pack_files(state: &AppState) -> (Vec<Value>, bool) {
+    let separator_ready = vocal_separator(state).await.is_some();
+    let mut pack = state.training.pack_status();
+    pack.push(serde_json::json!({
+        "id": "vocal-separator",
+        "label": separation::MODEL.label,
+        "bytes": separation::MODEL.bytes,
+        "installed": separator_ready,
+    }));
+    (pack, separator_ready)
+}
+
+/// The training pack's download in progress: its own, or the separator's,
+/// whose files come through their own downloaders.
+async fn training_pack_download(state: &AppState) -> Option<downloads::DownloadProgress> {
+    let separator_download = match state.separator.downloader().active_for("separation").await {
+        Some(active) if !active.done => Some(active),
+        other => state.lyrics_sync.downloader().active_for("separation").await.filter(|active| !active.done).or(other),
+    };
+    match state.training.downloader().active_for(training::SCOPE).await {
+        Some(active) if !active.done => Some(active),
+        other => separator_download.or(other),
+    }
+}
+
+/// A pack as the models page lists an optional part: every file a runtime
+/// row, how much of the whole is on disk, and its download.
+fn pack_runtime(mut files: Vec<Value>, ready: bool, active_download: Option<downloads::DownloadProgress>) -> Value {
+    let bytes: u64 = files.iter().map(|file| file["bytes"].as_u64().unwrap_or(0)).sum();
+    let installed_bytes: u64 = files.iter().filter(|file| file["installed"].as_bool() == Some(true)).map(|file| file["bytes"].as_u64().unwrap_or(0)).sum();
+    for file in &mut files {
+        file["kind"] = "runtime".into();
+        file["note"] = "".into();
+    }
+    let count = files.len();
+    serde_json::json!({
+        "assets": files,
+        "set": { "bytes": bytes, "installed_bytes": installed_bytes, "ready": ready, "files": count },
+        "active_download": active_download,
+    })
+}
+
+/// The training pack on the models page, with what the reference there says:
+/// the video memory a run needs and whether this card trains at all.
+async fn training_pack_runtime(State(state): State<AppState>) -> Json<Value> {
+    let (pack, separator_ready) = training_pack_files(&state).await;
+    let mut body = pack_runtime(pack, state.training.pack_ready() && separator_ready, training_pack_download(&state).await);
+    body["min_vram_gb"] = music_engine::yue_train::MIN_VRAM_GB.into();
+    body["card_trains"] = hardware::hardware().cuda.is_some().into();
+    Json(body)
+}
+
+/// The listening pack on the models page.
+async fn listen_pack_runtime(State(state): State<AppState>) -> Json<Value> {
+    let training = &state.training;
+    let ready = training.listen_ready() && state.lyrics_sync.onnxruntime_library().is_some();
+    Json(pack_runtime(training.listen_status(), ready, training.downloader().active_for(training::LISTEN_SCOPE).await))
+}
+
+/// Audio to MIDI on the models page: the transcriber, and its sizes as one
+/// model's variants - one is chosen and downloaded.
+async fn midi_runtime(State(state): State<AppState>) -> Json<Value> {
+    let tool = midi::tool_asset();
+    let tool_installed = state.midi.tool_installed();
+    let mut assets = vec![serde_json::json!({ "id": tool.id, "label": tool.label, "bytes": tool.bytes, "note": "", "installed": tool_installed, "kind": "runtime" })];
+    assets.extend(midi::SIZES.iter().map(|size| {
+        serde_json::json!({
+            "id": size.id,
+            "label": format!("MuScriptor {} · {}", size.id, size.params),
+            "bytes": size.bytes,
+            "note": "",
+            "installed": state.midi.model_installed(size),
+            "kind": "model",
+        })
+    }));
+    let installed_size = midi::SIZES.iter().find(|size| state.midi.model_installed(size));
+    Json(serde_json::json!({
+        "assets": assets,
+        "set": { "bytes": tool.bytes, "installed_bytes": if tool_installed { tool.bytes } else { 0 }, "ready": tool_installed && installed_size.is_some(), "files": 1 },
+        "active_download": state.midi.downloader().active().await,
+        "chosen_model": installed_size.map_or(midi::DEFAULT_SIZE, |size| size.id),
     }))
 }
 
@@ -5219,7 +5293,8 @@ async fn midi_live_notes(State(state): State<AppState>) -> Json<Value> {
 
 #[derive(Debug, Deserialize)]
 struct MidiSizeRequest {
-    #[serde(default)]
+    /// `model_id` when the models page sends it, as for every optional part.
+    #[serde(default, alias = "model_id")]
     size: Option<String>,
 }
 
