@@ -742,7 +742,7 @@ pub const ASSETS: &[Asset] = &[
         marker: "onnxruntime.dll",
         pick: &["runtimes/win-x64/native/onnxruntime.dll", "runtimes/win-x64/native/onnxruntime_providers_shared.dll"],
         vram_gb: None,
-        note: "Runs the separator and the recognisers on an AMD or Intel card through DirectX 12.",
+        note: "Runs karaoke's Parakeet and the tempo model on an AMD or Intel card through DirectX 12.",
     },
     Asset {
         id: "directml",
