@@ -1240,9 +1240,7 @@ async fn separation_assets(State(state): State<AppState>) -> Json<Value> {
     let config = state.separation_config.read().await.clone();
     let mut set: Vec<&'static lyrics_sync::Asset> = Vec::new();
     if let Some(asset) = lyrics_sync::asset("onnxruntime") { set.push(asset); }
-    if config.runtime.uses_cuda() {
-        set.extend(CARD_ASSETS.iter().filter_map(|id| lyrics_sync::asset(id)));
-    }
+    set.extend(separation_card_assets(config.runtime).iter().filter_map(|id| lyrics_sync::asset(id)));
     let runtime_progress = set_progress(state.lyrics_sync.downloader(), &set);
     let model_installed = state.separator.is_installed();
     let bytes = runtime_progress["bytes"].as_u64().unwrap_or(0) + separation::MODEL.bytes;
@@ -1273,34 +1271,37 @@ struct InstallSeparationAssetRequest {
 /// Everything the card path needs, in the order it is used. `karaoke_set`
 /// builds a recogniser out of these plus its own model files, so this is the
 /// one place the CUDA provider's parts are named.
-const CARD_ASSETS: [&str; 5] = ["onnxruntime-cuda", "cuda-cudart", "cuda-cublas", "cuda-cufft", "cuda-cudnn"];
+const CUDA_ASSETS: [&str; 5] = ["onnxruntime-cuda", "cuda-cudart", "cuda-cublas", "cuda-cufft", "cuda-cudnn"];
+
+/// The runtime parts work set to `runtime` needs on this machine's card:
+/// CUDA's on an NVIDIA card that runs it, DirectML's on any other card,
+/// none on the processor.
+fn card_assets(runtime: lyrics_sync::OnnxFlavour) -> &'static [&'static str] {
+    match runtime.card() {
+        Some(lyrics_sync::OnnxCard::Cuda) => &CUDA_ASSETS,
+        Some(lyrics_sync::OnnxCard::DirectMl) => &lyrics_sync::DIRECTML_ASSETS,
+        None => &[],
+    }
+}
+
+/// Whether separation runs on this card: CUDA only. HT-Demucs's ONNX export
+/// does not run through DirectML - out of memory on a 2 GB card, over twenty
+/// gigabytes and minutes for 30 seconds on a 24 GB one - so every other card
+/// separates on the processor.
+fn separates_on(card: lyrics_sync::OnnxCard) -> bool {
+    card == lyrics_sync::OnnxCard::Cuda
+}
+
+/// The runtime parts separation needs on this machine's card.
+fn separation_card_assets(runtime: lyrics_sync::OnnxFlavour) -> &'static [&'static str] {
+    if runtime.card().is_some_and(separates_on) { &CUDA_ASSETS } else { &[] }
+}
 
 /// Stops a download. What arrived stays on disk: pressing this again later
 /// carries on from the last finished piece rather than starting the file over.
 ///
 /// Two panels can be downloading at once, and until this existed the only way
 /// to stop one of them was to close the studio.
-/// Points `ort` at the ONNX Runtime the studio installed, once per process.
-///
-/// It has to happen before anything touches `ort`, or the library binds to
-/// whatever `onnxruntime.dll` the system happens to have - and on Windows a
-/// DLL's own dependencies are resolved through the process search path, not
-/// through the folder it came from, which is why the directory joins PATH too.
-/// Every caller needs this, not only the separator: reading a track through the
-/// same runtime without it left the request waiting on a library that was never
-/// located.
-fn point_ort_at(runtime: &std::path::Path) {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    let runtime = runtime.to_path_buf();
-    ONCE.call_once(|| unsafe {
-        std::env::set_var("ORT_DYLIB_PATH", &runtime);
-        if let Some(directory) = runtime.parent() {
-            let existing = std::env::var("PATH").unwrap_or_default();
-            std::env::set_var("PATH", format!("{};{existing}", directory.display()));
-        }
-    });
-}
-
 async fn cancel_separation_download(State(state): State<AppState>) -> Json<Value> {
     state.separator.downloader().cancel();
     state.lyrics_sync.downloader().cancel();
@@ -1357,14 +1358,12 @@ async fn install_separation_asset(
     // for the card - the CUDA provider. Six rows of file names asked the user
     // to work out which of them belong together.
     if matches!(request.asset_id.as_str(), "auto" | "cuda" | "cpu") {
-        let card = request.asset_id != "cpu" && lyrics_sync::OnnxFlavour::Auto.uses_cuda();
+        let wanted = if request.asset_id == "cpu" { lyrics_sync::OnnxFlavour::Cpu } else { lyrics_sync::OnnxFlavour::Auto };
         let separator = state.separator.clone();
         let sync = state.lyrics_sync.clone();
         let mut runtime: Vec<&'static lyrics_sync::Asset> = Vec::new();
         if let Some(asset) = lyrics_sync::asset("onnxruntime") { runtime.push(asset); }
-        if card {
-            runtime.extend(CARD_ASSETS.iter().filter_map(|id| lyrics_sync::asset(id)));
-        }
+        runtime.extend(separation_card_assets(wanted).iter().filter_map(|id| lyrics_sync::asset(id)));
         tokio::spawn(async move {
             if let Err(error) = separator.downloader().install_all("separation", &[&separation::MODEL]).await {
                 eprintln!("the separator model could not be installed: {error}");
@@ -1378,7 +1377,7 @@ async fn install_separation_asset(
     }
     if request.asset_id == "card" {
         let sync = state.lyrics_sync.clone();
-        let card: Vec<&'static lyrics_sync::Asset> = CARD_ASSETS.iter().filter_map(|id| lyrics_sync::asset(id)).collect();
+        let card: Vec<&'static lyrics_sync::Asset> = separation_card_assets(lyrics_sync::OnnxFlavour::Auto).iter().filter_map(|id| lyrics_sync::asset(id)).collect();
         tokio::spawn(async move {
             if let Err(error) = sync.downloader().install_all("separation", &card).await {
                 eprintln!("the card path could not be installed: {error}");
@@ -1440,6 +1439,7 @@ async fn write_separation_settings(
 
 async fn separation_status(State(state): State<AppState>) -> Json<Value> {
     let runtime = state.lyrics_sync.onnxruntime_library();
+    let card = lyrics_sync::OnnxFlavour::Auto.card().filter(|card| separates_on(*card));
     Json(serde_json::json!({
         "model": {
             "id": separation::MODEL.id,
@@ -1449,19 +1449,16 @@ async fn separation_status(State(state): State<AppState>) -> Json<Value> {
             "installed": state.separator.is_installed(),
         },
         "runtime_installed": runtime.is_some(),
-        "cuda_runtime_installed": state.lyrics_sync.has_cuda_libraries(),
-        "cuda_card": lyrics_sync::OnnxFlavour::Auto.uses_cuda(),
-        // nothing is missing for a card that does not run CUDA: it never uses these
-        "card_missing_bytes": if lyrics_sync::OnnxFlavour::Auto.uses_cuda() {
-            CARD_ASSETS
-                .iter()
-                .filter_map(|id| lyrics_sync::asset(id))
-                .filter(|asset| !state.lyrics_sync.downloader().is_installed(asset))
-                .map(|asset| asset.bytes)
-                .sum::<u64>()
-        } else {
-            0
-        },
+        // the card separation takes on this machine, none on any card but
+        // CUDA's, and whether every library of it is installed
+        "card": card,
+        "card_runtime_installed": card.is_some_and(|card| state.lyrics_sync.has_card_libraries(card)),
+        "card_missing_bytes": separation_card_assets(lyrics_sync::OnnxFlavour::Auto)
+            .iter()
+            .filter_map(|id| lyrics_sync::asset(id))
+            .filter(|asset| !state.lyrics_sync.downloader().is_installed(asset))
+            .map(|asset| asset.bytes)
+            .sum::<u64>(),
         "ready": state.separator.ready(runtime.as_deref()),
         "stems": separation::STEMS,
         // Either downloader may be the busy one: the model has its own, the
@@ -1932,9 +1929,9 @@ async fn remove_song_version(
 /// and lyric recognition are measured on.
 struct StudioSeparator {
     model: PathBuf,
-    runtime: PathBuf,
     overlap: f64,
-    on_gpu: bool,
+    /// The card the bound runtime reaches, none for the processor.
+    card: Option<lyrics_sync::OnnxCard>,
     /// Loaded on the first song and kept for the rest: one separator is made
     /// per run of songs and dropped with it, taking the card's memory along.
     loaded: std::sync::Mutex<Option<separation::Loaded>>,
@@ -1942,11 +1939,10 @@ struct StudioSeparator {
 
 impl training::VocalSeparator for StudioSeparator {
     fn separate(&self, mix: &std::path::Path, out: &std::path::Path) -> anyhow::Result<()> {
-        point_ort_at(&self.runtime);
         let audio = audio_pcm::decode_stereo_44k(mix)?;
         let mut loaded = self.loaded.lock().map_err(|_| anyhow::anyhow!("the separator failed on an earlier song"))?;
         if loaded.is_none() {
-            *loaded = Some(separation::load(&self.model, self.on_gpu)?);
+            *loaded = Some(separation::load(&self.model, self.card)?);
         }
         let model = loaded.as_mut().expect("loaded above");
         let separated = separation::separate_with(model, &audio, separation::STEMS.len(), self.overlap, |_| {})?;
@@ -1955,29 +1951,18 @@ impl training::VocalSeparator for StudioSeparator {
     }
 }
 
-/// The ONNX Runtime build for the card when its libraries are there. The
-/// process binds one build on first use, so work that wants the card points
-/// at this one before anything else runs.
-fn preferred_onnx_runtime(state: &AppState) -> Option<PathBuf> {
-    state
-        .lyrics_sync
-        .onnxruntime_library_of(if state.lyrics_sync.has_cuda_libraries() { lyrics_sync::OnnxFlavour::Cuda } else { lyrics_sync::OnnxFlavour::Cpu })
-        .or_else(|| state.lyrics_sync.onnxruntime_library())
-}
-
-/// The separator when its model and runtime are installed; the runtime is
-/// chosen the way a song's separation chooses it.
+/// The separator when its model and runtime are installed, on the card a
+/// song's separation would use.
 async fn vocal_separator(state: &AppState) -> Option<Arc<dyn training::VocalSeparator>> {
-    let runtime = preferred_onnx_runtime(state)?;
+    let config = state.separation_config.read().await.clone();
+    let card = state.lyrics_sync.onnx_card(config.runtime).ok()?.filter(|card| separates_on(*card));
     if !state.separator.is_installed() {
         return None;
     }
-    let config = state.separation_config.read().await.clone();
     Some(Arc::new(StudioSeparator {
         model: state.separator.model_path(),
-        runtime,
         overlap: config.sane_overlap(),
-        on_gpu: config.runtime.uses_cuda() && state.lyrics_sync.has_cuda_libraries(),
+        card,
         loaded: std::sync::Mutex::new(None),
     }))
 }
@@ -1985,16 +1970,14 @@ async fn vocal_separator(state: &AppState) -> Option<Arc<dyn training::VocalSepa
 /// Everything the separator still lacks, through the same downloaders the
 /// separator's own panel uses; the card path unless the processor was chosen.
 async fn install_separator(state: &AppState) {
-    let card = state.separation_config.read().await.runtime.uses_cuda();
+    let wanted = state.separation_config.read().await.runtime;
     let separator = state.separator.clone();
     let sync = state.lyrics_sync.clone();
     let mut runtime: Vec<&'static lyrics_sync::Asset> = Vec::new();
     if let Some(asset) = lyrics_sync::asset("onnxruntime") {
         runtime.push(asset);
     }
-    if card {
-        runtime.extend(CARD_ASSETS.iter().filter_map(|id| lyrics_sync::asset(id)));
-    }
+    runtime.extend(separation_card_assets(wanted).iter().filter_map(|id| lyrics_sync::asset(id)));
     runtime.retain(|asset| !sync.downloader().is_installed(asset));
     if !separator.is_installed() {
         if let Err(error) = separator.downloader().install_all("separation", &[&separation::MODEL]).await {
@@ -2523,23 +2506,11 @@ async fn start_separation(
         return Err(api_error(StatusCode::CONFLICT, "a track is already being separated".into()));
     }
     let wanted_runtime = state.separation_config.read().await.runtime;
-    // Which library is loaded is decided once per process - `ort` binds it on
-    // first use - so always take the CUDA build when it is complete: it carries
-    // the processor provider too, and the setting below decides which of them
-    // actually runs. Choosing by the setting meant a studio that had run once
-    // on the processor could never reach the card without a restart.
-    let runtime = state
+    let card = state
         .lyrics_sync
-        .onnxruntime_library_of(if state.lyrics_sync.has_cuda_libraries() {
-            lyrics_sync::OnnxFlavour::Cuda
-        } else {
-            lyrics_sync::OnnxFlavour::Cpu
-        })
-        .or_else(|| state.lyrics_sync.onnxruntime_library())
-        .ok_or_else(|| api_error(StatusCode::BAD_REQUEST, "the ONNX Runtime is not installed yet".into()))?;
-    // The card is only really available when every CUDA library the provider
-    // links against is beside it.
-    let on_gpu = wanted_runtime.uses_cuda() && state.lyrics_sync.has_cuda_libraries();
+        .onnx_card(wanted_runtime)
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("{error:#}")))?
+        .filter(|card| separates_on(*card));
     if !state.separator.is_installed() {
         return Err(api_error(StatusCode::BAD_REQUEST, "the separation model is not installed yet".into()));
     }
@@ -2563,12 +2534,10 @@ async fn start_separation(
     let background = state.clone();
     let song_id = id.clone();
     tokio::task::spawn_blocking(move || {
-        point_ort_at(&runtime);
-
         let outcome = (|| -> anyhow::Result<(Vec<String>, bool)> {
             let audio = audio_pcm::decode_stereo_44k(&audio_path)?;
             let handle = tokio::runtime::Handle::current();
-            let separated = separation::separate(&model, &audio, separation::STEMS.len(), overlap, on_gpu, |fraction| {
+            let separated = separation::separate(&model, &audio, separation::STEMS.len(), overlap, card, |fraction| {
                 let state = background.clone();
                 handle.spawn(async move {
                     if let Some(run) = state.separation_run.write().await.as_mut() {
@@ -2780,7 +2749,7 @@ async fn time_lyrics_for(state: AppState, song_id: String) {
         lyrics_sync::AsrProvider::Parakeet => {
             let sync = state.lyrics_sync.clone();
             let path = std::path::PathBuf::from(&audio);
-            match tokio::task::spawn_blocking(move || sync.parakeet_words(&path)).await {
+            match tokio::task::spawn_blocking(move || sync.parakeet_words(config.runtime, &path)).await {
                 Ok(result) => result,
                 Err(error) => {
                     eprintln!("no karaoke for {song_id}: {error}");
@@ -4452,9 +4421,7 @@ fn karaoke_set(name: &str, device: lyrics_sync::OnnxFlavour, whisper_model: Opti
     match name {
         "parakeet" => {
             wanted.push("onnxruntime".into());
-            if device.uses_cuda() {
-                wanted.extend(CARD_ASSETS.map(String::from));
-            }
+            wanted.extend(card_assets(device).iter().map(|id| id.to_string()));
             // The precision is chosen the same way a Whisper model is: through
             // the dropdown, which names one of the two encoders.
             if whisper_model.is_some_and(|id| id.contains("fp32")) {
@@ -4586,7 +4553,7 @@ async fn create_song_karaoke(
         lyrics_sync::AsrProvider::Parakeet => {
             let sync = state.lyrics_sync.clone();
             let path = std::path::PathBuf::from(&audio);
-            tokio::task::spawn_blocking(move || sync.parakeet_words(&path))
+            tokio::task::spawn_blocking(move || sync.parakeet_words(config.runtime, &path))
                 .await
                 .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
         }

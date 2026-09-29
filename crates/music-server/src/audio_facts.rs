@@ -43,9 +43,9 @@ pub struct Measurer {
 }
 
 impl Measurer {
-    /// Loads the model, on the card when asked and when it takes it.
-    pub fn load(models: &Path, on_gpu: bool) -> Result<Self> {
-        let (beat, on_gpu) = session(&models.join(BEAT_MODEL), on_gpu)?;
+    /// Loads the model, on the card a path reaches when one is given and it takes it.
+    pub fn load(models: &Path, card: Option<crate::lyrics_sync::OnnxCard>) -> Result<Self> {
+        let (beat, on_gpu) = session(&models.join(BEAT_MODEL), card)?;
         Ok(Self { beat, on_gpu })
     }
 
@@ -64,15 +64,14 @@ pub fn decode(audio: &Path) -> Result<Vec<f32>> {
     Ok(stereo.left.iter().zip(&stereo.right).map(|(left, right)| 0.5 * (left + right)).collect())
 }
 
-/// A session on the card when asked; says whether the card took it.
-fn session(model: &Path, on_gpu: bool) -> Result<(Session, bool)> {
+/// A session on the card a path reaches, when one is given; says whether the card took it.
+fn session(model: &Path, card: Option<crate::lyrics_sync::OnnxCard>) -> Result<(Session, bool)> {
     let mut builder = Session::builder().context("prepare an ONNX session")?;
-    if on_gpu {
-        // `error_on_failure`: without it the runtime quietly runs on the processor
-        if let Ok(mut with_cuda) = builder.clone().with_execution_providers([ort::ep::CUDA::default().build().error_on_failure()]) {
-            if let Ok(session) = with_cuda.commit_from_file(model) {
-                return Ok((session, true));
-            }
+    let (mut on_card, took) = crate::lyrics_sync::with_card(builder.clone(), card);
+    if took {
+        match on_card.commit_from_file(model) {
+            Ok(session) => return Ok((session, true)),
+            Err(error) => eprintln!("[ERROR] the card could not load {}, the processor measures instead: {error}", model.display()),
         }
     }
     let session = builder.commit_from_file(model).with_context(|| format!("load {}", model.display()))?;
@@ -275,7 +274,12 @@ mod tests {
     #[ignore]
     fn measures_real_songs() {
         let models = std::path::PathBuf::from(std::env::var("AUDIO_FACTS_MODELS").expect("AUDIO_FACTS_MODELS"));
-        let mut measurer = Measurer::load(&models, std::env::var("AUDIO_FACTS_GPU").is_ok()).expect("load the models");
+        let card = match std::env::var("AUDIO_FACTS_CARD").as_deref() {
+            Ok("cuda") => Some(crate::lyrics_sync::OnnxCard::Cuda),
+            Ok("directml") => Some(crate::lyrics_sync::OnnxCard::DirectMl),
+            _ => None,
+        };
+        let mut measurer = Measurer::load(&models, card).expect("load the models");
         println!("on the card: {}", measurer.on_gpu);
         for song in std::env::var("AUDIO_FACTS_SONGS").expect("AUDIO_FACTS_SONGS").split(';') {
             let started = std::time::Instant::now();
