@@ -7,7 +7,7 @@ import { transcribeWithNativeOpenRouter } from '../services/nativeOpenRouter';
 import { apiUrl } from '../services/apiBase';
 import { openExternal } from '../services/externalLinks';
 import { StemPlayer } from './StemPlayer';
-import { mapNativeLibrarySong } from '../services/nativeLibrary';
+import { mapNativeLibrarySong, type NativeLibrarySong } from '../services/nativeLibrary';
 import { MidiTool } from './midi/MidiTool';
 import { isPart } from './songParts';
 
@@ -23,12 +23,6 @@ import { isPart } from './songParts';
  * The page used to be diagnostics. Those moved to Settings, next to the flags
  * that produce them, which left this page for the tools it is named after.
  */
-
-interface LibrarySong {
-  id: string;
-  title: string;
-  audio_path?: string | null;
-}
 
 interface SeparationStatus {
   model: { label: string; bytes: number; installed: boolean; note: string };
@@ -55,16 +49,16 @@ interface CatalogModel {
   capabilities: string[];
 }
 
-const CARD = 'rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]';
+const CARD = 'rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/3';
 const CONTROL =
-  'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-pink-500 disabled:opacity-50 dark:border-white/10 dark:bg-black/30 dark:text-white';
+  'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-hidden focus:border-pink-500 disabled:opacity-50 dark:border-white/10 dark:bg-black/30 dark:text-white';
 
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(0)} MB`;
 
 export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | null } = {}): React.ReactElement {
   const { t } = useI18n();
 
-  const [songs, setSongs] = useState<LibrarySong[]>([]);
+  const [songs, setSongs] = useState<NativeLibrarySong[]>([]);
   const [songId, setSongId] = useState('');
   const [status, setStatus] = useState<SeparationStatus | null>(null);
   const [stems, setStems] = useState<string[]>([]);
@@ -83,7 +77,7 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
 
   const loadSongs = useCallback(async () => {
     const body = await fetch('/v1/library/songs').then(response => response.json());
-    const list: LibrarySong[] = Array.isArray(body) ? body : body.songs ?? [];
+    const list: NativeLibrarySong[] = Array.isArray(body) ? body : body.songs ?? [];
     const playable = list.filter(song => song.audio_path);
     setSongs(playable);
     setSongId(current => current || playable[0]?.id || '');
@@ -273,7 +267,7 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
                           : 'border-zinc-200 text-zinc-500 dark:border-white/10'
                       }`}
                     >
-                      <span className={`grid h-3.5 w-3.5 place-items-center rounded ${chosen ? 'bg-pink-500 text-white' : 'bg-zinc-200 dark:bg-white/10'}`}>
+                      <span className={`grid h-3.5 w-3.5 place-items-center rounded-sm ${chosen ? 'bg-pink-500 text-white' : 'bg-zinc-200 dark:bg-white/10'}`}>
                         {chosen && <Check size={9} strokeWidth={3} />}
                       </span>
                       {t(`stem_${stem}` as never) || stem}
@@ -341,7 +335,7 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
                 type="button"
                 onClick={() => void separate()}
                 disabled={!status?.ready || !songId || settings.stems.length === 0 || running || busy}
-                className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
                 {stems.length > 0 ? t('stemsAgain') : t('stemsStart')}
@@ -358,7 +352,7 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
                 <div className="mt-2">
                   <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-black/30">
                     <div
-                      className="h-full bg-gradient-to-r from-orange-500 to-pink-500 transition-[width]"
+                      className="h-full bg-linear-to-r from-orange-500 to-pink-500 transition-[width]"
                       style={{ width: `${Math.round((download.downloaded_bytes / Math.max(1, download.total_bytes)) * 100)}%` }}
                     />
                   </div>
@@ -386,7 +380,7 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
                 <span className="tabular-nums text-zinc-500">{percent}%</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-black/30">
-                <div className="h-full bg-gradient-to-r from-orange-500 to-pink-500 transition-[width]" style={{ width: `${percent}%` }} />
+                <div className="h-full bg-linear-to-r from-orange-500 to-pink-500 transition-[width]" style={{ width: `${percent}%` }} />
               </div>
             </div>
           )}
@@ -415,7 +409,7 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
           )}
 
           {run?.error && (
-            <p role="alert" className="mt-3 select-text rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-700 [overflow-wrap:anywhere] dark:text-rose-300">{run.error}</p>
+            <p role="alert" className="mt-3 select-text rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-700 wrap-anywhere dark:text-rose-300">{run.error}</p>
           )}
         </section>
 
@@ -517,7 +511,7 @@ export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | n
             type="button"
             onClick={() => void transcribe()}
             disabled={!asrFile || !asrModel || asrBusy}
-            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {asrBusy ? <Loader2 size={14} className="animate-spin" /> : <FileAudio size={14} />} {t('transcribeAudio')}
           </button>

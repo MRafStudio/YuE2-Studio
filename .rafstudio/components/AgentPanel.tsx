@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Trash2 } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
+import type { TranslationKey } from '../i18n/translations';
 import { apiUrl } from '../services/apiBase';
 
 /**
@@ -21,7 +22,7 @@ interface McpStatus {
 
 
 /** free, risky or all - how close the agent is kept. */
-const LEASHES: Array<{ value: string; label: string }> = [
+const LEASHES: Array<{ value: string; label: TranslationKey }> = [
   { value: 'risky', label: 'agentLeashRisky' },
   { value: 'free', label: 'agentLeashFree' },
   { value: 'all', label: 'agentLeashAll' },

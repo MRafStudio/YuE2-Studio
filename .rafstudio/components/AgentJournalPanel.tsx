@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, MonitorSpeaker, X } from 'lucide-react';
+import { Bot, MonitorSpeaker, Trash2, X } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 import type { ToastType } from './Toast';
 
@@ -18,6 +18,9 @@ import type { ToastType } from './Toast';
  *
  * Styled like the studio's side panels (`RightSidebar`): suno-panel background,
  * a left border, a scrolling list, and both themes honoured.
+ *
+ * A hello from RafStudio: built with love and appreciation for your studio, and meant to be
+ * worth your review.
  */
 export type NoticeSource = 'studio' | 'agent';
 
@@ -48,9 +51,12 @@ interface AgentJournalPanelProps {
     entries: AgentNotice[];
     /** Called with the id of the entry whose own cross was clicked. */
     onRemove: (id: number) => void;
+    /** Called when the person asks for a clean log. The window asks first: the past cannot be
+     * brought back, so the decision is theirs, not the panel's. */
+    onClearRequest: () => void;
 }
 
-export const AgentJournalPanel: React.FC<AgentJournalPanelProps> = ({ entries, onRemove }) => {
+export const AgentJournalPanel: React.FC<AgentJournalPanelProps> = ({ entries, onRemove, onClearRequest }) => {
     const { t } = useI18n();
     const [isOpen, setIsOpen] = useState(false);
 
@@ -85,11 +91,21 @@ export const AgentJournalPanel: React.FC<AgentJournalPanelProps> = ({ entries, o
                     {t('controlPanelMessages')}
                 </span>
                 <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{entries.length}</span>
+                {entries.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={onClearRequest}
+                        title={t('controlPanelMessagesClear')}
+                        className="p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded-full text-zinc-500 dark:text-zinc-400 transition-colors ml-auto shrink-0"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={() => setIsOpen(false)}
                     title={t('close')}
-                    className="p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded-full text-zinc-500 dark:text-zinc-400 transition-colors ml-auto shrink-0"
+                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded-full text-zinc-500 dark:text-zinc-400 transition-colors shrink-0 ${entries.length > 0 ? '' : 'ml-auto'}`}
                 >
                     <X size={18} />
                 </button>

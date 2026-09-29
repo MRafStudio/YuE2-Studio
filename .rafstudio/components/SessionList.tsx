@@ -1,6 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Archive, FolderOpen, Pencil, Plus, Search } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
+import { orderSessions, type SortOrder } from '../services/workspaces';
+import { stampOf, changedAfter } from '../services/dates';
+import { Pager } from './Pager';
 
 /**
  * A workspace session: the working set the studio collects everything into.
@@ -12,7 +15,11 @@ import { useI18n } from '../context/I18nContext';
 export interface WorkspaceSession {
     id: string;
     name: string;
+    /** `import` for the session the studio keeps itself: it is shown by its mark, not its name. */
+    kind?: string | null;
     createdAt: number;
+    /** When it was last touched: renamed, opened, closed. Falls back to createdAt. */
+    updatedAt?: number;
     /** null while the session is open; the moment it was closed otherwise. */
     closedAt: number | null;
 }
@@ -29,6 +36,10 @@ interface SessionListProps {
     onRenameSession: (id: string, name: string) => void;
     /** Creating one asks for a name in a modal, so it is asked here. */
     onCreateRequest: () => void;
+    /** How many rows one page holds: the person's setting, shared with every other list. */
+    itemsPerPage: number;
+    /** What the sessions are ordered by, and which way - set in the alpha panel above. */
+    order: SortOrder;
 }
 
 /**
@@ -44,18 +55,26 @@ export const SessionList: React.FC<SessionListProps> = ({
     onCloseSession,
     onRenameSession,
     onCreateRequest,
+    itemsPerPage,
+    order,
 }) => {
-    const { t, songCount } = useI18n();
+    const { t, language, songCount } = useI18n();
     const [query, setQuery] = useState('');
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renamingValue, setRenamingValue] = useState('');
+    /* A list is read a page at a time, like the songs: a new search or a new page
+       size starts from the first page. */
+    const [page, setPage] = useState(0);
 
     const visible = useMemo(() => {
         const needle = query.trim().toLowerCase();
-        return sessions
-            .filter((session) => !needle || session.name.toLowerCase().includes(needle))
-            .sort((a, b) => b.createdAt - a.createdAt);
-    }, [sessions, query]);
+        const titleOf = (session: WorkspaceSession) => (session.kind === 'import' ? t('sessionImportName') : session.name);
+        const matching = sessions.filter((session) => !needle || titleOf(session).toLowerCase().includes(needle));
+        // The current session leads the list: it is the one being worked in.
+        return orderSessions(matching, activeSessionId, order);
+    }, [sessions, query, activeSessionId, order, t]);
+
+    useEffect(() => { setPage(0); }, [query, sessions.length, itemsPerPage]);
 
     const commitRename = (id: string) => {
         const name = renamingValue.trim();
@@ -73,7 +92,8 @@ export const SessionList: React.FC<SessionListProps> = ({
             <div className="w-full min-w-0 max-w-5xl">
                 <div className="mb-8 flex flex-col gap-6">
                     <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        <span className="font-medium text-zinc-900 dark:text-white">{t('controlPanelSessions')}</span>
+                        {/* The browser gets its own colour, so a glance says which list this is. */}
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t('controlPanelSessions')}</span>
                         <span className="text-zinc-400 dark:text-zinc-600">·</span>
                         <span>{sessions.length}</span>
                     </div>
@@ -101,6 +121,13 @@ export const SessionList: React.FC<SessionListProps> = ({
                     </div>
                 </div>
 
+                {/* The pager is read before the rows, not after them. */}
+                <Pager
+                    page={page}
+                    pageCount={Math.max(1, Math.ceil(visible.length / itemsPerPage))}
+                    onPage={setPage}
+                />
+
                 <div className="space-y-2">
                     {visible.length === 0 ? (
                         <div className="flex h-64 flex-col items-center justify-center space-y-4 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-white/5 dark:bg-white/[0.02]">
@@ -110,7 +137,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                             <p className="font-medium">{t('sessionNoMatch')}</p>
                         </div>
                     ) : (
-                        visible.map((session) => {
+                        visible.slice(page * itemsPerPage, (page + 1) * itemsPerPage).map((session) => {
                             const isCurrent = session.id === activeSessionId;
                             const isOpenSession = session.closedAt === null;
                             return (
@@ -118,7 +145,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                                     key={session.id}
                                     /* Same mark songs carry, so an agent reading the window
                                        sees the session by name and id, not by its place. */
-                                    data-mcp-context={`session ${session.id}: ${session.name}`}
+                                    data-mcp-context={`session ${session.id}: ${session.kind === 'import' ? t('sessionImportName') : session.name}`}
                                     className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                                         isCurrent
                                             ? 'border-emerald-500/40 bg-emerald-500/5 dark:border-emerald-500/30'
@@ -141,7 +168,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                                         ) : (
                                             <div className="flex items-center gap-2">
                                                 <span className="min-w-0 truncate text-sm font-medium text-zinc-900 dark:text-white">
-                                                    {session.name}
+                                                    {session.kind === 'import' ? t('sessionImportName') : session.name}
                                                 </span>
                                                 {isCurrent && (
                                                     <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
@@ -158,7 +185,21 @@ export const SessionList: React.FC<SessionListProps> = ({
                                         <span className="block text-[11px] text-zinc-500 dark:text-zinc-500">
                                             {songCount(trackCount(session.id))}
                                             {' · '}
-                                            {new Date(session.createdAt).toLocaleDateString()}
+                                            {/* The label is plain and the moment carries the colour:
+                                                a made moment is blue, a changed one is orange. */}
+                                            <span className="text-zinc-500 dark:text-zinc-500">{t('sessionMadeLabel')}</span>{' '}
+                                            <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                                {stampOf(session.createdAt, language)}
+                                            </span>
+                                            {changedAfter(session.createdAt, session.updatedAt) && (
+                                                <>
+                                                    {' · '}
+                                                    <span className="text-zinc-500 dark:text-zinc-500">{t('changedLabel')}</span>{' '}
+                                                    <span className="font-semibold text-orange-600 dark:text-orange-400">
+                                                        {stampOf(session.updatedAt, language)}
+                                                    </span>
+                                                </>
+                                            )}
                                         </span>
                                     </div>
 

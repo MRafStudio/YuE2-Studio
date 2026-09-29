@@ -12,16 +12,42 @@ import type { Song } from '../types';
  * library's "All songs" tab) can show and fold parts the same way.
  */
 
-/** The part a track is: the stem the separation tool recorded. Null for a song. */
+/**
+ * The part a track is: the stem the separation tool recorded. Null for a song.
+ *
+ * The stem name comes from the separator itself (`stem.name`), never from the file name,
+ * the format or the order the parts arrived in - those are guesses that break silently.
+ * A record that says "stems" but carries no stem name is still a part: it counts as "other"
+ * rather than quietly turning into a song of its own.
+ */
 export const partName = (song: Song): string | null => {
     const derived = song.derived;
     if (!derived || derived.tool !== 'stems') return null;
     const stem = derived.settings?.stem;
-    return typeof stem === 'string' ? stem : null;
+    return typeof stem === 'string' && stem ? stem : 'other';
+};
+
+/** The i18n key for a part's name, so it reads in the person's own language. */
+const PART_KEYS: Record<string, string> = {
+    drums: 'stemDrums',
+    bass: 'stemBass',
+    vocals: 'stemVocals',
+    guitar: 'stemGuitar',
+    piano: 'stemPiano',
+    other: 'stemOther',
+};
+
+export type PartLabelKey = 'stemDrums' | 'stemBass' | 'stemVocals' | 'stemGuitar' | 'stemPiano' | 'stemOther';
+
+export const partLabelKey = (song: Song): PartLabelKey | null => {
+    const name = partName(song);
+    if (!name) return null;
+    return (PART_KEYS[name] ?? 'stemOther') as PartLabelKey;
 };
 
 /// One icon per part, so a folded song still says what is inside it.
 const PART_ICONS: Record<string, React.ReactNode> = {
+    // One icon per stem the separator names; anything unknown reads as "other".
     drums: <Drum size={15} />,
     bass: <AudioLines size={15} />,
     guitar: <Guitar size={15} />,

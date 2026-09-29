@@ -26,6 +26,10 @@ import sys
 # repository is found relative to the script and no path is hard-coded.
 HERE = pathlib.Path(__file__).resolve().parent
 DEFAULT_ROOT = HERE.parent
+# The house rule (Raf, 30.09): a conventional subject AND a body that explains the change. The
+# author writes one long sentence with no body and builds his news page from it
+# (scripts/changelog.mjs reads subject + first paragraph), but a pull request we ask him to
+# review is no place to be lazy about.
 CONVENTIONAL = re.compile(r"^(feat|fix|docs|refactor|test|chore|perf|ci|build|style)(\([a-z0-9_.-]+\))?!?: .+")
 CYRILLIC = re.compile(r"[А-Яа-яЁё]")
 
@@ -87,7 +91,7 @@ class Report:
 
 
 def check_branch(root: pathlib.Path, base: str, report: Report) -> list[str]:
-    """One commit on a fresh base, a conventional subject, only source files."""
+    """One commit on a fresh base, a subject in the author's own style, only source files."""
     code, ahead = run(root, ["rev-list", "--count", f"{base}..HEAD"])
     if code != 0:
         report.line("FAIL", f"no such base '{base}' - fetch the remotes first")
@@ -102,9 +106,15 @@ def check_branch(root: pathlib.Path, base: str, report: Report) -> list[str]:
 
     code, subject = run(root, ["log", "-1", "--pretty=%s"])
     if CONVENTIONAL.match(subject):
-        report.line("PASS", f"conventional commit subject: {subject[:60]}")
+        report.line("PASS", f"conventional subject: {subject[:60]}")
     else:
-        report.line("FAIL", f"commit subject is not conventional: {subject[:60]}")
+        report.line("FAIL", f"subject is not a conventional commit: {subject[:60]}")
+
+    code, body = run(root, ["log", "-1", "--pretty=%b"])
+    if body.strip():
+        report.line("PASS", f"the commit carries a body ({len(body.split())} words)")
+    else:
+        report.line("FAIL", "the commit body is empty - say what changed and why, not only the subject")
 
     code, behind = run(root, ["rev-list", "--count", f"HEAD..{base}"])
     if code == 0 and int(behind or 0) > 0:

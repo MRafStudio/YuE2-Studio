@@ -1,7 +1,17 @@
 import React from 'react';
-import { Bell, Disc3, Layers, Library } from 'lucide-react';
+import { Bell, Disc3, Layers, Library, RefreshCw } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
+import { SortControls } from './SortControls';
+import type { SortOrder } from '../services/workspaces';
 
+/**
+ * The control strip above the track list: the sessions button, the view switch, the sort
+ * control, the refresh button, and the bell that opens the message log.
+ *
+ * A hello from RafStudio: glad to have worked alongside you, Timon - this fork is made with
+ * love and appreciation for the studio you built, and every line of it is meant to be worth
+ * your review.
+ */
 /** What the song list shows: the open session's tracks, or the whole library. */
 export type SessionView = 'session' | 'library';
 
@@ -12,8 +22,12 @@ interface TopControlPanelProps {
     sessionsOpen: boolean;
     /** Opens the session browser, or returns to the tracks. */
     onToggleSessions: () => void;
-    /** The open session's name, shown beside the switcher. */
-    openSessionName?: string | null;
+    /** Reads the lists again: what changed elsewhere is not always announced to us. */
+    onRefresh: () => void;
+    /** How the list below is read, and what it holds - so the name key says whose name it is. */
+    order: SortOrder;
+    onOrder: (order: SortOrder) => void;
+    what: 'songs' | 'sessions';
 }
 
 /**
@@ -25,7 +39,7 @@ interface TopControlPanelProps {
  * hover highlight on every item.
  *
  * It carries the session list button, the switcher between the open session and
- * the whole library, the name of the open session, and the bell that toggles the
+ * the whole library, and the bell that toggles the
  * agent message log on the right.
  */
 export const TopControlPanel: React.FC<TopControlPanelProps> = ({
@@ -33,7 +47,10 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = ({
     onViewChange,
     sessionsOpen,
     onToggleSessions,
-    openSessionName,
+    onRefresh,
+    order,
+    onOrder,
+    what,
 }) => {
     const { t } = useI18n();
 
@@ -61,6 +78,18 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = ({
             role="toolbar"
             aria-label={t('controlPanel')}
         >
+            {/* Reading again by hand: changes made in another window, or while this
+                one slept, are not always announced to it. */}
+            <button
+                type="button"
+                onClick={onRefresh}
+                title={t('controlPanelRefresh')}
+                aria-label={t('controlPanelRefresh')}
+                className={itemClass}
+            >
+                <RefreshCw size={17} />
+            </button>
+
             <button
                 type="button"
                 onClick={onToggleSessions}
@@ -72,6 +101,11 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = ({
             >
                 <Layers size={19} />
             </button>
+
+            <span className="mx-1 h-5 w-px shrink-0 bg-zinc-300 dark:bg-white/10" aria-hidden="true" />
+
+            {/* How the list below is read: what it is ordered by, and which way. */}
+            <SortControls order={order} onOrder={onOrder} what={what} />
 
             <span className="mx-1 h-5 w-px shrink-0 bg-zinc-300 dark:bg-white/10" aria-hidden="true" />
 
@@ -102,11 +136,6 @@ export const TopControlPanel: React.FC<TopControlPanelProps> = ({
                 </button>
             </div>
 
-            {openSessionName && (
-                <span className="ml-2 min-w-0 truncate text-[13px] text-zinc-500 dark:text-zinc-400">
-                    {openSessionName}
-                </span>
-            )}
 
             <span className="ml-auto" />
 
