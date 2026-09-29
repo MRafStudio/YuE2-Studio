@@ -3,6 +3,53 @@
 What changed, newest first. Dates are release dates; the studio is versioned by its
 Windows build.
 
+## 2026-09-30 — 3.2.0
+
+### Added
+
+- **One page for everything the studio downloads and runs.** Settings - Models lists, besides
+  the engine sets, the assistant, stems and karaoke, the training pack, the style-by-ear pack and
+  Audio to MIDI with its sizes, each fetched, cancelled and removed there as where it is used. The
+  optional parts are closed rows marked optional, and the ready-made sets say that one is enough.
+- **What runs where**, on that page and in the README: which part of the studio uses an NVIDIA
+  card, an AMD or Intel card, or the processor. The AMD and Intel paths are experimental.
+- **AMD and Intel cards.** The writing assistant runs on llama.cpp's Vulkan build, and karaoke's
+  Parakeet and the tempo model run on the card through DirectML. Stems separate on the processor,
+  and training, which needs an NVIDIA card with CUDA, is no longer offered where it cannot run.
+  (#25)
+- **A new playlist from the Create form**: "+ New playlist…" in the playlist choice, which is
+  shown even before there is any playlist.
+- **The maximum duration is kept** between sessions. (#27)
+- **"Take as they are" on the train step** too, so songs whose lyrics layout or style no
+  assistant wrote can be trained without one.
+
+### Changed
+
+- **"Without stopping" starts by a slide**: pull its knob to the end to switch it on; once on,
+  the same place is a bright button that switches it off. A stray click no longer starts it; the
+  keyboard does with the right arrow, Enter or Space.
+- **The library stays still when a song arrives**: the generation's card becomes the song in its
+  own row, songs being made stay on top, and the row keeps its height.
+- **Progress comes from the engine** as it works, pushed to the window, and a song is streamed
+  with byte ranges, so it starts and seeks at once.
+
+### Fixed
+
+- **Play on a song that has just finished** while other songs are still being made. (#28)
+- **The trainer on any processor**: the training pack carries every processor build of ggml
+  beside CUDA, so the trainer and the captioner start without AVX2 or an NVIDIA card instead of
+  "no backend available". An installed studio downloads the new trainer once and no longer calls
+  an older one with options it does not know ("unknown option --loudness-lufs"). (#29, #30)
+- **Tags and lyric files in a legacy code page** - Chinese GBK, Windows-1251 and others - are
+  read as Windows reads them instead of as mojibake. (#26)
+- **Settings and panels on Windows 7 and 8.1** (WebView2 before 111) are no longer transparent.
+  (#26)
+- **The style assistant starts from the style you wrote** and keeps its instruments and
+  constraints. (#33)
+- **The assistant cannot loop inside a title or a style**: short fields have a length limit, so
+  a local model no longer runs to its token limit. (#32)
+- Separation, karaoke timing and the tempo on an AMD card no longer try CUDA. (#25)
+
 ## 2026-09-29 — 3.1.0
 
 ### Added
