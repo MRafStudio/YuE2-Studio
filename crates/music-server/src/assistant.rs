@@ -242,11 +242,24 @@ pub fn user_message(request: &AssistRequest) -> String {
             request.style.trim(),
             request.duration_seconds.round() as i64,
         ),
-        AssistTarget::Style => format!(
-            "Sound instruction: {}\nCurrent lyrics, keep the style coherent with them:\n{}",
-            if brief.is_empty() { "(none - describe a sound that fits the lyrics)" } else { brief },
-            request.lyrics.trim(),
-        ),
+        AssistTarget::Style => {
+            // the style the user wrote is what the instruction works on, not a blank page (#33)
+            let style = request.style.trim();
+            let written = if style.is_empty() {
+                String::new()
+            } else {
+                format!("\nStyle (the user wrote this - keep it, build around it):\n{style}")
+            };
+            format!(
+                "Sound instruction: {}{written}\nCurrent lyrics, keep the style coherent with them:\n{}",
+                match (brief.is_empty(), style.is_empty()) {
+                    (false, _) => brief,
+                    (true, true) => "(none - describe a sound that fits the lyrics)",
+                    (true, false) => "(none - refine the style the user wrote)",
+                },
+                request.lyrics.trim(),
+            )
+        }
         AssistTarget::Transcript => format!("Transcript:\n{}", request.description.trim()),
         AssistTarget::Sheet => format!("Lyric sheet:\n{}", request.description.trim()),
         AssistTarget::Score => format!(
@@ -319,18 +332,20 @@ pub fn parse_draft(content: &str, required: &[&str]) -> Result<AssistDraft> {
 }
 
 /// The answer's shape as a schema the server can enforce: llama-server turns it
-/// into a grammar, so a local model cannot answer with prose.
+/// into a grammar, so a local model cannot answer with prose. A short field
+/// has a ceiling: a string without `maxLength` is unbounded in the grammar,
+/// and a model that loops inside a title runs to the token limit (#32).
 pub fn draft_schema(required: &[&str]) -> Value {
     let long = serde_json::json!({ "type": "string", "minLength": 20 });
-    let short = serde_json::json!({ "type": "string", "minLength": 3 });
+    let short = |ceiling: u32| serde_json::json!({ "type": "string", "minLength": 3, "maxLength": ceiling });
     serde_json::json!({
         "type": "object",
         "properties": {
             "lyrics": long,
-            "style": short,
+            "style": short(500),
             "abc": long,
-            "title": short,
-            "cover_prompt": short,
+            "title": short(80),
+            "cover_prompt": short(300),
             "duration_seconds": { "type": "number" },
         },
         "required": required,
@@ -874,6 +889,24 @@ mod tests {
         assert!(lyrics_message.contains("synth pop, female vocal"));
         assert!(lyrics_message.contains("90 seconds"));
         assert!(user_message(&request(AssistTarget::Style)).contains("[Verse 1]"));
+    }
+
+    #[test]
+    fn a_style_edit_starts_from_the_style_the_user_wrote() {
+        let message = user_message(&request(AssistTarget::Style));
+        assert!(message.contains("synth pop, female vocal, 110 BPM"));
+        assert!(message.contains("keep it, build around it"));
+        let blank = AssistRequest { style: String::new(), description: String::new(), ..request(AssistTarget::Style) };
+        assert!(user_message(&blank).contains("describe a sound that fits the lyrics"));
+    }
+
+    #[test]
+    fn a_short_field_has_a_ceiling_so_a_model_cannot_loop_in_it() {
+        let schema = draft_schema(&["style"]);
+        assert_eq!(schema["properties"]["title"]["maxLength"], 80);
+        assert_eq!(schema["properties"]["style"]["maxLength"], 500);
+        assert_eq!(schema["properties"]["cover_prompt"]["maxLength"], 300);
+        assert!(schema["properties"]["lyrics"].get("maxLength").is_none());
     }
 
     #[test]
