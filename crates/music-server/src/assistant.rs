@@ -243,7 +243,7 @@ pub fn user_message(request: &AssistRequest) -> String {
             request.duration_seconds.round() as i64,
         ),
         AssistTarget::Style => {
-            // the style the user wrote is what the instruction works on, not a blank page (#33)
+            // the style the user wrote is what the instruction works on, not a blank page
             let style = request.style.trim();
             let written = if style.is_empty() {
                 String::new()
@@ -334,7 +334,7 @@ pub fn parse_draft(content: &str, required: &[&str]) -> Result<AssistDraft> {
 /// The answer's shape as a schema the server can enforce: llama-server turns it
 /// into a grammar, so a local model cannot answer with prose. A short field
 /// has a ceiling: a string without `maxLength` is unbounded in the grammar,
-/// and a model that loops inside a title runs to the token limit (#32).
+/// and a model that loops inside a title runs to the token limit.
 pub fn draft_schema(required: &[&str]) -> Value {
     let long = serde_json::json!({ "type": "string", "minLength": 20 });
     let short = |ceiling: u32| serde_json::json!({ "type": "string", "minLength": 3, "maxLength": ceiling });
