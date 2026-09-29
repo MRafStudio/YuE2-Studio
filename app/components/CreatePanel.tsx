@@ -17,6 +17,7 @@ import { profileLabel as setLabel } from '../services/modelCatalog';
 import { REQUEST_FILE_ACCEPT, parseRequestFile, requestFileTitle, serializeRequest, type RequestFileFormat } from '../services/requestFile';
 import { AdapterPicker } from './AdapterPicker';
 import { CreatePlaylistModal } from './PlaylistModals';
+import { SlideToEnable } from './SlideToEnable';
 import { usesFromSettings, type AdapterUse } from '../services/adapters';
 
 /**
@@ -1521,10 +1522,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
           onClose={() => setNewPlaylistOpen(false)}
           onCreate={(name, description) => void onCreatePlaylist(name, description).then(playlist => { if (playlist) choosePlaylist(playlist.id); })}
         />
-        <label className="mb-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300" title={tt('generateForeverHint')}>
-          <input type="checkbox" checked={forever} onChange={event => setForever(event.target.checked)} className="accent-pink-500" />
-          {tt('generateForever')}
-        </label>
+        {/* songs without end are switched on by a deliberate slide, never by a stray click */}
+        <div className="mb-2">
+          <SlideToEnable
+            on={forever}
+            onChange={setForever}
+            offLabel={tt('generateForeverSlide')}
+            stopLabel={tt('generateForeverStop')}
+            title={tt('generateForeverHint')}
+          />
+        </div>
         <button
           type="button"
           onClick={submit}
