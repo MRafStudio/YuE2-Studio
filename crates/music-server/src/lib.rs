@@ -858,6 +858,8 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/library/songs/{id}", get(library_song).put(update_library_song).delete(delete_library_song))
         .route("/v1/library/songs/{id}/liked", axum::routing::put(set_library_song_liked))
         .route("/v1/library/liked", get(library_liked))
+        .route("/v1/journal", get(read_journal).post(write_journal).delete(clear_journal))
+        .route("/v1/journal/{id}", axum::routing::delete(remove_journal_entry))
         .route("/v1/library/media/{song_id}", get(library_media))
         .route("/v1/library/songs/{id}/cover", get(library_cover).put(store_library_cover))
         .route("/v1/library/playlists", get(library_playlists).post(create_library_playlist))
@@ -999,6 +1001,38 @@ async fn set_library_song_liked(State(state): State<AppState>, Path(id): Path<St
 /// The liked songs, the latest like first.
 async fn library_liked(State(state): State<AppState>) -> Result<Json<Vec<library::Song>>, (StatusCode, Json<ApiError>)> {
     state.library.liked_songs().map(Json).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
+}
+
+/// The journal's latest lines, the newest first: what agents changed and what
+/// the studio told the person.
+async fn read_journal(State(state): State<AppState>) -> Result<Json<Vec<library::JournalEntry>>, (StatusCode, Json<ApiError>)> {
+    state.library.journal(200).map(Json).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
+}
+
+/// A line for the journal: an agent's change as facts (the studio's MCP writes
+/// those), or a message a window showed.
+async fn write_journal(State(state): State<AppState>, Json(entry): Json<library::JournalEntry>) -> Result<Json<library::JournalEntry>, (StatusCode, Json<ApiError>)> {
+    let complete = match entry.source.as_str() {
+        "agent" => !entry.verb.is_empty() && !entry.kind.is_empty(),
+        "studio" => !entry.text.trim().is_empty(),
+        _ => false,
+    };
+    if !complete {
+        return Err(api_error(StatusCode::BAD_REQUEST, "a journal line is an agent's change (verb and kind) or a studio message (text)".into()));
+    }
+    state.library.note_journal(&entry).map(Json).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
+}
+
+async fn clear_journal(State(state): State<AppState>) -> Result<StatusCode, (StatusCode, Json<ApiError>)> {
+    state.library.clear_journal().map(|()| StatusCode::NO_CONTENT).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
+}
+
+async fn remove_journal_entry(State(state): State<AppState>, Path(id): Path<i64>) -> Result<StatusCode, (StatusCode, Json<ApiError>)> {
+    match state.library.remove_journal_entry(id) {
+        Ok(true) => Ok(StatusCode::NO_CONTENT),
+        Ok(false) => Err(api_error(StatusCode::NOT_FOUND, "no such journal line".into())),
+        Err(error) => Err(api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())),
+    }
 }
 async fn library_song(State(state): State<AppState>,Path(id):Path<String>)->Result<Json<library::Song>,(StatusCode,Json<ApiError>)>{state.library.get_song(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Song not found".into()))}
 async fn library_media(State(state): State<AppState>, Path(song_id): Path<String>, request: Request) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {

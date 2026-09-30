@@ -379,6 +379,110 @@ fn annotations(name: &str) -> Value {
     json!({ "title": title, "readOnlyHint": read_only, "destructiveHint": destructive, "idempotentHint": read_only || name.ends_with("_set") || name.contains("_select"), "openWorldHint": open_world })
 }
 
+/// What an agent's change goes into the journal as: what was done and to what kind
+/// of thing, for the window to put into words of its language. Reads, moving the
+/// window around and playing leave no line.
+const JOURNAL: &[(&str, &str, &str)] = &[
+    ("song_create", "created", "song"),
+    ("song_replay", "created", "song"),
+    ("song_job_cancel", "cancelled", "generation"),
+    ("library_song_update", "updated", "song"),
+    ("library_song_delete", "deleted", "song"),
+    ("library_import_audio", "imported", "song"),
+    ("library_version_select", "updated", "song"),
+    ("library_version_delete", "deleted", "version"),
+    ("playlist_create", "created", "playlist"),
+    ("playlist_update", "updated", "playlist"),
+    ("playlist_delete", "deleted", "playlist"),
+    ("stems_split", "started", "stems"),
+    ("karaoke_make", "started", "karaoke"),
+    ("karaoke_delete", "deleted", "karaoke"),
+    ("midi_transcribe", "started", "midi"),
+    ("midi_delete", "deleted", "midi"),
+    ("processing_start", "started", "processing"),
+    ("processing_keep", "kept", "processing"),
+    ("processing_discard", "discarded", "processing"),
+    ("cover_draw", "started", "cover"),
+    ("cover_set_from_file", "updated", "cover"),
+    ("dataset_create", "created", "dataset"),
+    ("dataset_import_folder", "created", "dataset"),
+    ("dataset_update", "updated", "dataset"),
+    ("dataset_add_folder", "updated", "dataset"),
+    ("dataset_add_library_songs", "updated", "dataset"),
+    ("dataset_song_update", "updated", "dataset"),
+    ("dataset_song_delete", "updated", "dataset"),
+    ("dataset_delete", "deleted", "dataset"),
+    ("training_start", "started", "training"),
+    ("training_cancel", "cancelled", "training"),
+    ("training_run_delete", "deleted", "training"),
+    ("lora_install_catalog", "installed", "lora"),
+    ("lora_install_hf", "installed", "lora"),
+    ("lora_import_files", "installed", "lora"),
+    ("lora_update", "updated", "lora"),
+    ("lora_delete", "deleted", "lora"),
+    ("lora_export_comfyui", "exported", "lora"),
+    ("models_download", "started", "download"),
+    ("models_remove", "deleted", "model"),
+    ("settings_set", "updated", "settings"),
+];
+
+/// The facts of a change, when the tool makes one worth a line.
+fn journal_facts(name: &str, args: &Value) -> Option<(&'static str, &'static str)> {
+    if name == "library_song_like" {
+        let taken_back = args.get("liked").and_then(Value::as_bool) == Some(false);
+        return Some((if taken_back { "unliked" } else { "liked" }, "song"));
+    }
+    JOURNAL.iter().find(|(tool, _, _)| *tool == name).map(|(_, verb, kind)| (*verb, *kind))
+}
+
+/// The name of what a change touches when the call does not carry it, read
+/// before the change: a deletion leaves nothing to read it from.
+async fn name_before_change(args: &Value) -> String {
+    let named = args.get("title").or_else(|| args.get("name")).and_then(Value::as_str).is_some_and(|name| !name.trim().is_empty());
+    if named {
+        return String::new();
+    }
+    let (path, field) = if let Some(id) = args.get("playlist_id").and_then(Value::as_str) {
+        (format!("/v1/library/playlists/{}", segment(id)), "name")
+    } else if let Some(id) = args.get("song_id").and_then(Value::as_str) {
+        (format!("/v1/library/songs/{}", segment(id)), "title")
+    } else {
+        return String::new();
+    };
+    fetch(&path).await.get(field).and_then(Value::as_str).unwrap_or_default().to_string()
+}
+
+/// The name a journal line gives what a change touched: the one the call gave,
+/// the one read before the change, or the one the studio answered with.
+fn change_target(args: &Value, before: &str, reply: &str) -> String {
+    let short = |text: &str| text.trim().chars().take(80).collect::<String>();
+    if let Some(name) = args.get("title").or_else(|| args.get("name")).and_then(Value::as_str).filter(|name| !name.trim().is_empty()) {
+        return short(name);
+    }
+    if !before.trim().is_empty() {
+        return short(before);
+    }
+    serde_json::from_str::<Value>(reply)
+        .ok()
+        .and_then(|value| value.get("title").or_else(|| value.get("name")).and_then(Value::as_str).map(short))
+        .unwrap_or_default()
+}
+
+/// Writes an agent's change into the studio's journal, where the person reads it.
+async fn journal_change(name: &str, args: &Value, before: &str, reply: &str) {
+    let Some((verb, kind)) = journal_facts(name, args) else { return };
+    let line = json!({ "source": "agent", "verb": verb, "kind": kind, "target": change_target(args, before, reply) });
+    let written = match send(Method::POST, "/v1/journal".into(), line) {
+        Ok(call) => call_route(call).await,
+        Err(problem) => Err(problem),
+    };
+    match written {
+        Ok((status, _)) if status.is_success() => {}
+        Ok((status, text)) => eprintln!("[ERROR] the journal refused an agent's change to {name}: {status} {text}"),
+        Err(problem) => eprintln!("[ERROR] the journal did not take an agent's change to {name}: {problem}"),
+    }
+}
+
 struct Bridge {
     commands: tokio::sync::broadcast::Sender<String>,
     pending: Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<Value, String>>>>,
@@ -2337,17 +2441,21 @@ pub async fn handle(headers: HeaderMap, body: axum::body::Bytes) -> Response {
                     Ok(text) => answer(text, false),
                     Err(problem) => answer(problem, true),
                 },
-                Ok(call) => match call_route(call).await {
-                    Ok((status, text)) if status.is_success() => {
-                        announce_change(name);
-                        match serde_json::from_str::<Value>(&text) {
-                            Ok(value) => tool_json(id, shape(name, &args, value)),
-                            Err(_) => answer(text, false),
+                Ok(call) => {
+                    let before = if journal_facts(name, &args).is_some() { name_before_change(&args).await } else { String::new() };
+                    match call_route(call).await {
+                        Ok((status, text)) if status.is_success() => {
+                            announce_change(name);
+                            journal_change(name, &args, &before, &text).await;
+                            match serde_json::from_str::<Value>(&text) {
+                                Ok(value) => tool_json(id, shape(name, &args, value)),
+                                Err(_) => answer(text, false),
+                            }
                         }
+                        Ok((_, text)) => answer(text, true),
+                        Err(problem) => answer(problem, true),
                     }
-                    Ok((_, text)) => answer(text, true),
-                    Err(problem) => answer(problem, true),
-                },
+                }
             }
         }
         _ => rpc_failure(StatusCode::NOT_FOUND, id, -32601, format!("Method not found: {method}"), None),
@@ -2521,6 +2629,21 @@ mod tests {
             assert_eq!(annotations(name)["destructiveHint"], false, "{name}");
         }
         assert_eq!(annotations("library_liked")["readOnlyHint"], true, "reading the liked songs changes nothing");
+    }
+
+    #[test]
+    fn a_change_is_written_as_what_was_done_and_to_what() {
+        for (tool, _, _) in JOURNAL {
+            assert!(tools().iter().any(|entry| entry.name == *tool), "{tool} is a tool of the studio");
+        }
+        assert_eq!(journal_facts("playlist_delete", &json!({})), Some(("deleted", "playlist")));
+        assert_eq!(journal_facts("library_song_like", &json!({ "liked": false })), Some(("unliked", "song")));
+        assert_eq!(journal_facts("library_song_like", &json!({})), Some(("liked", "song")));
+        assert_eq!(journal_facts("library_songs_list", &json!({})), None, "a read leaves no line");
+        assert_eq!(journal_facts("ui_click", &json!({})), None, "nor does moving the window around");
+        assert_eq!(change_target(&json!({ "title": " Night " }), "", "{}"), "Night");
+        assert_eq!(change_target(&json!({ "song_id": "s1" }), "Old name", "{}"), "Old name", "a deletion keeps the name it had");
+        assert_eq!(change_target(&json!({}), "", r#"{"name":"Rock"}"#), "Rock", "or the one the studio answered with");
     }
 
     #[test]

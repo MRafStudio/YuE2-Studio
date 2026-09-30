@@ -295,10 +295,11 @@ const builtIn: Record<string, Handler> = {
 /// an agent's call, which can touch anything.
 const LIBRARY = ['yue:library-changed'];
 const SETTINGS = ['yue:settings-changed', 'yue:models-changed', 'yue:adapters-changed'];
-const EVERYTHING = [...LIBRARY, ...SETTINGS, 'studio:jobs-changed'];
+const JOURNAL = ['studio:journal-changed'];
+const EVERYTHING = [...LIBRARY, ...SETTINGS, ...JOURNAL, 'studio:jobs-changed'];
 
 function changed(what: string): void {
-  const names = what === 'library' ? LIBRARY : what === 'settings' ? SETTINGS : EVERYTHING;
+  const names = what === 'library' ? LIBRARY : what === 'settings' ? SETTINGS : what === 'journal' ? JOURNAL : EVERYTHING;
   for (const name of names) window.dispatchEvent(new CustomEvent(name));
 }
 

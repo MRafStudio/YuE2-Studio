@@ -29,6 +29,8 @@ interface SongListProps {
     librarySongs?: Song[];
     /** The playlist the list shows, when it is not the whole library. */
     scopeName?: string;
+    /** The library is still being read: an empty list is not an answer yet. */
+    loading?: boolean;
     onToggleLike: (songId: string) => void;
     onAddToPlaylist: (song: Song) => void;
     onOpenCoverRegen?: (song: Song) => void;
@@ -111,6 +113,7 @@ export const SongList: React.FC<SongListProps> = ({
     onSelect,
     librarySongs,
     scopeName,
+    loading = false,
     onToggleLike,
     onAddToPlaylist,
     onOpenCoverRegen,
@@ -479,7 +482,12 @@ export const SongList: React.FC<SongListProps> = ({
 
                 {/* List */}
                 <div className="space-y-2"> {/* Reduced vertical spacing */}
-                    {listItems.length === 0 ? (
+                    {listItems.length === 0 && loading ? (
+                        <div className="flex h-64 items-center justify-center gap-2 text-sm text-zinc-500" role="status">
+                            <Loader2 size={16} className="animate-spin" />
+                            {t('libraryLoading')}
+                        </div>
+                    ) : listItems.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-zinc-500 space-y-4 border border-dashed border-zinc-200 dark:border-white/5 rounded-2xl bg-zinc-50 dark:bg-white/2">
                             <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
                                 {scopeName && !searchQuery && activeFilters.size === 0 ? <ListMusic size={32} /> : <Filter size={32} />}
