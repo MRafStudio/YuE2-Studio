@@ -41,37 +41,6 @@
       ]
     },
     {
-      "id": "yue2-realaudio",
-      "engine": "yue2-cpp",
-      "kind": "sound",
-      "author": "Mothersuperior",
-      "page": "https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4",
-      "name": {
-        "en": "Real Audio",
-        "ru": "Живой звук",
-        "zh": "真实音色",
-        "ja": "リアルオーディオ",
-        "ko": "리얼 오디오"
-      },
-      "description": {
-        "en": "Retrains the sound half on real recordings: fuller mixes and a more natural timbre. The composition is untouched.",
-        "ru": "Дообучает звуковую половину на реальных записях: плотнее микс, естественнее тембр. Композицию не меняет.",
-        "zh": "在真实录音上重新训练声音部分：混音更饱满，音色更自然。不改变作曲。",
-        "ja": "音のパートを実際の録音で再学習：ミックスが厚く、音色がより自然に。作曲はそのまま。",
-        "ko": "실제 녹음으로 사운드 부분을 재학습: 믹스가 풍성해지고 음색이 자연스러워집니다. 작곡은 그대로입니다."
-      },
-      "scales": {
-        "nar": 1
-      },
-      "files": [
-        {
-          "url": "https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4/resolve/e2e63d859f3af879baf1b4d4e9f22d1eeda6fde5/nar_lora_joint_v9.safetensors",
-          "file": "nar_lora_joint_v9.safetensors",
-          "bytes": 140560592
-        }
-      ]
-    },
-    {
       "id": "yue2-industrial-rock",
       "engine": "yue2-cpp",
       "kind": "style",
