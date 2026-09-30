@@ -657,7 +657,7 @@ pub async fn serve() -> anyhow::Result<()> {
     let persisted_components = persisted
         .as_ref()
         .and_then(|settings| settings.selected_component_ids.clone())
-        .filter(|ids| model_manager.installed_component_files(ids).is_ok());
+        .filter(|ids| model_manager.picked_components_installed(ids));
     let (selected_profile_id, selected_component_ids) = match persisted_components {
         Some(ids) => match model_manager::profile_matching(&ids) {
             Some(profile) => (Some(profile.to_owned()), None),
@@ -2105,13 +2105,14 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
     let listen_download = training.downloader().active_for(training::LISTEN_SCOPE).await.filter(|active| !active.done);
     Json(serde_json::json!({
         "pack": pack,
-        "pack_ready": training.pack_ready(),
+        "pack_ready": training.pack_ready() && !trainer_cublas_missing(&state),
         "separator_ready": separator_ready,
         "recipe_defaults": training::Recipe::default(),
         "recipe_fields": music_engine::yue_train::recipe_fields(),
         "min_vram_gb": music_engine::yue_train::MIN_VRAM_GB,
-        // the trainer computes on CUDA only
-        "card_trains": hardware::hardware().cuda.is_some(),
+        "card_trains": trainer_card_refusal().is_none(),
+        "card_needs": trainer_card_needs(),
+        "trainer_driver": hardware::CUDA13_DRIVER,
         "item_style": "style",
         "download": training_pack_download(&state).await,
         "listen": {
@@ -2128,11 +2129,20 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
 
 
 /// The training pack's files as the training page lists them: the trainer's
-/// own, and the vocal separator a recipe's lyric timing needs. Says whether
-/// the separator is ready too.
+/// own, the cuBLAS its CUDA backend loads, and the vocal separator a recipe's
+/// lyric timing needs. Says whether the separator is ready too.
 async fn training_pack_files(state: &AppState) -> (Vec<Value>, bool) {
     let separator_ready = vocal_separator(state).await.is_some();
     let mut pack = state.training.pack_status();
+    if trainer_card_refusal().is_none() {
+        let cublas = engine_runtime::cublas_asset(hardware::CudaBuild::Cuda13);
+        pack.push(serde_json::json!({
+            "id": cublas.id,
+            "label": cublas.label,
+            "bytes": cublas.bytes,
+            "installed": !trainer_cublas_missing(state),
+        }));
+    }
     pack.push(serde_json::json!({
         "id": "vocal-separator",
         "label": separation::MODEL.label,
@@ -2142,16 +2152,20 @@ async fn training_pack_files(state: &AppState) -> (Vec<Value>, bool) {
     (pack, separator_ready)
 }
 
-/// The training pack's download in progress: its own, or the separator's,
-/// whose files come through their own downloaders.
+/// The training pack's download in progress: its own, the trainer's cuBLAS,
+/// or the separator's, whose files come through their own downloaders.
 async fn training_pack_download(state: &AppState) -> Option<downloads::DownloadProgress> {
     let separator_download = match state.separator.downloader().active_for("separation").await {
         Some(active) if !active.done => Some(active),
         other => state.lyrics_sync.downloader().active_for("separation").await.filter(|active| !active.done).or(other),
     };
+    let cublas_download = state.engine_runtime.downloader().active_for("engine").await;
     match state.training.downloader().active_for(training::SCOPE).await {
         Some(active) if !active.done => Some(active),
-        other => separator_download.or(other),
+        other => match cublas_download {
+            Some(active) if !active.done || active.error.is_some() => Some(active),
+            _ => separator_download.or(other),
+        },
     }
 }
 
@@ -2176,9 +2190,10 @@ fn pack_runtime(mut files: Vec<Value>, ready: bool, active_download: Option<down
 /// the video memory a run needs and whether this card trains at all.
 async fn training_pack_runtime(State(state): State<AppState>) -> Json<Value> {
     let (pack, separator_ready) = training_pack_files(&state).await;
-    let mut body = pack_runtime(pack, state.training.pack_ready() && separator_ready, training_pack_download(&state).await);
+    let mut body = pack_runtime(pack, state.training.pack_ready() && separator_ready && !trainer_cublas_missing(&state), training_pack_download(&state).await);
     body["min_vram_gb"] = music_engine::yue_train::MIN_VRAM_GB.into();
-    body["card_trains"] = hardware::hardware().cuda.is_some().into();
+    body["card_trains"] = trainer_card_refusal().is_none().into();
+    body["card_needs"] = trainer_card_needs().into();
     Json(body)
 }
 
@@ -2216,13 +2231,17 @@ async fn midi_runtime(State(state): State<AppState>) -> Json<Value> {
 
 async fn install_training_pack(State(state): State<AppState>) -> Result<Json<Value>, (StatusCode, Json<ApiError>)> {
     // gigabytes of training files are no use to a machine that cannot train
-    if hardware::hardware().cuda.is_none() {
-        return Err(api_error(StatusCode::CONFLICT, TRAINING_NEEDS_CUDA.into()));
+    if let Some(refusal) = trainer_card_refusal() {
+        return Err(api_error(StatusCode::CONFLICT, refusal));
     }
     let background = state.clone();
     tokio::spawn(async move {
         if let Err(error) = background.training.install_pack().await {
             eprintln!("[ERROR] training pack: {error:#}");
+            return;
+        }
+        if let Err(error) = background.engine_runtime.install_missing(Some(hardware::CudaBuild::Cuda13)).await {
+            eprintln!("[ERROR] cuBLAS for the trainer: {error:#}");
             return;
         }
         install_separator(&background).await;
@@ -2251,6 +2270,7 @@ async fn install_listen_pack(State(state): State<AppState>) -> Json<Value> {
 
 async fn cancel_training_pack(State(state): State<AppState>) -> Json<Value> {
     state.training.downloader().cancel();
+    state.engine_runtime.downloader().cancel();
     state.separator.downloader().cancel();
     state.lyrics_sync.downloader().cancel();
     Json(serde_json::json!({ "cancelled": true }))
@@ -2469,13 +2489,15 @@ async fn start_training(State(state): State<AppState>, Json(input): Json<StartTr
         .map_err(|error| api_error(StatusCode::CONFLICT, error))
 }
 
-/// A run of `dataset`, refused while a song renders.
+/// A run of `dataset`, refused while a song renders or where the trainer
+/// could not compute on the card.
 async fn start_training_run(state: &AppState, dataset: &str, name: &str, recipe: training::Recipe) -> Result<training::Run, String> {
+    trainer_ready(state)?;
     no_song_rendering(state).await?;
-    let tokenizer = selected_engine_models(state).await?.backbone;
+    let models = selected_engine_models(state).await?;
     state
         .training
-        .start(Some(engine_bundle_root()), tokenizer, vocal_separator(state).await, dataset, name, recipe, card_hooks(state).await)
+        .start(Some(engine_bundle_root()), models.backbone, models.companion, vocal_separator(state).await, dataset, name, recipe, card_hooks(state).await)
         .await
         .map_err(|error| format!("{error:#}"))
 }
@@ -2521,13 +2543,10 @@ async fn no_song_rendering(state: &AppState) -> Result<(), String> {
 }
 
 /// What keeps the user from starting a training run or training one further:
-/// a machine with no card CUDA runs on - the trainer carries no other
-/// backend, and on the processor a run would take days - songs being
-/// prepared, or a song being made.
+/// a machine the trainer does not run on, songs being prepared, or a song
+/// being made.
 async fn card_free_for_training(state: &AppState) -> Result<(), String> {
-    if hardware::hardware().cuda.is_none() {
-        return Err(TRAINING_NEEDS_CUDA.into());
-    }
+    trainer_ready(state)?;
     let preparing = state.prepare.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).as_ref().is_some_and(|job| !job.finished);
     if preparing {
         return Err("songs are being prepared; train once that is done".into());
@@ -2535,8 +2554,52 @@ async fn card_free_for_training(state: &AppState) -> Result<(), String> {
     no_song_rendering(state).await
 }
 
+/// Why the trainer does not run on this machine's card, none when it does. It
+/// is a CUDA 13 build and computes on the card only: on the processor one run
+/// would take days.
+fn trainer_card_refusal() -> Option<String> {
+    match hardware::hardware().cuda {
+        Some(hardware::CudaBuild::Cuda13) => None,
+        Some(hardware::CudaBuild::Cuda12) => Some(format!(
+            "training needs NVIDIA driver {} or newer: the trainer is a CUDA 13 build, and this card or its driver runs CUDA 12 only",
+            hardware::CUDA13_DRIVER
+        )),
+        None => Some(TRAINING_NEEDS_CUDA.into()),
+    }
+}
+
+/// What the card lacks for the trainer, as the training page names it:
+/// "nvidia" on a machine with no CUDA card, "driver" where the card or its
+/// driver runs CUDA 12 only.
+fn trainer_card_needs() -> Option<&'static str> {
+    match hardware::hardware().cuda {
+        Some(hardware::CudaBuild::Cuda13) => None,
+        Some(hardware::CudaBuild::Cuda12) => Some("driver"),
+        None => Some("nvidia"),
+    }
+}
+
+/// Whether the cuBLAS the trainer's CUDA backend loads is missing. It comes
+/// from beside the engine, which fetches it only for a CUDA 13 run of its own.
+fn trainer_cublas_missing(state: &AppState) -> bool {
+    !state.engine_runtime.missing(Some(hardware::CudaBuild::Cuda13)).is_empty()
+}
+
+/// Refuses a run the trainer could not compute on the card.
+fn trainer_ready(state: &AppState) -> Result<(), String> {
+    if let Some(refusal) = trainer_card_refusal() {
+        return Err(refusal);
+    }
+    if trainer_cublas_missing(state) {
+        return Err(TRAINER_CUBLAS_MISSING.into());
+    }
+    Ok(())
+}
+
 /// Why this machine does not train.
 const TRAINING_NEEDS_CUDA: &str = "training runs on an NVIDIA card with CUDA only, and this machine has none";
+/// Why a run cannot start before the training pack is complete.
+const TRAINER_CUBLAS_MISSING: &str = "the training files are not downloaded yet: the trainer needs NVIDIA cuBLAS 13; download the training pack";
 
 async fn card_free_of_training(state: &AppState, what: &str) -> Result<(), (StatusCode, Json<ApiError>)> {
     if state.training.active_run().await.is_some() {
@@ -2554,9 +2617,10 @@ struct ContinueTraining {
 /// Trains a finished or stopped run further from its latest checkpoint.
 async fn continue_training(State(state): State<AppState>, Path(id): Path<String>, Json(input): Json<ContinueTraining>) -> Result<Json<training::Run>, (StatusCode, Json<ApiError>)> {
     card_free_for_training(&state).await.map_err(|reason| api_error(StatusCode::CONFLICT, reason))?;
+    let companion = selected_engine_models(&state).await.map_err(|reason| api_error(StatusCode::CONFLICT, reason))?.companion;
     state
         .training
-        .continue_run(Some(engine_bundle_root()), &id, input.steps, card_hooks(&state).await)
+        .continue_run(Some(engine_bundle_root()), companion, &id, input.steps, card_hooks(&state).await)
         .await
         .map(Json)
         .map_err(|error| api_error(StatusCode::CONFLICT, format!("{error:#}")))
@@ -3953,6 +4017,7 @@ async fn selected_engine_models(state: &AppState) -> Result<music_engine::yue_se
         vae: root.join(&files.vae),
         transcriber: files.transcriber.map(|name| root.join(name)),
         adapters: Some(adapters),
+        companion: root.join(&files.companion),
     })
 }
 

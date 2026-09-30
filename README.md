@@ -296,19 +296,29 @@ A runnable YuE2 installation is a **backbone** (the 3B model that writes the sco
 audio codes) and the **VAE** (turns them into 48 kHz stereo). **SheetSage2** is optional:
 without it the studio generates, but cannot transcribe recordings for covers.
 
+Every set also carries the **decoder companion**, 134 MB: Mothersuperior's decoder adapter,
+published as the pair of the tokenizer head the LoRA trainer turns songs into codes with. The
+engine merges it under every render and the trainer keeps it frozen under every LoRA, so a LoRA
+is trained on the decoder it is heard through. In HOT-Step's round trip of six real songs the
+decoder without it narrowed the stereo (left/right correlation 0.78–0.92 against the
+originals' ~0.65), with it 0.57–0.72.
+
 | Your GPU | Set | Download |
 | --- | --- | --- |
-| 12 GB VRAM and above | Full native — BF16 backbone, original weights | 9.7 GB |
-| 8 GB and above | Quality — Q8_0 backbone, near lossless | 4.9 GB |
-| 7 GB and above | Balanced — Q6_K backbone | 4.0 GB |
-| 5.5 GB and above | Light — Q5_K_M backbone | 3.6 GB |
+| 12 GB VRAM and above | Full native — BF16 backbone, original weights | 9.8 GB |
+| 8 GB and above | Quality — Q8_0 backbone, near lossless | 5.1 GB |
+| 7 GB and above | Balanced — Q6_K backbone | 4.1 GB |
+| 5.5 GB and above | Light — Q5_K_M backbone | 3.8 GB |
 
-Sizes include SheetSage2 at the matching quantisation. The studio detects your card and
-preselects the set, but the download is always your decision; the model manager also builds
-a custom mix role by role. Q5_K_M is the lightest quantisation published for YuE2.
+Sizes include SheetSage2 at the matching quantisation and the decoder companion. The studio
+detects your card and preselects the set, but the download is always your decision; the model
+manager also builds a custom mix role by role. Q5_K_M is the lightest quantisation published
+for YuE2.
 
-All files come from [Serveurperso/YuE2-GGUF](https://huggingface.co/Serveurperso/YuE2-GGUF),
-pinned to revision `64b030e`, and are checked by size and SHA-256. They are written to, and
+The GGUF files come from [Serveurperso/YuE2-GGUF](https://huggingface.co/Serveurperso/YuE2-GGUF),
+pinned to revision `64b030e`, the decoder companion from
+[Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4](https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4),
+pinned to revision `e2e63d8`; all are checked by size and SHA-256. They are written to, and
 can be dropped into by hand at:
 
 - `<the studio's folder>\data\models\yue2-cpp\` — the portable folder, or the folder
@@ -332,6 +342,7 @@ A file placed by hand with the exact catalogue name is recognised and never down
 | [`SheetSage2-Q8_0.gguf`](https://huggingface.co/Serveurperso/YuE2-GGUF/resolve/64b030e3deb6e8150d2b7c0db641ef5a17eca8a3/SheetSage2-Q8_0.gguf) | transcriber | 913 MB |
 | [`SheetSage2-Q6_K.gguf`](https://huggingface.co/Serveurperso/YuE2-GGUF/resolve/64b030e3deb6e8150d2b7c0db641ef5a17eca8a3/SheetSage2-Q6_K.gguf) | transcriber | 776 MB |
 | [`SheetSage2-Q5_K_M.gguf`](https://huggingface.co/Serveurperso/YuE2-GGUF/resolve/64b030e3deb6e8150d2b7c0db641ef5a17eca8a3/SheetSage2-Q5_K_M.gguf) | transcriber | 703 MB |
+| [`nar_lora_joint_v9.safetensors`](https://huggingface.co/Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4/resolve/e2e63d859f3af879baf1b4d4e9f22d1eeda6fde5/nar_lora_joint_v9.safetensors) | decoder companion, every set | 134 MB |
 
 </details>
 
@@ -486,6 +497,7 @@ Windows build with CUDA, Vulkan and CPU backends for now.
 ## Acknowledgements
 
 - [M-A-P](https://huggingface.co/m-a-p) for YuE2-3B, the YuE2 VAE and SheetSage2.
+- [Mothersuperior](https://huggingface.co/Mothersuperior) for the real-audio tokenizer head the trainer's codes come from and its paired decoder adapter, the decoder companion every render and every training runs on.
 - [Serveurperso](https://github.com/ServeurpersoCom) for yue2.cpp, its examples and the GGUF conversions.
 - [scragnog](https://github.com/scragnog) for [HOT-Step-CPP](https://github.com/scragnog/HOT-Step-CPP): the LoRA trainer the studio runs (its native joint AR/NAR training for YuE2), the training weights in [scragnog/YuE2-GGUF](https://huggingface.co/scragnog/YuE2-GGUF), the VST3 host, and the noise reduction, Spectral Lifter and mastering designs the studio's audio processing is ported from.
 - [sergree](https://github.com/sergree) for [matchering](https://github.com/sergree/matchering), the reference mastering algorithm, and [jeankassio](https://github.com/jeankassio) for the vocal naturalizer in [ComfyUI_MusicTools](https://github.com/jeankassio/ComfyUI_MusicTools).
@@ -530,7 +542,7 @@ weights are **CC BY-NC 4.0 with an individual-creator permission**
 them free of charge and publish, sell, license or otherwise monetize the songs they make, as long
 as the use is not illegal, harmful or deceptive. Companies that want to use the weights
 commercially need a license from their authors. SheetSage2, which reads the source song for
-covers, is **CC BY-NC 4.0** without that permission.
+covers, and the decoder companion (Mothersuperior) are **CC BY-NC 4.0** without that permission.
 
 One bundled component is under a different licence: the visualiser's spectrum looks come from
 [audioMotion-analyzer](https://github.com/hvianna/audioMotion-analyzer), which is **AGPL-3.0**;

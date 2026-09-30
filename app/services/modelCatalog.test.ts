@@ -28,4 +28,12 @@ describe('YuE2 model catalog helpers', () => {
     expect(componentPrecision(components[1])).toBe('Q5_K_M');
     expect(componentPrecision(components[2])).toBe('F32');
   });
+
+  it('puts the decoder companion in every set without offering it as a choice', () => {
+    const companion: ModelComponent = { id: 'companion-v9', kind: 'companion', filename: 'nar_lora_joint_v9.safetensors', bytes: 1, sha256: 'e' };
+    const catalog = [...components, companion];
+    expect(completeCustomComponentIds(catalog, { backbone: 'backbone-q5', vae: 'vae-f32' })).toEqual(['backbone-q5', 'vae-f32', 'companion-v9']);
+    expect(componentsByKind(catalog).map((group) => group.kind)).toEqual(['backbone', 'vae', 'transcriber']);
+    expect(componentPrecision(companion)).toBe('v9');
+  });
 });
