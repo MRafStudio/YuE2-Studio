@@ -18,6 +18,13 @@ const REVISION: &str = "64b030e3deb6e8150d2b7c0db641ef5a17eca8a3";
 /// Part of every set, picked or not: the engine merges it under every render
 /// and the trainer keeps it under every LoRA.
 const COMPANION: &str = "companion-v9";
+pub const COMPANION_REPOSITORY: &str = "Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4";
+
+/// The companion in any of the precisions and layouts its repository
+/// publishes: one more copy on top of the built-in one would merge it twice.
+pub fn is_companion_file(repo: &str, path: &str) -> bool {
+    repo.eq_ignore_ascii_case(COMPANION_REPOSITORY) && path.starts_with("nar_lora_joint_v9")
+}
 
 /// The recommendation is a property of the machine, not of the catalog.
 fn recommended_profile() -> &'static str {
@@ -709,7 +716,7 @@ fn components() -> Vec<Component> {
             filename: "nar_lora_joint_v9.safetensors",
             bytes: 140560592,
             sha256: "585f303da1d5252d228d1e8ac6d4c4d11d970df9297406935cc8bdafa49cfa7e",
-            repository: "Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4",
+            repository: COMPANION_REPOSITORY,
             revision: "e2e63d859f3af879baf1b4d4e9f22d1eeda6fde5",
         },
     ]

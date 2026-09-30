@@ -312,7 +312,13 @@ impl AdapterLibrary {
                 continue;
             }
             let mut error = None;
-            if let Some(view) = views.and_then(|views| views.get(&id)) {
+            // the original file is merged once by the engine; another precision would be a second copy
+            if let Origin::Hub { repo, file, .. } = &meta.origin {
+                if crate::model_manager::is_companion_file(repo, file) && file != "nar_lora_joint_v9.safetensors" {
+                    error = Some("the decoder companion every render already merges; this copy would merge it a second time".to_string());
+                }
+            }
+            if let Some(view) = views.and_then(|views| views.get(&id)).filter(|_| error.is_none()) {
                 error = view.error.clone();
                 if error.is_none() && view.slots != meta.slots {
                     meta.slots = view.slots.clone();
@@ -615,6 +621,8 @@ pub struct HubFile {
     pub bytes: u64,
     pub adapter_id: String,
     pub installed: bool,
+    /// The decoder companion every render already merges, in some precision.
+    pub built_in: bool,
     #[serde(flatten)]
     pub weights: AdapterWeights,
 }
@@ -812,7 +820,14 @@ impl AdapterLibrary {
             .zip(kinds)
             .map(|((path, bytes), weights)| {
                 let adapter_id = hub_adapter_id(&repo, path);
-                HubFile { installed: self.read_meta(&adapter_id).is_some(), path: path.clone(), bytes: *bytes, adapter_id, weights }
+                HubFile {
+                    installed: self.read_meta(&adapter_id).is_some(),
+                    built_in: crate::model_manager::is_companion_file(&repo, path),
+                    path: path.clone(),
+                    bytes: *bytes,
+                    adapter_id,
+                    weights,
+                }
             })
             .collect();
         Ok(HubListing { page: format!("{HUB}/{repo}"), repo, revision, files, all })
@@ -845,6 +860,9 @@ impl AdapterLibrary {
         let mut planned = Vec::new();
         for path in paths {
             let file = listing.files.iter().find(|file| file.path == *path).with_context(|| format!("{} has no file {path}", listing.repo))?;
+            if file.built_in {
+                bail!("{path} is the decoder companion every render already merges; a second copy would merge it twice");
+            }
             let mut assets = vec![asset(&file.adapter_id, &file.path, file.bytes)];
             let folder = Path::new(&file.path).parent().and_then(|parent| parent.to_str()).unwrap_or("");
             let config = if folder.is_empty() { "adapter_config.json".to_string() } else { format!("{folder}/adapter_config.json") };
