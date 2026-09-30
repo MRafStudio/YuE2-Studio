@@ -13,6 +13,7 @@ import { named } from '../services/accessibleName';
 import { foldStems, stemOf } from '../services/songStems';
 import { StemIcon, StemsToggle, useStemName } from './StemsToggle';
 import { SortMenu } from './SortMenu';
+import { exactMoment, relativeMoment } from '../services/dates';
 import { compareBy, SONG_ORDERS, useListOrder } from '../services/songOrder';
 
 interface SongListProps {
@@ -603,7 +604,7 @@ const SongItem: React.FC<SongItemProps> = ({
     onOpenOriginal,
     nested = false,
 }) => {
-    const { t } = useI18n();
+    const { t, language } = useI18n();
     const stemName = useStemName();
     const [showDropdown, setShowDropdown] = useState(false);
     const [imageError, setImageError] = useState(false);
@@ -958,7 +959,15 @@ const SongItem: React.FC<SongItemProps> = ({
                             {t('resetGeneration')}
                         </button>
                     </div>
-                ) : song.duration}
+                ) : (
+                    <div className="flex flex-col items-end gap-0.5">
+                        <span>{song.duration}</span>
+                        {/* when it was made: how long ago, the exact moment on hover */}
+                        <time dateTime={song.createdAt.toISOString()} title={exactMoment(song.createdAt, language)} className="font-sans text-[10px]">
+                            {relativeMoment(song.createdAt, language)}
+                        </time>
+                    </div>
+                )}
             </div>
         </div>
         </>

@@ -18,6 +18,7 @@ import { downloadSongAudio } from '../services/songDownload';
 import { saveFile } from '../services/saveFile';
 import { stemOf } from '../services/songStems';
 import { named } from '../services/accessibleName';
+import { exactMoment } from '../services/dates';
 
 interface RightSidebarProps {
     song: Song | null;
@@ -381,7 +382,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                 <span className="text-sm font-semibold text-zinc-900 dark:text-white">
                                     {song.creator || TRACK_ARTIST}
                                 </span>
-                                <p className="text-xs text-zinc-500">{t('created')} {new Date(song.createdAt).toLocaleDateString()}</p>
+                                <p className="text-xs text-zinc-500">{t('created')} {exactMoment(new Date(song.createdAt), language)}</p>
                             </div>
                         </div>
                     </div>
