@@ -11,6 +11,8 @@ export interface Song {
   isGenerating?: boolean;
   /** The engine job a generation's row follows. */
   jobId?: string;
+  /** The playlist the song being made goes into. */
+  playlistId?: string;
   /** The job that made a library song; its row becomes this song. */
   madeByJob?: string;
   /** The list row this item is drawn in, when it took over another item's row. */

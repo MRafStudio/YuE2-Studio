@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Song } from '../types';
-import { Play, MoreHorizontal, Heart, ListPlus, Pause, Search, Filter, Check, Globe, Lock, Loader2, ThumbsUp, Share2, Video, Info, Clock, Timer, ImagePlus, Pencil, Clapperboard } from 'lucide-react';
+import { Play, MoreHorizontal, Heart, ListPlus, Pause, Search, Filter, Check, Globe, Lock, Loader2, ThumbsUp, Share2, Video, Info, Clock, Timer, ImagePlus, Pencil, Clapperboard, ListMusic } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
@@ -27,6 +27,8 @@ interface SongListProps {
     onSelect: (song: Song) => void;
     /** The whole library, where a song's stems are found when the list holds the song alone. */
     librarySongs?: Song[];
+    /** The playlist the list shows, when it is not the whole library. */
+    scopeName?: string;
     onToggleLike: (songId: string) => void;
     onAddToPlaylist: (song: Song) => void;
     onOpenCoverRegen?: (song: Song) => void;
@@ -108,6 +110,7 @@ export const SongList: React.FC<SongListProps> = ({
     onPlay,
     onSelect,
     librarySongs,
+    scopeName,
     onToggleLike,
     onAddToPlaylist,
     onOpenCoverRegen,
@@ -326,7 +329,14 @@ export const SongList: React.FC<SongListProps> = ({
                         is in it rather than naming a workspace concept that this
                         single-user desktop build does not have. */}
                     <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        <span className="font-medium text-zinc-900 dark:text-white">{t('library')}</span>
+                        {scopeName ? (
+                            <span className="flex min-w-0 items-center gap-1.5 font-medium text-zinc-900 dark:text-white">
+                                <ListMusic size={14} className="shrink-0" />
+                                <span className="truncate">{t('playlist')} · {scopeName}</span>
+                            </span>
+                        ) : (
+                            <span className="font-medium text-zinc-900 dark:text-white">{t('library')}</span>
+                        )}
                         <span className="text-zinc-400 dark:text-zinc-600">·</span>
                         <span>{songCount(librarySize)}</span>
                     </div>
@@ -472,15 +482,21 @@ export const SongList: React.FC<SongListProps> = ({
                     {listItems.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-zinc-500 space-y-4 border border-dashed border-zinc-200 dark:border-white/5 rounded-2xl bg-zinc-50 dark:bg-white/2">
                             <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
-                                <Filter size={32} />
+                                {scopeName && !searchQuery && activeFilters.size === 0 ? <ListMusic size={32} /> : <Filter size={32} />}
                             </div>
-                            <p className="font-medium">{t('noSongsMatchFilters')}</p>
-                            <button
-                                onClick={() => { setActiveFilters(new Set()); setSearchQuery(''); }}
-                                className="text-pink-600 dark:text-pink-500 text-sm font-bold hover:underline"
-                            >
-                                {t('clearFilters')}
-                            </button>
+                            {scopeName && !searchQuery && activeFilters.size === 0 ? (
+                                <p className="max-w-xs text-center font-medium">{t('playlistEmptyCreate')}</p>
+                            ) : (
+                                <>
+                                    <p className="font-medium">{t('noSongsMatchFilters')}</p>
+                                    <button
+                                        onClick={() => { setActiveFilters(new Set()); setSearchQuery(''); }}
+                                        className="text-pink-600 dark:text-pink-500 text-sm font-bold hover:underline"
+                                    >
+                                        {t('clearFilters')}
+                                    </button>
+                                </>
+                            )}
                         </div>
                     ) : (
                         listItems.map((item) => (

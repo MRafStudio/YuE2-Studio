@@ -777,6 +777,7 @@ export const ko = {
     likedSongs: '좋아하는 곡',
     playlists: '재생목록',
     playlist: '재생목록',
+    playlistEmptyCreate: '이 플레이리스트에는 아직 곡이 없습니다. 새 곡이 여기에 들어갑니다.',
     byYou: '내가 만든',
 
     // User Profile
@@ -858,6 +859,7 @@ export const ko = {
     deletePlaylistConfirm: '이 재생목록을 삭제하시겠습니까?',
     artist: '아티스트',
     deletePlaylist: '재생목록 삭제',
+    removeFromPlaylist: '플레이리스트에서 제거',
     dateAdded: '추가일',
     justNow: '방금',
     unknown: '알 수 없음',

@@ -780,6 +780,7 @@ export const en = {
     likedSongs: 'Liked Songs',
     playlists: 'Playlists',
     playlist: 'Playlist',
+    playlistEmptyCreate: 'No songs in this playlist yet: the new ones go here.',
     byYou: 'By You',
 
     // User Profile
@@ -861,6 +862,7 @@ export const en = {
     deletePlaylistConfirm: 'Are you sure you want to delete this playlist?',
     artist: 'Artist',
     deletePlaylist: 'Delete Playlist',
+    removeFromPlaylist: 'Remove from playlist',
     dateAdded: 'Date Added',
     justNow: 'Just now',
     unknown: 'Unknown',

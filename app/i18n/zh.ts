@@ -777,6 +777,7 @@ export const zh = {
     likedSongs: '喜欢的歌曲',
     playlists: '播放列表',
     playlist: '播放列表',
+    playlistEmptyCreate: '这个播放列表里还没有歌曲：新生成的歌曲会放在这里。',
     byYou: '由你创建',
 
     // User Profile
@@ -858,6 +859,7 @@ export const zh = {
     deletePlaylistConfirm: '确定要删除这个播放列表吗？',
     artist: '艺术家',
     deletePlaylist: '删除播放列表',
+    removeFromPlaylist: '从播放列表移除',
     dateAdded: '添加日期',
     justNow: '刚刚',
     unknown: '未知',

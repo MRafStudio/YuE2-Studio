@@ -777,6 +777,7 @@ export const ja = {
   likedSongs: 'いいねした曲',
   playlists: 'プレイリスト',
   playlist: 'プレイリスト',
+  playlistEmptyCreate: 'このプレイリストにはまだ曲がありません。新しい曲はここに入ります。',
   byYou: 'あなたが作成',
 
   // User Profile
@@ -858,6 +859,7 @@ export const ja = {
   deletePlaylistConfirm: 'このプレイリストを削除してもよろしいですか？',
   artist: 'アーティスト',
   deletePlaylist: 'プレイリストを削除',
+  removeFromPlaylist: 'プレイリストから削除',
   dateAdded: '追加日',
   justNow: 'たった今',
   unknown: '不明',

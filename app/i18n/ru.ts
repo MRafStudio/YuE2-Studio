@@ -781,6 +781,7 @@ export const ru = {
     likedSongs: 'Понравившиеся песни',
     playlists: 'Плейлисты',
     playlist: 'Плейлист',
+    playlistEmptyCreate: 'В плейлисте пока нет песен: новые попадут сюда.',
     byYou: 'Вами',
 
     // User Profile
@@ -862,6 +863,7 @@ export const ru = {
     deletePlaylistConfirm: 'Вы уверены, что хотите удалить этот плейлист?',
     artist: 'Исполнитель',
     deletePlaylist: 'Удалить плейлист',
+    removeFromPlaylist: 'Убрать из плейлиста',
     dateAdded: 'Дата добавления',
     justNow: 'Только что',
     unknown: 'Неизвестно',

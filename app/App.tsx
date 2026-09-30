@@ -227,6 +227,15 @@ function AppContent() {
   const [currentView, setCurrentView] = useState<View>('create');
 
   // Content State: the library is the service's, read through the query cache
+  // The playlist new songs go into, kept between sessions: the project the
+  // user works on. The list beside the form shows it, as a workspace would.
+  const [createPlaylistId, setCreatePlaylistId] = useState(() => {
+    try { return window.localStorage.getItem('studio.createPlaylist') ?? ''; } catch { return ''; }
+  });
+  const chooseCreatePlaylist = (id: string) => {
+    setCreatePlaylistId(id);
+    try { window.localStorage.setItem('studio.createPlaylist', id); } catch { /* kept until a reload */ }
+  };
   const libraryRead = useLibrarySongs();
   const librarySongs = libraryRead.data ?? NO_SONGS;
   const playlists = useLibraryPlaylists().data ?? NO_PLAYLISTS;
@@ -360,6 +369,16 @@ function AppContent() {
       if (window.innerWidth < 768) setMobileShowList(true);
     },
   });
+  // The list beside the form shows the playlist the songs go into, and the
+  // songs being made for it; with none chosen it is the whole library.
+  const createScope = playlists.find(entry => entry.id === createPlaylistId) ?? null;
+  const createSongs = useMemo(() => {
+    if (!createScope) return generations.songs;
+    const inside = new Set(createScope.songIds ?? []);
+    return generations.songs.filter(song => (song.isGenerating || song.stage === 'cancelled'
+      ? song.playlistId === createScope.id
+      : inside.has(song.id)));
+  }, [generations.songs, createScope]);
 
   // The library asked for while the service was still starting came back
   // empty; once the service answers again it is read afresh.
@@ -1149,6 +1168,8 @@ function AppContent() {
                 request={createRequest}
                 playlists={playlists}
                 onCreatePlaylist={createEmptyPlaylist}
+                playlistId={createPlaylistId}
+                onChoosePlaylist={chooseCreatePlaylist}
               />
             </div>
             {leftPanel.handle}
@@ -1159,7 +1180,8 @@ function AppContent() {
               min-h-0 min-w-0 flex-1 flex-col h-full overflow-hidden bg-white dark:bg-suno transition-colors duration-300
             `}>
               <SongList
-                songs={generations.songs}
+                songs={createSongs}
+                scopeName={createScope?.name}
                 librarySongs={librarySongs}
                 currentSong={currentSong}
                 selectedSong={selectedSong}
