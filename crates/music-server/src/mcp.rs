@@ -228,6 +228,7 @@ fn shape(name: &str, args: &Value, value: Value) -> Value {
             value
         }
         "karaoke_settings_get" if !detailed => compact_karaoke(&value),
+        "library_liked" if !detailed => json!({ "songs": value.as_array().into_iter().flatten().map(|song| json!({ "id": song["id"], "title": song["title"], "made": song["created_at"], "liked_at": song["metadata"]["liked_at"] })).collect::<Vec<_>>() }),
         // any other answer that is a whole library song
         _ if !detailed && value.get("audio_codes").is_some() && value.get("replay_request").is_some() => compact_song(&value),
         "training_checkpoint_install" | "lora_install_hf" | "lora_import_files" if value["slots"].as_array().is_some_and(Vec::is_empty) => {
@@ -366,23 +367,23 @@ fn annotations(name: &str) -> Value {
     // a verb that changes something outweighs a noun that reads
     const CHANGES: &[&str] = &["install", "import", "remove", "delete", "refresh", "create", "update", "start", "cancel", "select", "download", "apply", "restart"];
     // reads whose names the rules above miss: create_form names the create page
-    const READ_NAMES: &[&str] = &["lyrics_find", "cover_prompt_render", "studio_wait", "engine_presets_get", "assistant_requests_wait", "ui_console", "song_defaults", "create_form_get"];
+    const READ_NAMES: &[&str] = &["lyrics_find", "cover_prompt_render", "studio_wait", "engine_presets_get", "assistant_requests_wait", "ui_console", "song_defaults", "create_form_get", "library_liked"];
+    // writes over what was stored, so the earlier content is gone: a client asks first
+    const OVERWRITES: &[&str] = &["library_song_update", "playlist_update", "dataset_update", "dataset_song_update", "lora_update", "stems_split", "karaoke_make", "cover_draw", "cover_set_from_file", "openrouter_set_key"];
     let changes = CHANGES.iter().any(|verb| name.split('_').any(|word| word == *verb));
     let read_only = READ_NAMES.contains(&name) || !changes && (READS.iter().any(|part| name.ends_with(part) || name.contains(&format!("{part}_"))) || name.starts_with("writing_"));
-    let destructive = name.ends_with("_delete") || name.ends_with("_remove") || name == "processing_discard" || name.ends_with("_cancel") || name.contains("_cancel_");
+    let destructive = name.ends_with("_delete") || name.ends_with("_remove") || name == "processing_discard" || name.ends_with("_cancel") || name.contains("_cancel_") || OVERWRITES.contains(&name);
     // what reaches the internet: OpenRouter, Hugging Face, the lyric databases and every download
     let open_world = name.starts_with("openrouter_") || name.contains("_hf") || name == "lyrics_find" || name == "models_download" || name == "lora_install_catalog" || name.ends_with("_install") && name != "training_checkpoint_install";
     let title = name.replace('_', " ");
     json!({ "title": title, "readOnlyHint": read_only, "destructiveHint": destructive, "idempotentHint": read_only || name.ends_with("_set") || name.contains("_select"), "openWorldHint": open_world })
 }
 
-/// The window's side of the bridge: the page subscribes to the commands and
-/// posts each answer back.
 struct Bridge {
     commands: tokio::sync::broadcast::Sender<String>,
     pending: Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<Value, String>>>>,
-    /// The open windows, oldest first; a command goes to the newest only, so
-    /// a second window never runs it again.
+    /// The open windows, the one the person turned to last at the end: a
+    /// command goes to that one only, so a second window never runs it again.
     windows: Mutex<Vec<u64>>,
     sequence: AtomicU64,
 }
@@ -468,6 +469,28 @@ pub async fn window_result(headers: HeaderMap, Json(answer): Json<WindowAnswer>)
         }
         None => StatusCode::NOT_FOUND,
     }
+}
+
+#[derive(serde::Deserialize)]
+pub struct WindowFocus {
+    window: u64,
+}
+
+/// The page the person turned to: an agent's command goes there, not to the
+/// window that happened to open last.
+pub async fn window_focus(headers: HeaderMap, Json(focus): Json<WindowFocus>) -> StatusCode {
+    if !local_origin(&headers) {
+        return StatusCode::FORBIDDEN;
+    }
+    if focus_window(focus.window) { StatusCode::NO_CONTENT } else { StatusCode::NOT_FOUND }
+}
+
+fn focus_window(window: u64) -> bool {
+    let mut windows = open_windows();
+    let Some(place) = windows.iter().position(|open| *open == window) else { return false };
+    windows.remove(place);
+    windows.push(window);
+    true
 }
 
 /// Tells every open window that something changed behind it, so the screens
@@ -1269,15 +1292,15 @@ fn tools() -> &'static [Tool] {
             },
             Tool {
                 name: "library_liked",
-                description: "The songs the user liked (the thumbs-up in the library): the ones they count as the best. With library_songs_list since today it gives today's best.",
+                description: "The songs the user liked (the thumbs-up in the library), the latest like first: the ones they count as the best. With library_songs_list since today it gives today's best. The like is kept with the song, so no window has to be open.",
                 schema: nothing,
-                call: |args| window("library_liked", args, 15),
+                call: |_| get("/v1/library/liked".into()),
             },
             Tool {
                 name: "library_song_like",
                 description: "Like a library song (liked true, the default) or take the like back (liked false), as the thumbs-up in the library does.",
                 schema: || object(json!({ "song_id": { "type": "string" }, "liked": { "type": "boolean" } }), &["song_id"]),
-                call: |args| window("library_song_like", args, 15),
+                call: |args| send(Method::PUT, format!("/v1/library/songs/{}/liked", segment(&text(args, "song_id")?)), json!({ "liked": args.get("liked").and_then(Value::as_bool).unwrap_or(true) })),
             },
             Tool {
                 name: "library_song_get",
@@ -2399,6 +2422,18 @@ mod tests {
     }
 
     #[test]
+    fn a_command_goes_to_the_window_the_person_turned_to() {
+        let (older, newer) = (u64::MAX - 20, u64::MAX - 21);
+        open_windows().extend([older, newer]);
+        let place = |window: u64| open_windows().iter().position(|open| *open == window).unwrap();
+        assert!(place(newer) > place(older), "the window opened last is asked first");
+        assert!(focus_window(older));
+        assert!(place(older) > place(newer), "the one the person turned to is asked now");
+        assert!(!focus_window(u64::MAX - 22), "a window that is not open is not taken");
+        open_windows().retain(|open| *open != older && *open != newer);
+    }
+
+    #[test]
     fn every_tool_has_a_unique_name_and_an_object_schema() {
         let mut names: Vec<&str> = tools().iter().map(|tool| tool.name).collect();
         let count = names.len();
@@ -2475,6 +2510,17 @@ mod tests {
             assert_eq!(annotations(name)["openWorldHint"], true, "{name}");
         }
         assert_eq!(annotations("training_checkpoint_install")["openWorldHint"], false);
+    }
+
+    #[test]
+    fn a_tool_that_writes_over_what_was_stored_is_destructive() {
+        for name in ["library_song_update", "playlist_update", "stems_split", "karaoke_make", "cover_set_from_file", "library_song_delete"] {
+            assert_eq!(annotations(name)["destructiveHint"], true, "{name}");
+        }
+        for name in ["song_create", "playlist_create", "library_song_like", "library_version_select", "settings_set"] {
+            assert_eq!(annotations(name)["destructiveHint"], false, "{name}");
+        }
+        assert_eq!(annotations("library_liked")["readOnlyHint"], true, "reading the liked songs changes nothing");
     }
 
     #[test]

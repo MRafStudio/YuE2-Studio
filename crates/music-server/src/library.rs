@@ -205,6 +205,35 @@ impl Library {
   self.save_song(&song)?;
   Ok(Some(song))
  }
+
+ /// The thumbs-up, kept with the track like its karaoke: every window and the
+ /// agent read the same mark, and a profile or machine change keeps it.
+ /// `liked_at` orders the liked list, newest first.
+ pub fn set_song_liked(&self,id:&str,liked:bool)->Result<Option<Song>>{
+  let Some(mut song)=self.get_song(id)? else{return Ok(None)};
+  let mut metadata=match song.metadata.take(){serde_json::Value::Object(map)=>map,_=>serde_json::Map::new()};
+  let already=metadata.get("liked").and_then(serde_json::Value::as_bool).unwrap_or(false);
+  if liked&&!already{
+   metadata.insert("liked".into(),serde_json::Value::Bool(true));
+   metadata.insert("liked_at".into(),serde_json::Value::String(now()));
+  }else if !liked{
+   metadata.remove("liked");
+   metadata.remove("liked_at");
+  }
+  song.metadata=serde_json::Value::Object(metadata);
+  if liked==already{return Ok(Some(song))}
+  // a like is not an edit of the track: updated_at, which its audio address
+  // follows, stays, so a song liked while it plays is not loaded again
+  self.save_song(&song)?;
+  Ok(Some(song))
+ }
+ /// The liked songs, the latest like first.
+ pub fn liked_songs(&self)->Result<Vec<Song>>{
+  let liked_at=|song:&Song|song.metadata.get("liked_at").and_then(serde_json::Value::as_str).and_then(|at|at.parse::<u64>().ok()).unwrap_or(0);
+  let mut songs:Vec<Song>=self.list_songs()?.into_iter().filter(|song|song.metadata.get("liked").and_then(serde_json::Value::as_bool).unwrap_or(false)).collect();
+  songs.sort_by(|a,b|liked_at(b).cmp(&liked_at(a)));
+  Ok(songs)
+ }
  /// Adds a processed version of a track, stored in the media folder, and makes
  /// it the one that plays. The original's file is remembered on the first
  /// version, so a track can always go back to what it was generated as. Kept in
@@ -249,14 +278,21 @@ impl Library {
  pub fn get_playlist(&self,id:&str)->Result<Option<Playlist>>{let c=self.connection.lock().unwrap();c.query_row("SELECT id,name,description,created_at,updated_at FROM playlists WHERE id=?",[id],|r|playlist(&c,r)).optional().map_err(Into::into)}
  pub fn create_playlist(&self,input:PlaylistInput)->Result<Playlist>{let now=now();let p=Playlist{id:uuid::Uuid::now_v7().to_string(),name:input.name,description:input.description,song_ids:input.song_ids,created_at:now.clone(),updated_at:now};self.save_playlist(&p)?;Ok(p)}
  pub fn update_playlist(&self,id:&str,input:PlaylistInput)->Result<Option<Playlist>>{let Some(mut playlist)=self.get_playlist(id)? else{return Ok(None)};playlist.name=input.name;playlist.description=input.description;playlist.song_ids=input.song_ids;playlist.updated_at=now();self.save_playlist(&playlist)?;Ok(Some(playlist))}
- pub fn delete_playlist(&self,id:&str)->Result<bool>{Ok(self.connection.lock().unwrap().execute("DELETE FROM playlists WHERE id=?",[id])?>0)}
- fn save_playlist(&self,p:&Playlist)->Result<()> {let mut c=self.connection.lock().unwrap();let tx=c.transaction()?;tx.execute("INSERT INTO playlists VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,updated_at=excluded.updated_at",params![p.id,p.name,p.description,p.created_at,p.updated_at])?;tx.execute("DELETE FROM playlist_songs WHERE playlist_id=?",[&p.id])?;for(pos,id)in p.song_ids.iter().enumerate(){tx.execute("INSERT INTO playlist_songs VALUES(?,?,?)",params![p.id,id,pos as i64])?;}tx.commit()?;Ok(())}
+ pub fn delete_playlist(&self,id:&str)->Result<bool>{let gone=self.connection.lock().unwrap().execute("DELETE FROM playlists WHERE id=?",[id])?>0;if gone{crate::mcp::announce("library")}Ok(gone)}
+ fn save_playlist(&self,p:&Playlist)->Result<()> {let mut c=self.connection.lock().unwrap();let tx=c.transaction()?;tx.execute("INSERT INTO playlists VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,updated_at=excluded.updated_at",params![p.id,p.name,p.description,p.created_at,p.updated_at])?;tx.execute("DELETE FROM playlist_songs WHERE playlist_id=?",[&p.id])?;for(pos,id)in p.song_ids.iter().enumerate(){tx.execute("INSERT INTO playlist_songs VALUES(?,?,?)",params![p.id,id,pos as i64])?;}tx.commit()?;crate::mcp::announce("library");Ok(())}
 }
 /// An edit's metadata over the stored one: what the studio keeps there itself
 /// (processed versions, the original audio, karaoke, the cover) is not the
-/// client's to drop by leaving it out.
+/// client's to drop by leaving it out, and the like belongs to its own route,
+/// so an edit carrying an older copy of it does not undo a like.
 fn merged_metadata(stored:&serde_json::Value,edit:serde_json::Value)->serde_json::Value{
- let(Some(stored),serde_json::Value::Object(mut edit))=(stored.as_object(),edit.clone()) else{return edit};
+ const OWN_ROUTE:[&str;2]=["liked","liked_at"];
+ let serde_json::Value::Object(mut edit)=edit else{return edit};
+ let nothing=serde_json::Map::new();
+ let stored=stored.as_object().unwrap_or(&nothing);
+ for key in OWN_ROUTE{
+  match stored.get(key){Some(value)=>{edit.insert(key.into(),value.clone());}None=>{edit.remove(key);}}
+ }
  for(key,value)in stored{edit.entry(key.clone()).or_insert_with(||value.clone());}
  serde_json::Value::Object(edit)
 }
@@ -302,6 +338,45 @@ mod edit_tests {
         assert_eq!(merged["active_version"], "v1");
         assert_eq!(merged["audio_versions"][0]["file"], "v1.wav");
         assert_eq!(merged["original_audio_path"], "song.mp3");
+    }
+
+    #[test]
+    fn an_edit_neither_undoes_nor_makes_a_like() {
+        let liked = serde_json::json!({ "liked": true, "liked_at": "100" });
+        let merged = merged_metadata(&liked, serde_json::json!({ "liked": false, "tags": ["x"] }));
+        assert_eq!(merged["liked"], true, "an older copy of the metadata does not take the like back");
+        assert_eq!(merged["liked_at"], "100");
+        let merged = merged_metadata(&serde_json::json!({ "tags": [] }), serde_json::json!({ "liked": true, "liked_at": "5" }));
+        assert!(merged.get("liked").is_none() && merged.get("liked_at").is_none(), "only the like route sets it");
+        let merged = merged_metadata(&serde_json::Value::Null, serde_json::json!({ "liked": true }));
+        assert!(merged.get("liked").is_none(), "nor on a song with no metadata yet");
+    }
+
+    #[test]
+    fn a_like_is_kept_with_the_song_and_the_latest_comes_first() {
+        let root = std::env::temp_dir().join(format!("library-liked-{}", uuid::Uuid::now_v7().simple()));
+        let db = Library::open_at(root.join("library.sqlite"), root.join("media")).unwrap();
+        let song = |title: &str| db.create_song(SongInput { title: title.into(), audio_path: None, caption: String::new(), lyrics: String::new(), metadata: serde_json::json!({ "tags": ["t"] }), generation_settings: serde_json::Value::Null, engine_id: "manual".into(), profile_id: None, replay_request: None, audio_codes: None, source: "manual".into() }).unwrap().id;
+        let (first, second) = (song("first"), song("second"));
+        assert!(db.liked_songs().unwrap().is_empty());
+        db.set_song_liked(&first, true).unwrap();
+        // the stamp is in seconds: the second like lands a second later
+        let mut older = db.get_song(&first).unwrap().unwrap();
+        older.metadata["liked_at"] = serde_json::json!("1");
+        db.save_song(&older).unwrap();
+        db.set_song_liked(&second, true).unwrap();
+        let liked: Vec<String> = db.liked_songs().unwrap().into_iter().map(|song| song.id).collect();
+        assert_eq!(liked, vec![second.clone(), first.clone()], "the latest like first");
+        let stamp = db.get_song(&second).unwrap().unwrap().metadata["liked_at"].clone();
+        db.set_song_liked(&second, true).unwrap();
+        assert_eq!(db.get_song(&second).unwrap().unwrap().metadata["liked_at"], stamp, "liking again keeps the moment of the first like");
+        db.set_song_liked(&second, false).unwrap();
+        let taken_back = db.get_song(&second).unwrap().unwrap();
+        assert!(taken_back.metadata.get("liked").is_none() && taken_back.metadata.get("liked_at").is_none());
+        assert_eq!(taken_back.metadata["tags"][0], "t", "the rest of the metadata stays");
+        assert!(db.set_song_liked("gone", true).unwrap().is_none());
+        drop(db);
+        let _ = fs::remove_dir_all(root);
     }
 }
 

@@ -9,6 +9,11 @@ import { AlbumCover } from './AlbumCover';
 import { updateNativeSong } from '../services/nativeLibrary';
 import { ownsSong, SongActionsProvider, useSongActions } from '../context/SongActionsContext';
 import { captionSummary } from '../services/examples';
+import { named } from '../services/accessibleName';
+import { foldStems, stemOf } from '../services/songStems';
+import { StemIcon, StemsToggle, useStemName } from './StemsToggle';
+import { SortMenu } from './SortMenu';
+import { compareBy, SONG_ORDERS, useListOrder } from '../services/songOrder';
 
 interface SongListProps {
     songs: Song[];
@@ -17,8 +22,11 @@ interface SongListProps {
     likedSongIds: Set<string>;
     isPlaying: boolean;
     referenceTracks?: { id: string; filename: string; audio_url: string; duration?: number | null; created_at?: string }[];
-    onPlay: (song: Song) => void;
+    /** Plays a track; the queue is the list's songs in their order, or the stem alone. */
+    onPlay: (song: Song, queue?: Song[]) => void;
     onSelect: (song: Song) => void;
+    /** The whole library, where a song's stems are found when the list holds the song alone. */
+    librarySongs?: Song[];
     onToggleLike: (songId: string) => void;
     onAddToPlaylist: (song: Song) => void;
     onOpenCoverRegen?: (song: Song) => void;
@@ -99,6 +107,7 @@ export const SongList: React.FC<SongListProps> = ({
     referenceTracks = [],
     onPlay,
     onSelect,
+    librarySongs,
     onToggleLike,
     onAddToPlaylist,
     onOpenCoverRegen,
@@ -113,7 +122,8 @@ export const SongList: React.FC<SongListProps> = ({
     activeJobCount = 0,
 }) => {
     const { user } = useAuth();
-    const { t, songCount } = useI18n();
+    const { t, songCount, language } = useI18n();
+    const [order, setOrder] = useListOrder('create', 'newest', SONG_ORDERS);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilters, setActiveFilters] = useState<Set<FilterType>>(new Set());
     const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -168,8 +178,19 @@ export const SongList: React.FC<SongListProps> = ({
 
     // the track a derived track was made from, found without a scan per row
     const songsById = useMemo(() => new Map(songs.map(entry => [entry.id, entry])), [songs]);
-    // the cards are not songs yet; the count is of what the library holds
-    const librarySize = useMemo(() => songs.filter(song => !isCard(song)).length, [songs]);
+    // the cards are not songs yet, and a stem is part of its song: the count is of the songs
+    const librarySize = useMemo(
+        () => foldStems(songs.filter(song => !isCard(song)), librarySongs ?? songs).songs.length,
+        [songs, librarySongs],
+    );
+    // which songs have their stems unfolded
+    const [openStems, setOpenStems] = useState<Set<string>>(new Set());
+    const toggleStems = (songId: string) => setOpenStems(prev => {
+        const next = new Set(prev);
+        if (next.has(songId)) next.delete(songId);
+        else next.add(songId);
+        return next;
+    });
 
     const filteredSongs = useMemo(() => {
         return songs.filter(song => {
@@ -205,29 +226,95 @@ export const SongList: React.FC<SongListProps> = ({
     // The songs being made stay on top, newest first, and the newest finished
     // song sits right under them: a card that finishes becomes the song in its
     // own place instead of moving.
+    // a stem is shown under the song it came from, when that song is in the list
+    const { songs: listedSongs, stemsOf } = useMemo(
+        () => foldStems(filteredSongs, librarySongs ?? songs),
+        [filteredSongs, librarySongs, songs],
+    );
+
     const listItems = useMemo(() => {
         const newestFirst = (a: { createdAt: Date }, b: { createdAt: Date }) => b.createdAt.getTime() - a.createdAt.getTime();
         const songItem = (song: Song) => ({ type: 'song' as const, id: song.id, createdAt: song.createdAt, song });
-        const cards = filteredSongs.filter(isCard).map(songItem).sort(newestFirst);
+        const cards = listedSongs.filter(isCard).map(songItem).sort(newestFirst);
+        // the finished songs follow in the order chosen; newest first, a card
+        // that finishes becomes the song in its own place instead of moving
+        const compare = compareBy(order, language);
         const finished = [
-            ...filteredSongs.filter(song => !isCard(song)).map(songItem),
+            ...listedSongs.filter(song => !isCard(song)).map(songItem),
             ...filteredUploads.map(track => ({
                 type: 'upload' as const,
                 id: track.id,
                 createdAt: new Date(track.created_at || Date.now()),
                 track,
             })),
-        ].sort(newestFirst);
+        ].sort((a, b) => compare(
+            a.type === 'song' ? a.song : { createdAt: a.createdAt, title: a.track.filename },
+            b.type === 'song' ? b.song : { createdAt: b.createdAt, title: b.track.filename },
+        ));
         return [...cards, ...finished];
-    }, [filteredSongs, filteredUploads]);
+    }, [listedSongs, filteredUploads, order, language]);
 
+    // what plays after a song: the list's songs in the order shown
+    const queue = useMemo(
+        () => listItems.flatMap(item => (item.type === 'song' && !isCard(item.song) && item.song.audioUrl ? [item.song] : [])),
+        [listItems],
+    );
+
+    // what a selection can reach is what is on screen: folded stems are not
     const selectableSongs = useMemo(
-        () => filteredSongs.filter(song => !isCard(song)),
-        [filteredSongs]
+        () => listedSongs.filter(song => !isCard(song)).flatMap(song => [song, ...(openStems.has(song.id) ? stemsOf.get(song.id) ?? [] : [])]),
+        [listedSongs, openStems, stemsOf]
     );
 
     const allSelected = selectableSongs.length > 0 && selectableSongs.every(song => selectedIds.has(song.id));
     const selectedSongs = selectableSongs.filter(song => selectedIds.has(song.id));
+
+    // one row for a song and for each of its stems
+    const renderSong = (song: Song, play: () => void, nested = false) => (
+        <SongItem
+            key={song.id}
+            song={song}
+            nested={nested}
+            isCurrent={currentSong?.id === song.id}
+            isSelected={selectedSong?.id === song.id}
+            isSelectionMode={isSelecting}
+            isChecked={selectedIds.has(song.id)}
+            isLiked={likedSongIds.has(song.id)}
+            isPlaying={isPlaying}
+            isOwner={ownsSong(user, song)}
+            onPlay={play}
+            onSelect={() => onSelect(song)}
+            onOpenOriginal={(() => {
+                const original = song.derived ? songsById.get(song.derived.from) : undefined;
+                return original ? () => onSelect(original) : undefined;
+            })()}
+            onToggleSelect={() => {
+                if (isCard(song)) return;
+                setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(song.id)) next.delete(song.id);
+                    else next.add(song.id);
+                    return next;
+                });
+            }}
+            onToggleLike={() => onToggleLike(song.id)}
+            onAddToPlaylist={() => onAddToPlaylist(song)}
+            onOpenCoverRegen={() => onOpenCoverRegen && onOpenCoverRegen(song)}
+            onShowDetails={() => onShowDetails && onShowDetails(song)}
+            onNavigateToProfile={onNavigateToProfile}
+            onSongUpdate={onSongUpdate}
+            // a card can be stopped once the engine has its job
+            onCancelJob={(() => {
+              const jobId = song.isGenerating ? song.jobId : undefined;
+              return jobId ? () => onCancelJob?.(jobId) : undefined;
+            })()}
+            onResetJob={
+              song.stage === 'cancelled'
+                ? () => onResetJob?.(song.jobId || song.id)
+                : undefined
+            }
+        />
+    );
 
     return (
         <div className="h-full min-w-0 flex-1 overflow-y-auto bg-white p-4 pb-32 transition-colors duration-300 dark:bg-black sm:p-6">
@@ -303,6 +390,8 @@ export const SongList: React.FC<SongListProps> = ({
                                 </div>
                             )}
                         </div>
+
+                        <SortMenu order={order} orders={SONG_ORDERS} onChange={setOrder} />
 
                         <button
                             onClick={() => {
@@ -396,48 +485,23 @@ export const SongList: React.FC<SongListProps> = ({
                     ) : (
                         listItems.map((item) => (
                             item.type === 'song' ? (
-                                <SongItem
-                                    key={item.song.viewKey ?? item.id}
-                                    song={item.song}
-                                    isCurrent={currentSong?.id === item.song.id}
-                                    isSelected={selectedSong?.id === item.song.id}
-                                    isSelectionMode={isSelecting}
-                                    isChecked={selectedIds.has(item.song.id)}
-                                    isLiked={likedSongIds.has(item.song.id)}
-                                    isPlaying={isPlaying}
-                                    isOwner={ownsSong(user, item.song)}
-                                    onPlay={() => onPlay(item.song)}
-                                    onSelect={() => onSelect(item.song)}
-                                    onOpenOriginal={(() => {
-                                        const original = item.song.derived ? songsById.get(item.song.derived.from) : undefined;
-                                        return original ? () => onSelect(original) : undefined;
-                                    })()}
-                                    onToggleSelect={() => {
-                                        if (isCard(item.song)) return;
-                                        setSelectedIds(prev => {
-                                            const next = new Set(prev);
-                                            if (next.has(item.song.id)) next.delete(item.song.id);
-                                            else next.add(item.song.id);
-                                            return next;
-                                        });
-                                    }}
-                                    onToggleLike={() => onToggleLike(item.song.id)}
-                                    onAddToPlaylist={() => onAddToPlaylist(item.song)}
-                                    onOpenCoverRegen={() => onOpenCoverRegen && onOpenCoverRegen(item.song)}
-                                    onShowDetails={() => onShowDetails && onShowDetails(item.song)}
-                                    onNavigateToProfile={onNavigateToProfile}
-                                    onSongUpdate={onSongUpdate}
-                                    // a card can be stopped once the engine has its job
-                                    onCancelJob={(() => {
-                                      const jobId = item.song.isGenerating ? item.song.jobId : undefined;
-                                      return jobId ? () => onCancelJob?.(jobId) : undefined;
-                                    })()}
-                                    onResetJob={
-                                      item.song.stage === 'cancelled'
-                                        ? () => onResetJob?.(item.song.jobId || item.song.id)
-                                        : undefined
-                                    }
-                                />
+                                <React.Fragment key={item.song.viewKey ?? item.id}>
+                                    {renderSong(item.song, () => onPlay(item.song, queue))}
+                                    {(stemsOf.get(item.song.id)?.length ?? 0) > 0 && (
+                                        <div className="pl-[5.5rem]">
+                                            <StemsToggle
+                                                stems={stemsOf.get(item.song.id) ?? []}
+                                                open={openStems.has(item.song.id)}
+                                                onToggle={() => toggleStems(item.song.id)}
+                                            />
+                                            {openStems.has(item.song.id) && (
+                                                <div className="mt-1 space-y-2 border-l border-zinc-200 pl-3 dark:border-white/10">
+                                                    {(stemsOf.get(item.song.id) ?? []).map(stem => renderSong(stem, () => onPlay(stem, [stem]), true))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </React.Fragment>
                             ) : (
                                 <UploadItem
                                     key={`upload_${item.id}`}
@@ -488,6 +552,8 @@ interface SongItemProps {
     onResetJob?: () => void;
     /** Opens the track this one was made from; absent when it is gone. */
     onOpenOriginal?: () => void;
+    /** A stem shown under its song: its name stands where the badge naming the song would. */
+    nested?: boolean;
 }
 
 const SongItem: React.FC<SongItemProps> = ({
@@ -511,8 +577,10 @@ const SongItem: React.FC<SongItemProps> = ({
     onCancelJob,
     onResetJob,
     onOpenOriginal,
+    nested = false,
 }) => {
     const { t } = useI18n();
+    const stemName = useStemName();
     const [showDropdown, setShowDropdown] = useState(false);
     const [imageError, setImageError] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -698,7 +766,12 @@ const SongItem: React.FC<SongItemProps> = ({
                                 <Pencil size={14} />
                             </button>
                         )}
-                        {song.derived && (
+                        {nested ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-xs border border-zinc-300 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:border-white/15 dark:text-zinc-300">
+                                <StemIcon song={song} size={11} />
+                                {stemName(song)}
+                            </span>
+                        ) : song.derived && (
                             <button
                                 type="button"
                                 disabled={!onOpenOriginal}
@@ -707,7 +780,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                 className="inline-flex max-w-full items-center gap-1 truncate rounded-xs border border-zinc-300 px-1.5 py-0.5 text-[10px] text-zinc-600 hover:border-pink-400 hover:text-pink-600 disabled:cursor-default disabled:hover:border-zinc-300 disabled:hover:text-zinc-600 dark:border-white/15 dark:text-zinc-300"
                             >
                                 {t('madeFrom')} «{song.derived.fromTitle}» · {t(`derivedTool_${song.derived.tool}` as TranslationKey)}
-                                {song.derived.tool === 'stems' && typeof song.derived.settings?.stem === 'string' ? `: ${song.derived.settings.stem}` : ''}
+                                {stemOf(song) !== null ? `: ${stemName(song)}` : ''}
                             </button>
                         )}
                         <span
@@ -763,6 +836,8 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className={`flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-white/5 transition-colors ${isLiked ? 'text-pink-600 dark:text-pink-500 bg-pink-100 dark:bg-pink-500/10' : 'text-zinc-400 hover:text-black dark:hover:text-white'}`}
                             onClick={(e) => { e.stopPropagation(); onToggleLike(); }}
+                            {...named(t('like'))}
+                            aria-pressed={isLiked}
                         >
                             <ThumbsUp size={16} fill={isLiked ? "currentColor" : "none"} />
                             {(song.likeCount || 0) > 0 && (
@@ -777,7 +852,7 @@ const SongItem: React.FC<SongItemProps> = ({
                             <button
                                 className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
                                 onClick={(e) => { e.stopPropagation(); if (onOpenCoverRegen) onOpenCoverRegen(); }}
-                                title={t('coverRegen.openTooltip') || 'Regenerate cover'}
+                                {...named(t('coverRegen.openTooltip'))}
                             >
                                 <ImagePlus size={16} />
                             </button>
@@ -787,7 +862,7 @@ const SongItem: React.FC<SongItemProps> = ({
                             <button
                                 className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
                                 onClick={(e) => { e.stopPropagation(); songActions.exportVideo?.(song); }}
-                                title={t('videoExport')}
+                                {...named(t('videoExport'))}
                             >
                                 <Clapperboard size={16} />
                             </button>
@@ -796,7 +871,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors ml-auto"
                             onClick={(e) => { e.stopPropagation(); onAddToPlaylist(); }}
-                            title={t('addToPlaylist')}
+                            {...named(t('addToPlaylist'))}
                         >
                             <ListPlus size={16} />
                         </button>
@@ -805,7 +880,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors xl:hidden"
                             onClick={(e) => { e.stopPropagation(); if (onShowDetails) onShowDetails(); }}
-                            title={t('songDetails')}
+                            {...named(t('songDetails'))}
                         >
                             <Info size={16} />
                         </button>
@@ -817,6 +892,9 @@ const SongItem: React.FC<SongItemProps> = ({
                                     e.stopPropagation();
                                     setShowDropdown(!showDropdown);
                                 }}
+                                {...named(t('moreActions'))}
+                                aria-haspopup="menu"
+                                aria-expanded={showDropdown}
                             >
                                 <MoreHorizontal size={16} />
                             </button>

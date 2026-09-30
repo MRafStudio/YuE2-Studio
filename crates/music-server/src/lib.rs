@@ -856,6 +856,8 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/library/songs", get(library_songs).post(create_library_song))
         .route("/v1/library/import", post(import_library_audio))
         .route("/v1/library/songs/{id}", get(library_song).put(update_library_song).delete(delete_library_song))
+        .route("/v1/library/songs/{id}/liked", axum::routing::put(set_library_song_liked))
+        .route("/v1/library/liked", get(library_liked))
         .route("/v1/library/media/{song_id}", get(library_media))
         .route("/v1/library/songs/{id}/cover", get(library_cover).put(store_library_cover))
         .route("/v1/library/playlists", get(library_playlists).post(create_library_playlist))
@@ -892,6 +894,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/mcp/status", get(mcp::status))
         .route("/mcp/window", get(mcp::window_events))
         .route("/mcp/window/result", post(mcp::window_result))
+        .route("/mcp/window/focus", post(mcp::window_focus))
         .fallback(remote::interface)
         .layer(axum::middleware::from_fn(remote::guard))
         // Everything here is live state or a local file: nothing is worth a
@@ -977,6 +980,26 @@ pub async fn serve() -> anyhow::Result<()> {
 }
 
 async fn library_songs(State(state): State<AppState>) -> Result<Json<Vec<library::Song>>, (StatusCode, Json<ApiError>)> { state.library.list_songs().map(Json).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string())) }
+
+#[derive(Deserialize)]
+struct LikeInput {
+    liked: bool,
+}
+
+/// The thumbs-up: set or take back, kept with the song.
+async fn set_library_song_liked(State(state): State<AppState>, Path(id): Path<String>, Json(input): Json<LikeInput>) -> Result<Json<library::Song>, (StatusCode, Json<ApiError>)> {
+    state
+        .library
+        .set_song_liked(&id, input.liked)
+        .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
+        .map(Json)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Song not found".into()))
+}
+
+/// The liked songs, the latest like first.
+async fn library_liked(State(state): State<AppState>) -> Result<Json<Vec<library::Song>>, (StatusCode, Json<ApiError>)> {
+    state.library.liked_songs().map(Json).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))
+}
 async fn library_song(State(state): State<AppState>,Path(id):Path<String>)->Result<Json<library::Song>,(StatusCode,Json<ApiError>)>{state.library.get_song(&id).map_err(|e|api_error(StatusCode::INTERNAL_SERVER_ERROR,e.to_string()))?.map(Json).ok_or_else(||api_error(StatusCode::NOT_FOUND,"Song not found".into()))}
 async fn library_media(State(state): State<AppState>, Path(song_id): Path<String>, request: Request) -> Result<axum::response::Response, (StatusCode, Json<ApiError>)> {
     let song = state.library.get_song(&song_id).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?.ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Song not found".into()))?;

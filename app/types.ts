@@ -21,6 +21,10 @@ export interface Song {
   generationParams?: any;
   tags: string[];
   audioUrl?: string;
+  /** The thumbs-up, kept with the song in the library. */
+  liked?: boolean;
+  /** When it was liked: the liked list is read from the latest. */
+  likedAt?: Date;
   isPublic?: boolean;
   likeCount?: number;
   viewCount?: number;

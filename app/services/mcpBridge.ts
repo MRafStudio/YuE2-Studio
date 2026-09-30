@@ -309,6 +309,16 @@ export function startBridge(): void {
   started = true;
   watchConsole();
   let reconnecting = false;
+  // the number the service gave this window, for the focus notices below
+  let current: number | null = null;
+  // an agent's command goes to the window the person turned to, not the one opened last
+  const reportFocus = () => {
+    if (current === null || document.visibilityState !== 'visible' || !document.hasFocus()) return;
+    void fetch(apiUrl('/mcp/window/focus'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ window: current }) })
+      .catch((problem) => console.error('[ERROR] the studio did not learn which window is in front:', problem));
+  };
+  window.addEventListener('focus', reportFocus);
+  document.addEventListener('visibilitychange', reportFocus);
   const connect = () => {
     const events = new EventSource(apiUrl('/mcp/window'));
     // the service names this window first; a command for another window is not ours
@@ -325,6 +335,8 @@ export function startBridge(): void {
       }
       if (data.id === undefined) {
         ours = data.window ?? null;
+        current = ours;
+        reportFocus();
         // what an agent changed while the stream was down is read now
         if (reconnecting) changed('everything');
         return;

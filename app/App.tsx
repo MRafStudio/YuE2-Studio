@@ -119,23 +119,22 @@ import { PlayerExtras } from './components/player/PlayerExtras';
 import { registerPlayer } from './services/audioGraph';
 import { serveVisualizerFeed } from './services/visualizerFeed';
 import { winampControl, winampOn } from './services/winamp';
-import { createNativePlaylist, deleteNativeSong, updateNativePlaylist } from './services/nativeLibrary';
+import { createNativePlaylist, deleteNativeSong, moveStoredLikes, setNativeSongLiked, updateNativePlaylist } from './services/nativeLibrary';
+import { foldStems } from './services/songStems';
 
-const NATIVE_LIKED_SONG_IDS_KEY = 'yue2-studio-liked-song-ids';
+/** Where versions before 3.3 kept the likes, in the window's own storage. */
+const STORED_LIKES_KEY = 'yue2-studio-liked-song-ids';
 const NO_SONGS: Song[] = [];
 const NO_PLAYLISTS: Playlist[] = [];
 
-function loadNativeLikedSongIds(): Set<string> {
+function storedLikes(): string[] {
   try {
-    const stored = JSON.parse(localStorage.getItem(NATIVE_LIKED_SONG_IDS_KEY) || '[]');
-    return new Set(Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : []);
-  } catch {
-    return new Set();
+    const stored: unknown = JSON.parse(localStorage.getItem(STORED_LIKES_KEY) || '[]');
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
+  } catch (error) {
+    console.error('[ERROR] reading the likes kept in the window:', error);
+    return [];
   }
-}
-
-function saveNativeLikedSongIds(ids: Set<string>): void {
-  localStorage.setItem(NATIVE_LIKED_SONG_IDS_KEY, JSON.stringify([...ids]));
 }
 
 function NativeUnavailableView({ title, detail }: { title: string; detail: string }): React.ReactElement {
@@ -228,9 +227,31 @@ function AppContent() {
   const [currentView, setCurrentView] = useState<View>('create');
 
   // Content State: the library is the service's, read through the query cache
-  const librarySongs = useLibrarySongs().data ?? NO_SONGS;
+  const libraryRead = useLibrarySongs();
+  const librarySongs = libraryRead.data ?? NO_SONGS;
   const playlists = useLibraryPlaylists().data ?? NO_PLAYLISTS;
-  const [likedSongIds, setLikedSongIds] = useState<Set<string>>(loadNativeLikedSongIds);
+  // the like is kept with the song, so every window and the agent see one mark
+  const likedSongIds = useMemo(() => new Set(librarySongs.filter(song => song.liked).map(song => song.id)), [librarySongs]);
+  const likedSongs = useMemo(() => librarySongs.filter(song => song.liked), [librarySongs]);
+  // Likes an earlier version kept in this window move into the library once,
+  // after the first read shows the service answers.
+  const likesMoved = useRef(false);
+  useEffect(() => {
+    if (likesMoved.current || !libraryRead.isSuccess) return;
+    likesMoved.current = true;
+    const stored = storedLikes();
+    if (stored.length === 0) return;
+    void moveStoredLikes(stored).then(left => {
+      try {
+        if (left.length === 0) localStorage.removeItem(STORED_LIKES_KEY);
+        else localStorage.setItem(STORED_LIKES_KEY, JSON.stringify(left));
+      } catch (error) {
+        console.error('[ERROR] updating the likes kept in the window:', error);
+      }
+      if (left.length > 0) console.error(`[ERROR] ${left.length} likes stay in the window until the service takes them`);
+      libraryChanged();
+    });
+  }, [libraryRead.isSuccess]);
   const [playQueue, setPlayQueue] = useState<Song[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
 
@@ -433,7 +454,9 @@ function AppContent() {
 
 
   // Player Logic
-  const getActiveQueue = () => (playQueue.length > 0 ? playQueue : librarySongs);
+  // with no queue chosen the library plays, its songs without their stems
+  const libraryQueue = useMemo(() => foldStems(librarySongs, librarySongs).songs, [librarySongs]);
+  const getActiveQueue = () => (playQueue.length > 0 ? playQueue : libraryQueue);
 
   const playNext = useCallback(() => {
     if (!currentSong) return;
@@ -704,7 +727,7 @@ function AppContent() {
       ? list
       : (playQueue.length > 0 && playQueue.some(s => s.id === song.id))
           ? playQueue
-          : (librarySongs.some(s => s.id === song.id) ? librarySongs : [song]);
+          : (libraryQueue.some(s => s.id === song.id) ? libraryQueue : [song]);
     const nextIndex = nextQueue.findIndex(s => s.id === song.id);
     setPlayQueue(nextQueue);
     setQueueIndex(nextIndex);
@@ -757,14 +780,6 @@ function AppContent() {
   }));
   // while the Winamp mode is on, Winamp is the player the agent drives
   const inWinamp = async (change: Record<string, unknown>) => ({ text: `Winamp: ${await winampControl()!.set(change)}` });
-  useBridgeCommand('library_liked', () => ({
-    songs: librarySongs.filter((song) => likedSongIds.has(song.id)).map((song) => ({ id: song.id, title: song.title, made: song.createdAt })),
-  }));
-  useBridgeCommand('library_song_like', ({ song_id, liked }) => {
-    const song = songById(song_id);
-    if (likedSongIds.has(song.id) !== (liked !== false)) toggleLike(song.id);
-    return { text: `${song.title} is ${liked !== false ? 'liked' : 'no longer liked'}.` };
-  });
   useBridgeCommand('player_play', ({ song_id, song_ids, stem }) => {
     if (Array.isArray(song_ids) && song_ids.length) {
       // a list of songs becomes the queue, played from its first
@@ -846,18 +861,20 @@ function AppContent() {
     setCurrentTime(time);
   };
 
-  /// Favourites are a local library flag: the desktop studio has no social
-  /// service, so the star is persisted next to the library instead of being
-  /// posted to a server that does not exist.
+  /// The thumbs-up is shown at once and kept in the library; when the service
+  /// refuses it, the mark goes back and the window says why.
   const toggleLike = (songId: string) => {
-    const isLiked = likedSongIds.has(songId);
-    setLikedSongIds(prev => {
-      const next = new Set(prev);
-      if (isLiked) next.delete(songId);
-      else next.add(songId);
-      saveNativeLikedSongIds(next as Set<string>);
-      return next;
-    });
+    const liked = !likedSongIds.has(songId);
+    const mark = (value: boolean) => updateLibrarySongs(songs => songs.map(song => (
+      song.id === songId ? { ...song, liked: value, likedAt: value ? song.likedAt ?? new Date() : undefined } : song
+    )));
+    mark(liked);
+    setNativeSongLiked(songId, liked)
+      .then(stored => updateLibrarySongs(songs => songs.map(song => (song.id === songId ? stored : song))))
+      .catch((error: unknown) => {
+        mark(!liked);
+        showToast(error instanceof Error ? error.message : String(error), 'error');
+      });
   };
 
   const handleDeleteSong = (song: Song) => {
@@ -895,12 +912,6 @@ function AppContent() {
 
         if (succeeded.length > 0) {
           updateLibrarySongs(songs => songs.filter(s => !idsToDelete.has(s.id) || failed.includes(s.id)));
-
-          setLikedSongIds(prev => {
-            const next = new Set(prev);
-            succeeded.forEach(id => next.delete(id));
-            return next;
-          });
 
           if (selectedSong?.id && succeeded.includes(selectedSong.id)) {
             setSelectedSong(null);
@@ -1061,9 +1072,11 @@ function AppContent() {
         return (
           <LibraryView
             allSongs={librarySongs}
-            likedSongs={librarySongs.filter(s => likedSongIds.has(s.id))}
+            likedSongs={likedSongs}
             playlists={playlists}
             onPlaySong={playSong}
+            currentSong={currentSong}
+            isPlaying={isPlaying}
             onCreatePlaylist={() => {
               setSongToAddToPlaylist(null);
               setIsCreatePlaylistModalOpen(true);
@@ -1147,6 +1160,7 @@ function AppContent() {
             `}>
               <SongList
                 songs={generations.songs}
+                librarySongs={librarySongs}
                 currentSong={currentSong}
                 selectedSong={selectedSong}
                 likedSongIds={likedSongIds}
