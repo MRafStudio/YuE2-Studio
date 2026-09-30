@@ -904,14 +904,16 @@ function AppContent() {
   /// refuses it, the mark goes back and the window says why.
   const toggleLike = (songId: string) => {
     const liked = !likedSongIds.has(songId);
-    const mark = (value: boolean) => updateLibrarySongs(songs => songs.map(song => (
-      song.id === songId ? { ...song, liked: value, likedAt: value ? song.likedAt ?? new Date() : undefined } : song
+    const before = librarySongs.find(song => song.id === songId);
+    const mark = (value: boolean, at: Date | undefined) => updateLibrarySongs(songs => songs.map(song => (
+      song.id === songId ? { ...song, liked: value, likedAt: at } : song
     )));
-    mark(liked);
+    mark(liked, liked ? new Date() : undefined);
     setNativeSongLiked(songId, liked)
       .then(stored => updateLibrarySongs(songs => songs.map(song => (song.id === songId ? stored : song))))
       .catch((error: unknown) => {
-        mark(!liked);
+        // the mark goes back to what it was, the moment of the like with it
+        mark(!liked, before?.likedAt);
         showToast(error instanceof Error ? error.message : String(error), 'error');
       });
   };
@@ -926,7 +928,7 @@ function AppContent() {
     const isSingle = songsToDelete.length === 1;
     const title = isSingle ? t('confirmDeleteTitle') : t('confirmDeleteManyTitle');
     const message = isSingle
-      ? t('deleteSongConfirm').replace('{title}', songsToDelete[0].title)
+      ? t('deleteSongConfirm').replace('{title}', () => songsToDelete[0].title)
       : t('deleteSongsConfirm').replace('{count}', String(songsToDelete.length));
 
     setConfirmDialog({
@@ -1137,6 +1139,7 @@ function AppContent() {
               setSelectedSong(s);
               setShowRightSidebar(true);
             }}
+            onError={message => showToast(message, 'error')}
           />
         );
 

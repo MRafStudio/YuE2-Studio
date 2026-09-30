@@ -41,6 +41,8 @@ export const zh = {
     journalKind_download: '下载',
     journalKind_model: '模型',
     journalKind_settings: '设置',
+    journalKind_preparation: '数据集准备',
+    journalKind_score: '乐谱',
 
     // Tools
     toolsDescription: '模型转换和管理工具',
