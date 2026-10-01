@@ -999,6 +999,7 @@ impl Training {
         self: &Arc<Self>,
         libraries: Option<PathBuf>,
         tokenizer: PathBuf,
+        companion: PathBuf,
         separator: Option<Arc<dyn VocalSeparator>>,
         dataset_id: &str,
         name: &str,
@@ -1040,6 +1041,7 @@ impl Training {
             audio,
             models: self.models_dir(),
             tokenizer,
+            companion,
             run: run_dir.clone(),
             vocals: self.vocals_dir(&dataset.id)?,
             trigger: dataset.trigger.clone(),
@@ -1096,7 +1098,7 @@ impl Training {
     /// the same recipe, the same prepared songs, the steps and the chart go on
     /// where they stopped. Stops by steps only - a likeness target would be
     /// judged on a window the resumed trainer starts empty.
-    pub async fn continue_run(self: &Arc<Self>, libraries: Option<PathBuf>, run_id: &str, steps: u32, card: CardHooks) -> Result<Run> {
+    pub async fn continue_run(self: &Arc<Self>, libraries: Option<PathBuf>, companion: PathBuf, run_id: &str, steps: u32, card: CardHooks) -> Result<Run> {
         let trainer = self.trainer();
         if !self.pack_ready() {
             bail!("the training files are not downloaded yet");
@@ -1120,7 +1122,7 @@ impl Training {
         recipe.target_kl = 0.0;
         recipe.stop = "kl".into();
         let output = run_dir.join(format!("output-{}", new_id()));
-        let stage = yue_train::continuation_stage(&self.models_dir(), &run_dir, &recipe, &output, &state);
+        let stage = yue_train::continuation_stage(&self.models_dir(), &companion, &run_dir, &recipe, &output, &state);
         run.recipe = recipe;
         run.status = RunStatus::Running;
         run.stage = None;
@@ -1238,6 +1240,9 @@ impl Training {
                 }
                 command.env("PATH", path);
             }
+            // The pack carries ggml's processor builds beside CUDA; without this
+            // a card whose CUDA does not load would train on the processor.
+            command.env("GGML_BACKEND", "CUDA0");
             #[cfg(windows)]
             command.creation_flags(0x0800_0000);
             let mut child = command.spawn().with_context(|| format!("start {}", trainer.display()))?;
@@ -1271,7 +1276,7 @@ impl Training {
                                 if let Err(error) = recorded {
                                     log.write_all(format!("[studio] the step was not recorded: {error:#}\n").as_bytes()).await?;
                                 }
-                            } else if line.to_ascii_lowercase().contains("error") {
+                            } else if line.contains("FATAL") || line.to_ascii_lowercase().contains("error") {
                                 last_error = line;
                             }
                         }
@@ -1284,6 +1289,9 @@ impl Training {
                 }
             };
             if !status.success() {
+                if last_error.contains("GGML_BACKEND=CUDA0 not found") {
+                    bail!("{} stopped: the trainer's CUDA did not load on the graphics card, and training does not run on the processor; it needs NVIDIA driver {} or newer", stage.id, crate::hardware::CUDA13_DRIVER);
+                }
                 bail!("{} stopped ({status}){}", stage.id, if last_error.is_empty() { String::new() } else { format!(": {last_error}") });
             }
         }

@@ -180,6 +180,8 @@ export interface YueJob {
   playlist_id?: string;
   song?: YueJobSong;
   songs?: YueJobSong[];
+  /** How the lyrics were laid along a score that came without sections. */
+  laid?: { seconds: number; ceiling: number; crowded: { ratio: number; notes: number; syllables: number } | null };
 }
 
 /** What the engine log says the running job is doing. */

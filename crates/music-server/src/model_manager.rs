@@ -15,6 +15,16 @@ use tokio::sync::RwLock;
 pub const ENGINE_ID: &str = "yue2-cpp";
 const REPOSITORY: &str = "Serveurperso/YuE2-GGUF";
 const REVISION: &str = "64b030e3deb6e8150d2b7c0db641ef5a17eca8a3";
+/// Part of every set, picked or not: the engine merges it under every render
+/// and the trainer keeps it under every LoRA.
+const COMPANION: &str = "companion-v9";
+pub const COMPANION_REPOSITORY: &str = "Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4";
+
+/// The companion in any of the precisions and layouts its repository
+/// publishes: one more copy on top of the built-in one would merge it twice.
+pub fn is_companion_file(repo: &str, path: &str) -> bool {
+    repo.eq_ignore_ascii_case(COMPANION_REPOSITORY) && path.starts_with("nar_lora_joint_v9")
+}
 
 /// The recommendation is a property of the machine, not of the catalog.
 fn recommended_profile() -> &'static str {
@@ -111,6 +121,8 @@ pub struct ProfileModelFiles {
     /// SheetSage2 is optional: without it the studio generates but cannot
     /// read a recording into a score.
     pub transcriber: Option<String>,
+    /// The decoder adapter paired with the tokenizer head of the training codes.
+    pub companion: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -284,6 +296,19 @@ impl ModelManager {
     pub fn installed_component_files(&self, component_ids: &[String]) -> Result<ProfileModelFiles> {
         let selection = resolve_install(InstallRequest { profile_id: None, component_ids: component_ids.to_vec() })?;
         self.installed_files_from_selection(selection, "selected custom component set")
+    }
+
+    /// A saved hand-picked set stays chosen while the files picked for it are
+    /// there. The companion is not the user's pick: missing, it is fetched
+    /// with the set rather than dropping the set for the recommended one.
+    pub fn picked_components_installed(&self, component_ids: &[String]) -> bool {
+        resolve_install(InstallRequest { profile_id: None, component_ids: component_ids.to_vec() }).is_ok_and(|selection| {
+            selection
+                .components
+                .iter()
+                .filter(|component| component_ids.iter().any(|id| id == component.id))
+                .all(|component| published_component(&self.root.join(component.filename), component))
+        })
     }
 
     fn installed_files_from_selection(&self, selection: ResolvedInstall, label: &str) -> Result<ProfileModelFiles> {
@@ -500,7 +525,7 @@ fn resolve_install(request: InstallRequest) -> Result<ResolvedInstall> {
     }
     let profiles = profiles();
     let profile = request.profile_id.unwrap_or_else(|| recommended_profile().into());
-    let (profile_id, ids) = if request.component_ids.is_empty() {
+    let (profile_id, mut ids) = if request.component_ids.is_empty() {
         let selected = profiles.iter().find(|candidate| candidate.id == profile)
             .with_context(|| format!("unknown profile '{profile}'"))?;
         if !selected.installable || selected.backend != ENGINE_ID {
@@ -508,8 +533,11 @@ fn resolve_install(request: InstallRequest) -> Result<ResolvedInstall> {
         }
         (Some(selected.id.into()), selected.components.clone())
     } else {
-        (None, request.component_ids.iter().map(String::as_str).collect())
+        (None, request.component_ids.iter().map(String::as_str).collect::<Vec<_>>())
     };
+    if !ids.contains(&COMPANION) {
+        ids.push(COMPANION);
+    }
     let catalog = components();
     let selected: Vec<Component> = ids
         .iter()
@@ -521,7 +549,7 @@ fn resolve_install(request: InstallRequest) -> Result<ResolvedInstall> {
 }
 
 fn validate_complete_set(selected: &[Component]) -> Result<()> {
-    for kind in ["backbone", "vae"] {
+    for kind in ["backbone", "vae", "companion"] {
         if selected.iter().filter(|component| component.kind == kind).count() != 1 {
             bail!("a runnable YuE2 installation requires exactly one {kind} component");
         }
@@ -538,6 +566,7 @@ fn profile_files_from_components(components: &[Component]) -> ProfileModelFiles 
         backbone: filename("backbone").expect("complete set"),
         vae: filename("vae").expect("complete set"),
         transcriber: filename("transcriber"),
+        companion: filename("companion").expect("complete set"),
     }
 }
 
@@ -637,7 +666,7 @@ fn part_path(path: &Path) -> PathBuf {
 /// The declared set whose components are exactly these, whatever order they
 /// arrive in: picking every component of a set by hand is choosing that set.
 pub fn profile_matching(component_ids: &[String]) -> Option<&'static str> {
-    let mut wanted: Vec<&str> = component_ids.iter().map(String::as_str).collect();
+    let mut wanted: Vec<&str> = component_ids.iter().map(String::as_str).chain([COMPANION]).collect();
     wanted.sort_unstable();
     wanted.dedup();
     profiles().into_iter().find_map(|profile| {
@@ -649,10 +678,10 @@ pub fn profile_matching(component_ids: &[String]) -> Option<&'static str> {
 
 fn profiles() -> Vec<Profile> {
     vec![
-        profile("light", "Light - Q5_K_M backbone (6 GB cards)", &["backbone-q5", "vae-f32", "transcriber-q5"]),
-        profile("balanced", "Balanced - Q6_K backbone", &["backbone-q6", "vae-f32", "transcriber-q6"]),
-        profile("quality-q8", "Quality - Q8_0 backbone, near lossless", &["backbone-q8", "vae-f32", "transcriber-q8"]),
-        profile("native", "Full native - BF16 backbone, original weights", &["backbone-bf16", "vae-f32", "transcriber-f32"]),
+        profile("light", "Light - Q5_K_M backbone (6 GB cards)", &["backbone-q5", "vae-f32", "transcriber-q5", COMPANION]),
+        profile("balanced", "Balanced - Q6_K backbone", &["backbone-q6", "vae-f32", "transcriber-q6", COMPANION]),
+        profile("quality-q8", "Quality - Q8_0 backbone, near lossless", &["backbone-q8", "vae-f32", "transcriber-q8", COMPANION]),
+        profile("native", "Full native - BF16 backbone, original weights", &["backbone-bf16", "vae-f32", "transcriber-f32", COMPANION]),
     ]
 }
 
@@ -680,6 +709,16 @@ fn components() -> Vec<Component> {
         c("transcriber-q8", "transcriber", "SheetSage2-Q8_0.gguf", 957571488, "4507d8c1d9245f312c0894ea610ab18fbcbf31443764b5bd6a60e4b6df59e973"),
         c("transcriber-q6", "transcriber", "SheetSage2-Q6_K.gguf", 813864856, "9e9d7868bd96dbf016fcc4e484db38385c8863a94bbc0f6ed37455b4e410c7e0"),
         c("transcriber-q5", "transcriber", "SheetSage2-Q5_K_M.gguf", 737104280, "165e7b5f4d8c7954473b44481cf2d1ecc96f73e3690d9561390614dd3a7bcc03"),
+        // Mothersuperior's pair of the v9 tokenizer head, CC BY-NC 4.0
+        Component {
+            id: COMPANION,
+            kind: "companion",
+            filename: "nar_lora_joint_v9.safetensors",
+            bytes: 140560592,
+            sha256: "585f303da1d5252d228d1e8ac6d4c4d11d970df9297406935cc8bdafa49cfa7e",
+            repository: COMPANION_REPOSITORY,
+            revision: "e2e63d859f3af879baf1b4d4e9f22d1eeda6fde5",
+        },
     ]
 }
 
@@ -695,6 +734,7 @@ mod tests {
     fn a_hand_picked_set_equal_to_a_declared_one_is_that_set() {
         let ids = |list: &[&str]| list.iter().map(|id| id.to_string()).collect::<Vec<_>>();
         assert_eq!(profile_matching(&ids(&["transcriber-f32", "backbone-bf16", "vae-f32"])), Some("native"));
+        assert_eq!(profile_matching(&ids(&["transcriber-f32", "backbone-bf16", "vae-f32", COMPANION])), Some("native"));
         assert_eq!(profile_matching(&ids(&["backbone-q8", "vae-f32", "transcriber-q8"])), Some("quality-q8"));
         assert_eq!(profile_matching(&ids(&["backbone-q8", "vae-f32"])), None);
         assert_eq!(profile_matching(&ids(&["backbone-q8", "vae-f32", "transcriber-f32"])), None);
@@ -728,6 +768,36 @@ mod tests {
         assert_eq!(files.backbone, "YuE2-3B-Q6_K.gguf");
         assert_eq!(files.vae, "YuE2-Vae-F32.gguf");
         assert!(files.transcriber.is_none());
+        assert_eq!(files.companion, "nar_lora_joint_v9.safetensors");
+    }
+
+    #[test]
+    fn every_set_carries_the_companion() {
+        let picked = resolve_install(InstallRequest { profile_id: None, component_ids: vec!["backbone-q6".into(), "vae-f32".into()] }).unwrap();
+        assert!(picked.components.iter().any(|component| component.id == COMPANION));
+        let named = resolve_install(InstallRequest { profile_id: None, component_ids: vec!["backbone-q6".into(), "vae-f32".into(), COMPANION.into()] }).unwrap();
+        assert_eq!(named.components.len(), picked.components.len());
+        assert!(profiles().iter().all(|profile| profile.components.contains(&COMPANION)));
+    }
+
+    #[test]
+    fn a_picked_set_stays_chosen_while_only_the_companion_is_missing() {
+        let root = std::env::temp_dir().join(format!("yue2-picked-{}", uuid::Uuid::now_v7()));
+        fs::create_dir_all(&root).unwrap();
+        let manager = ModelManager {
+            root: root.clone(),
+            state_path: root.join("state.json"),
+            http: reqwest::Client::new(),
+            state: Arc::new(RwLock::new(PersistentState::default())),
+            cancelled: Arc::new(AtomicBool::new(false)),
+        };
+        let picked = vec!["backbone-q6".to_string(), "vae-f32".to_string()];
+        assert!(!manager.picked_components_installed(&picked));
+        fs::write(root.join("YuE2-3B-Q6_K.gguf"), b"weights").unwrap();
+        fs::write(root.join("YuE2-Vae-F32.gguf"), b"weights").unwrap();
+        assert!(manager.picked_components_installed(&picked));
+        assert!(manager.installed_component_files(&picked).is_err());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
@@ -742,8 +812,9 @@ mod tests {
 
     #[test]
     fn catalog_pins_every_published_file() {
-        assert_eq!(components().len(), 9);
-        assert!(components().iter().all(|component| component.sha256.len() == 64 && component.revision == REVISION));
+        assert_eq!(components().len(), 10);
+        assert!(components().iter().all(|component| component.sha256.len() == 64 && component.revision.len() == 40));
+        assert!(components().iter().filter(|component| component.id != COMPANION).all(|component| component.revision == REVISION));
     }
 
     #[tokio::test]

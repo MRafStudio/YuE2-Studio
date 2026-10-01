@@ -740,7 +740,7 @@ export const SetupGate: React.FC<{ onReady?: () => void; mode?: 'first-run' | 's
   const active = status?.active;
   const progress = active && active.total_bytes > 0 ? Math.min(100, (active.downloaded_bytes / active.total_bytes) * 100) : 0;
   const installedIds = status?.installed_components ?? [];
-  const missing = chosenValues.filter((id) => !installedIds.includes(id));
+  const missing = (chosenIds ?? chosenValues).filter((id) => !installedIds.includes(id));
 
   // What the studio is set to right now, so "use this set" only appears when
   // the selection on screen is something else.

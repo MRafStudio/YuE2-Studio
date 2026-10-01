@@ -1765,6 +1765,7 @@ dependencies = [
  "tokio-stream",
  "tower",
  "tower-http 0.7.1",
+ "unicode-normalization-alignments",
  "uuid",
  "zip",
 ]

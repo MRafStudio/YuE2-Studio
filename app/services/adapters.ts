@@ -125,6 +125,8 @@ export interface HubFile {
   bytes: number;
   adapter_id: string;
   installed: boolean;
+  /** The decoder companion every render already merges, in some precision. */
+  built_in?: boolean;
   model?: DitFamily | null;
   format?: string | null;
   /** Why the engine cannot use the file, when it cannot. */

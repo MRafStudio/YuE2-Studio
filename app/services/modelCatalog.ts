@@ -13,11 +13,14 @@ export const REQUIRED_KINDS = ['backbone', 'vae'] as const;
 /** SheetSage2: without it the studio generates but cannot transcribe covers. */
 export const OPTIONAL_KINDS = ['transcriber'] as const;
 export const COMPONENT_KINDS = [...REQUIRED_KINDS, ...OPTIONAL_KINDS] as const;
+/** In every set and never a choice: the decoder companion every render merges. */
+export const ALWAYS_KINDS = ['companion'] as const;
 
-const labels: Record<(typeof COMPONENT_KINDS)[number], string> = {
+const labels: Record<(typeof COMPONENT_KINDS)[number] | (typeof ALWAYS_KINDS)[number], string> = {
   backbone: 'Backbone',
   vae: 'VAE',
   transcriber: 'SheetSage2',
+  companion: 'Decoder companion',
 };
 
 export const componentKindLabel = (kind: string) => labels[kind as keyof typeof labels] || kind;
@@ -25,9 +28,10 @@ export const componentKindLabel = (kind: string) => labels[kind as keyof typeof 
 export const isOptionalKind = (kind: string) => (OPTIONAL_KINDS as readonly string[]).includes(kind);
 
 export const componentPrecision = (component: ModelComponent) => {
-  // every catalog file ends in -<ggml type>.gguf
-  const matched = component.filename.match(/-([A-Z0-9_]+)\.gguf$/i);
-  return matched?.[1]?.toUpperCase() || component.id;
+  // the GGUF files end in -<ggml type>.gguf, the companion in _v<version>.safetensors
+  const quant = component.filename.match(/-([A-Z0-9_]+)\.gguf$/i)?.[1];
+  if (quant) return quant.toUpperCase();
+  return component.filename.match(/_(v\d+)\.safetensors$/i)?.[1] || component.id;
 };
 
 export const componentsByKind = (components: ModelComponent[]) =>
@@ -45,6 +49,9 @@ export const completeCustomComponentIds = (components: ModelComponent[], selecte
     const component = components.find((entry) => entry.id === id);
     if (!component || component.kind !== kind) return null;
     ids.push(id);
+  }
+  for (const component of components) {
+    if ((ALWAYS_KINDS as readonly string[]).includes(component.kind)) ids.push(component.id);
   }
   return ids;
 };

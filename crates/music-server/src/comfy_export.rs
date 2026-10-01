@@ -372,6 +372,7 @@ pub fn export_yue2(ar: Option<&Path>, nar: Option<&Path>, ar_strength: f32, nar_
     metadata.insert("base_model".to_string(), "YuE2-3B (ComfyUI native)".to_string());
     metadata.insert("name".to_string(), name.to_string());
     metadata.insert("layout".to_string(), "planner under text_encoders, sound under diffusion_model; qkv_proj and gate_up_proj are exact block-diagonal fusions of the separate q, k, v and gate, up adapters, strength folded in".to_string());
+    metadata.insert("companion".to_string(), "rendered in YuE2 Studio over Mothersuperior's decoder adapter; load nar_lora_joint_v9_comfyui.safetensors from Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4 beside it at strength 1 for the same sound".to_string());
     if let Some(trigger) = trigger.filter(|trigger| !trigger.trim().is_empty()) {
         metadata.insert("modelspec.trigger_phrase".to_string(), trigger.to_string());
     }

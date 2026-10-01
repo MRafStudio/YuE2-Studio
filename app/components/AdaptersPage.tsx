@@ -415,7 +415,9 @@ const HubPanel: React.FC<{ current?: DitFamily | null; downloading: boolean; onS
                           <span className="mt-0.5 block text-[11px] text-zinc-500">{t('adaptersHubUnknown')}</span>
                         ) : null}
                       </span>
-                      {file.installed ? (
+                      {file.built_in ? (
+                        <span className="shrink-0 text-right text-[11px] text-zinc-500 dark:text-zinc-400">{t('adaptersHubBuiltIn')}</span>
+                      ) : file.installed ? (
                         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><Check size={13} />{t('adaptersInstalled')}</span>
                       ) : (
                         <button

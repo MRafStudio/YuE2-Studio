@@ -96,8 +96,12 @@ export interface TrainingState {
   recipe_fields: RecipeField[];
   /** Video memory a run of the default recipe needs, in GB. */
   min_vram_gb: number;
-  /** Whether this machine's card runs the trainer: an NVIDIA card with CUDA. */
+  /** Whether this machine's card runs the trainer: an NVIDIA card whose driver runs CUDA 13. */
   card_trains: boolean;
+  /** What the card lacks for the trainer: no CUDA card at all, or a driver or card that runs CUDA 12 only. */
+  card_needs?: 'nvidia' | 'driver' | null;
+  /** The oldest NVIDIA driver the trainer's CUDA 13 runs on. */
+  trainer_driver?: number;
   /** What a song's style field holds for this engine: a short style, or a structured caption. */
   item_style: 'style' | 'caption';
   download: { downloaded_bytes: number; total_bytes: number; done: boolean; error?: string | null } | null;

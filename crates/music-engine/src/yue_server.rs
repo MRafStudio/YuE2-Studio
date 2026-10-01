@@ -37,6 +37,8 @@ pub struct YueModelFiles {
     pub transcriber: Option<PathBuf>,
     /// The folder of adapters requests may name; without it they name none.
     pub adapters: Option<PathBuf>,
+    /// The decoder adapter merged under every render, beneath the request's.
+    pub companion: PathBuf,
 }
 
 /// A part of the model an adapter can change, with its own strength.
@@ -188,6 +190,7 @@ impl YueServerLocation {
                 .map(|path| canonical_file(&path, "SheetSage2 transcriber"))
                 .transpose()?,
             adapters: models.adapters.map(|path| canonical_directory(&path, "adapter folder")).transpose()?,
+            companion: canonical_file(&models.companion, "YuE2 decoder companion")?,
         };
         let host = self.host.unwrap_or_else(|| DEFAULT_HOST.into());
         validate_loopback_host(&host)?;
@@ -218,6 +221,8 @@ impl YueServerLaunchConfig {
             strip_verbatim(&self.models.backbone).into(),
             "--vae".into(),
             strip_verbatim(&self.models.vae).into(),
+            "--companion".into(),
+            strip_verbatim(&self.models.companion).into(),
         ];
         if let Some(transcriber) = &self.models.transcriber {
             arguments.push("--transcriber".into());
@@ -561,7 +566,7 @@ mod tests {
     fn resolves_bundled_runtime_and_names_every_model_on_the_command_line() {
         let root = fresh_directory("runtime");
         fs::write(root.join(EXECUTABLE), b"test").unwrap();
-        for name in ["b.gguf", "v.gguf", "t.gguf"] {
+        for name in ["b.gguf", "v.gguf", "t.gguf", "c.safetensors"] {
             fs::write(root.join(name), b"gguf").unwrap();
         }
         fs::create_dir_all(root.join("adapters")).unwrap();
@@ -577,6 +582,7 @@ mod tests {
             vae: root.join("v.gguf"),
             transcriber: Some(root.join("t.gguf")),
             adapters: Some(root.join("adapters")),
+            companion: root.join("c.safetensors"),
         })
         .unwrap();
         assert_eq!(config.port, DEFAULT_PORT);
@@ -586,6 +592,7 @@ mod tests {
         assert!(arguments[flag("--vae") + 1].ends_with("v.gguf"));
         assert!(arguments[flag("--transcriber") + 1].ends_with("t.gguf"));
         assert!(arguments[flag("--adapters") + 1].ends_with("adapters"));
+        assert!(arguments[flag("--companion") + 1].ends_with("c.safetensors"));
         assert_eq!(arguments[flag("--port") + 1], DEFAULT_PORT.to_string());
         assert!(arguments.contains(&"--keep-loaded".to_string()));
         assert_eq!(arguments[flag("--max-batch") + 1], "2");
@@ -599,7 +606,7 @@ mod tests {
         fs::write(root.join(EXECUTABLE), b"test").unwrap();
         let config = |folder| YueServerLaunchConfig {
             executable: root.join(EXECUTABLE),
-            models: YueModelFiles { backbone: root.join("b.gguf"), vae: root.join("v.gguf"), transcriber: None, adapters: None },
+            models: YueModelFiles { backbone: root.join("b.gguf"), vae: root.join("v.gguf"), transcriber: None, adapters: None, companion: root.join("c.safetensors") },
             host: DEFAULT_HOST.into(),
             port: DEFAULT_PORT,
             options: YueServerOptions { cuda_folder: folder, ..Default::default() },
@@ -653,6 +660,7 @@ mod tests {
             vae: root.join("absent.gguf"),
             transcriber: None,
             adapters: None,
+            companion: root.join("absent.safetensors"),
         });
         assert!(result.unwrap_err().to_string().contains("backbone"));
         fs::remove_dir_all(root).unwrap();

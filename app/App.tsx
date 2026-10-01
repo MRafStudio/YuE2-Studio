@@ -1064,15 +1064,19 @@ function AppContent() {
         setCreateRequest({ id: Date.now(), kind: 'transcribe', song: detail.song, melodyOnly: Boolean(detail.melodyOnly) });
       } else if (event.type === 'yue:use-score' && detail?.abc) {
         setCreateRequest({ id: Date.now(), kind: 'score', abc: detail.abc, cot: detail.cot, lyrics: detail.lyrics, title: detail.title });
+      } else if (event.type === 'yue:cover-midi' && detail?.song) {
+        setCreateRequest({ id: Date.now(), kind: 'midi', song: detail.song });
       }
       setCurrentView('create');
       if (window.innerWidth < 768) setMobileShowList(false);
     };
     window.addEventListener('yue:transcribe-song', open);
     window.addEventListener('yue:use-score', open);
+    window.addEventListener('yue:cover-midi', open);
     return () => {
       window.removeEventListener('yue:transcribe-song', open);
       window.removeEventListener('yue:use-score', open);
+      window.removeEventListener('yue:cover-midi', open);
     };
   }, []);
 

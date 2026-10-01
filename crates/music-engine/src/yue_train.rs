@@ -88,6 +88,9 @@ pub struct TrainingInputs {
     pub models: PathBuf,
     /// A YuE2 GGUF the studio already has, read for its text tokenizer.
     pub tokenizer: PathBuf,
+    /// The decoder adapter every render merges, frozen under the LoRA so it
+    /// trains on the decoder it will be heard through.
+    pub companion: PathBuf,
     /// The run's own folder; every stage writes below it.
     pub run: PathBuf,
     /// Holds `<song>/vocals.wav` for every song with lyrics, the audio the
@@ -103,9 +106,9 @@ pub struct TrainingInputs {
 /// since 2026-09-27): the adapter is trained the way the YuE2 report says the
 /// base was - AdamW at 1e-4 with the report's betas, several songs per
 /// update, cosine to a floor, the planner's loss on the tokens it generates
-/// at a quarter weight, prompt dropout, the whole song through the decoder -
-/// with no KL stop and no lyric timing. `fast`, `balanced` and `thorough` are
-/// its three sizes. `tuned` is the recipe before it (KL stop, Prodigy, lyric
+/// at a quarter weight, prompt dropout, the decoder on 60 s crops, a dim-128
+/// LoKr - with no KL stop and no lyric timing. `fast`, `balanced` and
+/// `thorough` are its three sizes, each a fixed recipe. `tuned` is the recipe before it (KL stop, Prodigy, lyric
 /// timing), kept as it was so a run can go back to it; the fields from `stop`
 /// to `cursor_weight` are that recipe's.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -157,13 +160,17 @@ fn one() -> u32 {
     1
 }
 
-/// The base-matched sizes, as HOT-Step's presets: updates, songs per update.
-/// Balanced reached its likeness at update 100 on a full album; Thorough is
-/// the 8-song run.
-pub const PRESETS: [(&str, u32, u32); 3] = [("fast", 50, 4), ("balanced", 100, 4), ("thorough", 200, 8)];
+/// The base-matched sizes, as HOT-Step's presets since 2026-09-29: updates,
+/// songs per update, checkpoint every. Ten checkpoints each.
+pub const PRESETS: [(&str, u32, u32, u32); 3] = [("fast", 100, 4, 10), ("balanced", 200, 4, 20), ("thorough", 300, 8, 30)];
 
-/// Checkpoints of a base-matched run: every tenth update, as HOT-Step saves them.
-const BASE_MATCHED_SAVE_EVERY: u32 = 10;
+/// The decoder window of a base-matched run, 60 s: HOT-Step's presets crop
+/// to it since a blind test scored it level with whole songs.
+const BASE_MATCHED_DECODER_CROP: &str = "1500";
+
+/// The adapter every base-matched preset trains: LoKr dim 128, factor 4,
+/// alpha 256.
+const BASE_MATCHED_LOKR: (u32, u32, f64) = (128, 4, 256.0);
 
 impl Default for Recipe {
     fn default() -> Self {
@@ -268,11 +275,11 @@ pub fn recipe_fields() -> Vec<RecipeField> {
         tuned(RecipeField { shown_when: [Some(FieldCondition { field: "stop", values: &["epochs"] }), None], ..integer("epochs", "stop", 1.0, 500.0, 1.0) }),
         tuned(integer("save_every", "stop", 1.0, 1000.0, 10.0)),
         integer("seed", "stop", 0.0, 4_294_967_295.0, 1.0),
-        choice("adapter", "adapter", &["lokr", "lora"]),
-        integer("rank", "adapter", 1.0, 512.0, 8.0),
-        number("alpha", "adapter", 1.0, 1024.0, 8.0),
-        RecipeField { shown_when: [Some(lokr), None], ..integer("lokr_dim", "adapter", 1.0, 512.0, 8.0) },
-        RecipeField { shown_when: [Some(lokr), None], ..integer("lokr_factor", "adapter", 1.0, 64.0, 1.0) },
+        tuned(choice("adapter", "adapter", &["lokr", "lora"])),
+        tuned(integer("rank", "adapter", 1.0, 512.0, 8.0)),
+        tuned(number("alpha", "adapter", 1.0, 1024.0, 8.0)),
+        RecipeField { shown_when: [Some(TUNED), Some(lokr)], ..integer("lokr_dim", "adapter", 1.0, 512.0, 8.0) },
+        RecipeField { shown_when: [Some(TUNED), Some(lokr)], ..integer("lokr_factor", "adapter", 1.0, 64.0, 1.0) },
         tuned(choice("optimizer", "optimizer", &["prodigy", "adamw"])),
         tuned(RecipeField { off_when: Some(FieldCondition { field: "optimizer", values: &["prodigy"] }), ..number("learning_rate", "optimizer", 0.0, 0.01, 0.00005) }),
         tuned(number("planner_lr_scale", "optimizer", 0.05, 1.0, 0.05)),
@@ -286,10 +293,12 @@ impl Recipe {
     /// steps are the epochs times the songs and nothing stops it earlier.
     pub fn for_songs(&self, songs: usize) -> Recipe {
         let mut recipe = self.clone();
-        if let Some((_, updates, songs_per_update)) = PRESETS.iter().find(|(name, ..)| *name == recipe.preset) {
+        if let Some((_, updates, songs_per_update, save_every)) = PRESETS.iter().find(|(name, ..)| *name == recipe.preset) {
             recipe.steps = *updates;
             recipe.grad_accum = *songs_per_update;
-            recipe.save_every = BASE_MATCHED_SAVE_EVERY;
+            recipe.save_every = *save_every;
+            recipe.adapter = "lokr".into();
+            (recipe.lokr_dim, recipe.lokr_factor, recipe.alpha) = BASE_MATCHED_LOKR;
             recipe.target_kl = 0.0;
             recipe.lyric_timing = false;
             recipe.cursor_weight = 0.0;
@@ -355,13 +364,15 @@ fn path(value: &Path) -> OsString {
 
 /// The training stage's arguments: the prepared songs of `run`, trained by
 /// `recipe` into `output`, which the trainer wants new.
-fn train_args(models: &Path, run: &Path, recipe: &Recipe, output: &Path) -> Vec<OsString> {
+fn train_args(models: &Path, companion: &Path, run: &Path, recipe: &Recipe, output: &Path) -> Vec<OsString> {
     let arg = |text: &str| OsString::from(text);
     let text = |value: &dyn ToString| OsString::from(value.to_string());
     let mut train = vec![
         arg("yue2-joint-train"),
         arg("--checkpoint"),
         path(&models.join(TRAINING_FILES[0].file)),
+        arg("--companion"),
+        path(companion),
         arg("--dataset"),
         path(&run.join("prepared").join("dataset.json")),
         arg("--output"),
@@ -391,7 +402,7 @@ fn train_args(models: &Path, run: &Path, recipe: &Recipe, output: &Path) -> Vec<
                 "--optimizer", "adamw-lm", "--lr", "1e-4", "--weight-decay", "0.1", "--beta1", "0.9", "--beta2", "0.95",
                 "--kl-weight", "0", "--caption-dropout", "0", "--abc-dropout", "0.5", "--planner-lr-scale", "1",
                 "--lr-schedule", "cosine-floor", "--lr-floor", "0.1", "--ar-loss-weight", "0.25", "--ar-targets", "base",
-                "--nar-crop-frames", "0", "--text-dropout", "0.1", "--lyric-dropout", "0.1", "--both-dropout", "0.1",
+                "--nar-crop-frames", BASE_MATCHED_DECODER_CROP, "--text-dropout", "0.1", "--lyric-dropout", "0.1", "--both-dropout", "0.1",
                 "--cursor-weight", "0",
             ]
             .map(arg),
@@ -422,8 +433,8 @@ fn train_args(models: &Path, run: &Path, recipe: &Recipe, output: &Path) -> Vec<
 /// trainer picks up the optimizer, the song order and the step count from
 /// `resume` and writes the new checkpoints into `output`. The recipe must be
 /// the one the run started with; the trainer refuses any other.
-pub fn continuation_stage(models: &Path, run: &Path, recipe: &Recipe, output: &Path, resume: &Path) -> TrainingStage {
-    let mut args = train_args(models, run, recipe, output);
+pub fn continuation_stage(models: &Path, companion: &Path, run: &Path, recipe: &Recipe, output: &Path, resume: &Path) -> TrainingStage {
+    let mut args = train_args(models, companion, run, recipe, output);
     args.extend([OsString::from("--resume"), path(resume)]);
     TrainingStage { id: "train", args }
 }
@@ -464,7 +475,7 @@ pub fn training_stages(inputs: &TrainingInputs) -> Vec<TrainingStage> {
     let arg = |text: &str| OsString::from(text);
     let model = |name: &str, file: &str| OsString::from(format!("{name}={}", models.join(file).display()));
     let recipe = &inputs.recipe;
-    let train = train_args(models, &inputs.run, recipe, &inputs.run.join("output"));
+    let train = train_args(models, &inputs.companion, &inputs.run, recipe, &inputs.run.join("output"));
     let mut prepare = vec![
         arg("yue2-prepare-aitk"),
         arg("--legacy-manifest"),
@@ -629,7 +640,7 @@ mod tests {
     #[test]
     fn a_continuation_trains_the_prepared_songs_into_a_new_output_from_the_state() {
         let recipe = Recipe { steps: 1400, target_kl: 0.0, ..Recipe::default() };
-        let stage = continuation_stage(Path::new("models"), Path::new("run"), &recipe, Path::new("run/output-x"), Path::new("run/output/checkpoint-step1000/optimizer.resume"));
+        let stage = continuation_stage(Path::new("models"), Path::new("models/c.safetensors"), Path::new("run"), &recipe, Path::new("run/output-x"), Path::new("run/output/checkpoint-step1000/optimizer.resume"));
         let args: Vec<String> = stage.args.iter().map(|arg| arg.to_string_lossy().replace('\\', "/")).collect();
         let after = |flag: &str| args[args.iter().position(|arg| arg == flag).unwrap() + 1].clone();
         assert_eq!(stage.id, "train");
@@ -637,6 +648,7 @@ mod tests {
         assert_eq!(after("--output"), "run/output-x");
         assert_eq!(after("--dataset"), "run/prepared/dataset.json");
         assert_eq!(after("--steps"), "1400");
+        assert_eq!(after("--companion"), "models/c.safetensors");
         assert!(!args.iter().any(|arg| arg == "--target-kl"), "a continuation stops by steps");
     }
 
@@ -653,12 +665,18 @@ mod tests {
     #[test]
     fn a_method_size_sets_the_updates_the_songs_per_update_and_the_warmup() {
         let balanced = Recipe::default().for_songs(61);
-        assert_eq!((balanced.steps, balanced.grad_accum, balanced.warmup, balanced.save_every), (100, 4, 3, 10));
+        assert_eq!((balanced.steps, balanced.grad_accum, balanced.warmup, balanced.save_every), (200, 4, 6, 20));
+        assert_eq!((balanced.adapter.as_str(), balanced.lokr_dim, balanced.lokr_factor, balanced.alpha), ("lokr", 128, 4, 256.0));
         assert!(!balanced.lyric_timing && balanced.target_kl == 0.0);
         let thorough = Recipe { preset: "thorough".into(), ..Recipe::default() }.for_songs(61);
-        assert_eq!((thorough.steps, thorough.grad_accum, thorough.warmup), (200, 8, 6));
+        assert_eq!((thorough.steps, thorough.grad_accum, thorough.warmup, thorough.save_every), (300, 8, 9, 30));
         let fast = Recipe { preset: "fast".into(), ..Recipe::default() }.for_songs(3);
-        assert_eq!((fast.steps, fast.grad_accum, fast.warmup), (50, 4, 2));
+        assert_eq!((fast.steps, fast.grad_accum, fast.warmup, fast.save_every), (100, 4, 3, 10));
+        // a preset is a fixed recipe: an adapter set by hand for the previous one does not carry over
+        let hand = Recipe { adapter: "lora".into(), lokr_dim: 32, ..Recipe::default() }.for_songs(61);
+        assert_eq!((hand.adapter.as_str(), hand.lokr_dim), ("lokr", 128));
+        let tuned = Recipe { preset: "tuned".into(), lokr_dim: 32, ..Recipe::default() }.for_songs(61);
+        assert_eq!(tuned.lokr_dim, 32);
         assert!(Recipe { preset: "slow".into(), ..Recipe::default() }.check().is_err());
     }
 
@@ -685,6 +703,7 @@ mod tests {
             audio: "a".into(),
             models: "m".into(),
             tokenizer: "t.gguf".into(),
+            companion: "c.safetensors".into(),
             run: "r".into(),
             vocals: "v".into(),
             trigger: "sks".into(),
@@ -696,7 +715,7 @@ mod tests {
         let args = |stage: &TrainingStage| -> Vec<String> { stage.args.iter().map(|arg| arg.to_string_lossy().into_owned()).collect() };
         assert!(args(&stages[0]).windows(2).any(|pair| pair == ["--loudness-lufs", "0"]));
         let train = args(&stages[4]);
-        for pair in [["--optimizer", "adamw-lm"], ["--lr", "1e-4"], ["--grad-accum", "4"], ["--warmup", "3"], ["--ar-targets", "base"], ["--cursor-weight", "0"], ["--lokr-dim", "64"]] {
+        for pair in [["--optimizer", "adamw-lm"], ["--lr", "1e-4"], ["--grad-accum", "4"], ["--warmup", "6"], ["--ar-targets", "base"], ["--cursor-weight", "0"], ["--lokr-dim", "128"], ["--nar-crop-frames", "1500"], ["--steps", "200"], ["--save-every", "20"], ["--companion", "c.safetensors"]] {
             assert!(train.windows(2).any(|window| window == pair), "{pair:?}");
         }
         assert!(!train.iter().any(|arg| arg == "--target-kl" || arg == "--prodigy-d0"));
@@ -723,6 +742,7 @@ mod tests {
         let train: Vec<String> = stages.last().unwrap().args.iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
         assert!(train.windows(2).any(|window| window == ["--cursor-weight", "0"]));
         assert!(train.windows(2).any(|window| window == ["--lr", "0.0002"]));
+        assert!(train.windows(2).any(|window| window == ["--companion", "c.safetensors"]));
         assert!(!train.iter().any(|arg| arg == "--lokr-dim"));
     }
 

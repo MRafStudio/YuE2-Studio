@@ -3,6 +3,32 @@
 What changed, newest first. Dates are release dates; the studio is versioned by its
 Windows build.
 
+## Unreleased
+
+### Added
+
+- **The MIDI editor.** A piano roll with tracks, instruments and drums (signal, MIT, played
+  through the A320U SoundFont) opens in three places: in Studio tools on a new song, played
+  in from a MIDI keyboard or the computer's keys, recorded or drawn; on a track's MIDI, kept
+  on the track in place of the transcription; and on the create form's score, read in as MIDI
+  and put back into the form by Apply. A new song is saved to the library as a track, its
+  audio rendered through the same SoundFont and its MIDI kept beside it, and To cover opens
+  the cover form on it with its MIDI read into the score.
+- **A MIDI file becomes the score.** The tracks are listed with the voice and the instrument
+  chosen, chords read from a Chords track or guessed, the file's karaoke words offered for
+  the lyrics; a tune without sections has the lyrics laid along its phrases when the song is
+  made.
+
+### Changed
+
+- **Training on the card with HOT-Step's recipe of 29.09:** Fast 100 x 4, Balanced 200 x 4,
+  Thorough 300 x 8, the decoder on 60-second pieces, LoKr 128/4/256. Training is offered only
+  where the engine runs its CUDA 13 build (driver 580 or newer); a trainer whose CUDA does not
+  load stops and names the driver it needs instead of training on the processor.
+- **The decoder companion** (Mothersuperior's nar_lora_joint_v9) is part of every model set:
+  the engine merges it under every render and the trainer keeps it frozen under every LoRA.
+  It leaves the LoRA catalogue, and a copy already in a library keeps working.
+
 ## 2026-09-30 — 3.3.0
 
 ### Added

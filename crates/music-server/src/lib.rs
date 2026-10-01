@@ -31,6 +31,8 @@ mod resources;
 mod chunked;
 mod separation;
 mod midi;
+mod midi_edit;
+mod score;
 mod sizes;
 pub mod net;
 mod saving;
@@ -335,6 +337,9 @@ struct MusicJob {
     /// The playlist the made songs go into, a project the user works in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     playlist_id: Option<String>,
+    /// How the lyrics were laid along a score that came without sections.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    laid: Option<Value>,
 }
 
 fn unix_millis() -> u64 {
@@ -657,7 +662,7 @@ pub async fn serve() -> anyhow::Result<()> {
     let persisted_components = persisted
         .as_ref()
         .and_then(|settings| settings.selected_component_ids.clone())
-        .filter(|ids| model_manager.installed_component_files(ids).is_ok());
+        .filter(|ids| model_manager.picked_components_installed(ids));
     let (selected_profile_id, selected_component_ids) = match persisted_components {
         Some(ids) => match model_manager::profile_matching(&ids) {
             Some(profile) => (Some(profile.to_owned()), None),
@@ -852,7 +857,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/midi/remove", post(remove_midi_model))
         .route("/v1/midi/cancel", post(cancel_midi))
         .route("/v1/midi/transcribe", post(start_midi))
-        .route("/v1/library/songs/{id}/midi", get(read_song_midi).delete(delete_song_midi))
+        .route("/v1/library/songs/{id}/midi", get(read_song_midi).put(write_song_midi).delete(delete_song_midi))
         .route("/v1/library/songs/{id}/midi/file", get(song_midi_file))
         .route("/v1/training/datasets/{id}/items/{item}/files", get(dataset_song_files))
         .route("/v1/training/prepare/cancel", post(prepare::cancel))
@@ -861,6 +866,8 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/system/gpus", get(system_gpus))
         .route("/v1/network", get(remote::status).put(remote::change))
         .route("/v1/adapters/{id}/comfyui", get(export_adapter_comfyui).post(save_adapter_comfyui))
+        .route("/v1/score/midi", post(score::api::midi))
+        .route("/v1/score/from-midi", post(score::api::from_midi))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -2105,13 +2112,14 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
     let listen_download = training.downloader().active_for(training::LISTEN_SCOPE).await.filter(|active| !active.done);
     Json(serde_json::json!({
         "pack": pack,
-        "pack_ready": training.pack_ready(),
+        "pack_ready": training.pack_ready() && !trainer_cublas_missing(&state),
         "separator_ready": separator_ready,
         "recipe_defaults": training::Recipe::default(),
         "recipe_fields": music_engine::yue_train::recipe_fields(),
         "min_vram_gb": music_engine::yue_train::MIN_VRAM_GB,
-        // the trainer computes on CUDA only
-        "card_trains": hardware::hardware().cuda.is_some(),
+        "card_trains": trainer_card_refusal().is_none(),
+        "card_needs": trainer_card_needs(),
+        "trainer_driver": hardware::CUDA13_DRIVER,
         "item_style": "style",
         "download": training_pack_download(&state).await,
         "listen": {
@@ -2128,11 +2136,20 @@ async fn read_training(State(state): State<AppState>) -> Json<Value> {
 
 
 /// The training pack's files as the training page lists them: the trainer's
-/// own, and the vocal separator a recipe's lyric timing needs. Says whether
-/// the separator is ready too.
+/// own, the cuBLAS its CUDA backend loads, and the vocal separator a recipe's
+/// lyric timing needs. Says whether the separator is ready too.
 async fn training_pack_files(state: &AppState) -> (Vec<Value>, bool) {
     let separator_ready = vocal_separator(state).await.is_some();
     let mut pack = state.training.pack_status();
+    if trainer_card_refusal().is_none() {
+        let cublas = engine_runtime::cublas_asset(hardware::CudaBuild::Cuda13);
+        pack.push(serde_json::json!({
+            "id": cublas.id,
+            "label": cublas.label,
+            "bytes": cublas.bytes,
+            "installed": !trainer_cublas_missing(state),
+        }));
+    }
     pack.push(serde_json::json!({
         "id": "vocal-separator",
         "label": separation::MODEL.label,
@@ -2142,16 +2159,20 @@ async fn training_pack_files(state: &AppState) -> (Vec<Value>, bool) {
     (pack, separator_ready)
 }
 
-/// The training pack's download in progress: its own, or the separator's,
-/// whose files come through their own downloaders.
+/// The training pack's download in progress: its own, the trainer's cuBLAS,
+/// or the separator's, whose files come through their own downloaders.
 async fn training_pack_download(state: &AppState) -> Option<downloads::DownloadProgress> {
     let separator_download = match state.separator.downloader().active_for("separation").await {
         Some(active) if !active.done => Some(active),
         other => state.lyrics_sync.downloader().active_for("separation").await.filter(|active| !active.done).or(other),
     };
+    let cublas_download = state.engine_runtime.downloader().active_for("engine").await;
     match state.training.downloader().active_for(training::SCOPE).await {
         Some(active) if !active.done => Some(active),
-        other => separator_download.or(other),
+        other => match cublas_download {
+            Some(active) if !active.done || active.error.is_some() => Some(active),
+            _ => separator_download.or(other),
+        },
     }
 }
 
@@ -2176,9 +2197,10 @@ fn pack_runtime(mut files: Vec<Value>, ready: bool, active_download: Option<down
 /// the video memory a run needs and whether this card trains at all.
 async fn training_pack_runtime(State(state): State<AppState>) -> Json<Value> {
     let (pack, separator_ready) = training_pack_files(&state).await;
-    let mut body = pack_runtime(pack, state.training.pack_ready() && separator_ready, training_pack_download(&state).await);
+    let mut body = pack_runtime(pack, state.training.pack_ready() && separator_ready && !trainer_cublas_missing(&state), training_pack_download(&state).await);
     body["min_vram_gb"] = music_engine::yue_train::MIN_VRAM_GB.into();
-    body["card_trains"] = hardware::hardware().cuda.is_some().into();
+    body["card_trains"] = trainer_card_refusal().is_none().into();
+    body["card_needs"] = trainer_card_needs().into();
     Json(body)
 }
 
@@ -2216,13 +2238,17 @@ async fn midi_runtime(State(state): State<AppState>) -> Json<Value> {
 
 async fn install_training_pack(State(state): State<AppState>) -> Result<Json<Value>, (StatusCode, Json<ApiError>)> {
     // gigabytes of training files are no use to a machine that cannot train
-    if hardware::hardware().cuda.is_none() {
-        return Err(api_error(StatusCode::CONFLICT, TRAINING_NEEDS_CUDA.into()));
+    if let Some(refusal) = trainer_card_refusal() {
+        return Err(api_error(StatusCode::CONFLICT, refusal));
     }
     let background = state.clone();
     tokio::spawn(async move {
         if let Err(error) = background.training.install_pack().await {
             eprintln!("[ERROR] training pack: {error:#}");
+            return;
+        }
+        if let Err(error) = background.engine_runtime.install_missing(Some(hardware::CudaBuild::Cuda13)).await {
+            eprintln!("[ERROR] cuBLAS for the trainer: {error:#}");
             return;
         }
         install_separator(&background).await;
@@ -2251,6 +2277,7 @@ async fn install_listen_pack(State(state): State<AppState>) -> Json<Value> {
 
 async fn cancel_training_pack(State(state): State<AppState>) -> Json<Value> {
     state.training.downloader().cancel();
+    state.engine_runtime.downloader().cancel();
     state.separator.downloader().cancel();
     state.lyrics_sync.downloader().cancel();
     Json(serde_json::json!({ "cancelled": true }))
@@ -2469,13 +2496,15 @@ async fn start_training(State(state): State<AppState>, Json(input): Json<StartTr
         .map_err(|error| api_error(StatusCode::CONFLICT, error))
 }
 
-/// A run of `dataset`, refused while a song renders.
+/// A run of `dataset`, refused while a song renders or where the trainer
+/// could not compute on the card.
 async fn start_training_run(state: &AppState, dataset: &str, name: &str, recipe: training::Recipe) -> Result<training::Run, String> {
+    trainer_ready(state)?;
     no_song_rendering(state).await?;
-    let tokenizer = selected_engine_models(state).await?.backbone;
+    let models = selected_engine_models(state).await?;
     state
         .training
-        .start(Some(engine_bundle_root()), tokenizer, vocal_separator(state).await, dataset, name, recipe, card_hooks(state).await)
+        .start(Some(engine_bundle_root()), models.backbone, models.companion, vocal_separator(state).await, dataset, name, recipe, card_hooks(state).await)
         .await
         .map_err(|error| format!("{error:#}"))
 }
@@ -2521,13 +2550,10 @@ async fn no_song_rendering(state: &AppState) -> Result<(), String> {
 }
 
 /// What keeps the user from starting a training run or training one further:
-/// a machine with no card CUDA runs on - the trainer carries no other
-/// backend, and on the processor a run would take days - songs being
-/// prepared, or a song being made.
+/// a machine the trainer does not run on, songs being prepared, or a song
+/// being made.
 async fn card_free_for_training(state: &AppState) -> Result<(), String> {
-    if hardware::hardware().cuda.is_none() {
-        return Err(TRAINING_NEEDS_CUDA.into());
-    }
+    trainer_ready(state)?;
     let preparing = state.prepare.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).as_ref().is_some_and(|job| !job.finished);
     if preparing {
         return Err("songs are being prepared; train once that is done".into());
@@ -2535,8 +2561,52 @@ async fn card_free_for_training(state: &AppState) -> Result<(), String> {
     no_song_rendering(state).await
 }
 
+/// Why the trainer does not run on this machine's card, none when it does. It
+/// is a CUDA 13 build and computes on the card only: on the processor one run
+/// would take days.
+fn trainer_card_refusal() -> Option<String> {
+    match hardware::hardware().cuda {
+        Some(hardware::CudaBuild::Cuda13) => None,
+        Some(hardware::CudaBuild::Cuda12) => Some(format!(
+            "training needs NVIDIA driver {} or newer: the trainer is a CUDA 13 build, and this card or its driver runs CUDA 12 only",
+            hardware::CUDA13_DRIVER
+        )),
+        None => Some(TRAINING_NEEDS_CUDA.into()),
+    }
+}
+
+/// What the card lacks for the trainer, as the training page names it:
+/// "nvidia" on a machine with no CUDA card, "driver" where the card or its
+/// driver runs CUDA 12 only.
+fn trainer_card_needs() -> Option<&'static str> {
+    match hardware::hardware().cuda {
+        Some(hardware::CudaBuild::Cuda13) => None,
+        Some(hardware::CudaBuild::Cuda12) => Some("driver"),
+        None => Some("nvidia"),
+    }
+}
+
+/// Whether the cuBLAS the trainer's CUDA backend loads is missing. It comes
+/// from beside the engine, which fetches it only for a CUDA 13 run of its own.
+fn trainer_cublas_missing(state: &AppState) -> bool {
+    !state.engine_runtime.missing(Some(hardware::CudaBuild::Cuda13)).is_empty()
+}
+
+/// Refuses a run the trainer could not compute on the card.
+fn trainer_ready(state: &AppState) -> Result<(), String> {
+    if let Some(refusal) = trainer_card_refusal() {
+        return Err(refusal);
+    }
+    if trainer_cublas_missing(state) {
+        return Err(TRAINER_CUBLAS_MISSING.into());
+    }
+    Ok(())
+}
+
 /// Why this machine does not train.
 const TRAINING_NEEDS_CUDA: &str = "training runs on an NVIDIA card with CUDA only, and this machine has none";
+/// Why a run cannot start before the training pack is complete.
+const TRAINER_CUBLAS_MISSING: &str = "the training files are not downloaded yet: the trainer needs NVIDIA cuBLAS 13; download the training pack";
 
 async fn card_free_of_training(state: &AppState, what: &str) -> Result<(), (StatusCode, Json<ApiError>)> {
     if state.training.active_run().await.is_some() {
@@ -2554,9 +2624,10 @@ struct ContinueTraining {
 /// Trains a finished or stopped run further from its latest checkpoint.
 async fn continue_training(State(state): State<AppState>, Path(id): Path<String>, Json(input): Json<ContinueTraining>) -> Result<Json<training::Run>, (StatusCode, Json<ApiError>)> {
     card_free_for_training(&state).await.map_err(|reason| api_error(StatusCode::CONFLICT, reason))?;
+    let companion = selected_engine_models(&state).await.map_err(|reason| api_error(StatusCode::CONFLICT, reason))?.companion;
     state
         .training
-        .continue_run(Some(engine_bundle_root()), &id, input.steps, card_hooks(&state).await)
+        .continue_run(Some(engine_bundle_root()), companion, &id, input.steps, card_hooks(&state).await)
         .await
         .map(Json)
         .map_err(|error| api_error(StatusCode::CONFLICT, format!("{error:#}")))
@@ -3953,6 +4024,7 @@ async fn selected_engine_models(state: &AppState) -> Result<music_engine::yue_se
         vae: root.join(&files.vae),
         transcriber: files.transcriber.map(|name| root.join(name)),
         adapters: Some(adapters),
+        companion: root.join(&files.companion),
     })
 }
 
@@ -5996,6 +6068,38 @@ async fn song_midi_file(State(state): State<AppState>, Path(id): Path<String>) -
         .map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?)
 }
 
+#[derive(Deserialize)]
+struct MidiUpload {
+    data: String,
+}
+
+/// A .mid from the MIDI editor kept as a library track's MIDI: the file as it came, and the notes the player reads from it.
+async fn write_song_midi(State(state): State<AppState>, Path(id): Path<String>, Json(body): Json<MidiUpload>) -> Result<Json<Value>, (StatusCode, Json<ApiError>)> {
+    use base64::Engine as _;
+    if state.library.get_song(&id).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?.is_none() {
+        return Err(api_error(StatusCode::NOT_FOUND, format!("no library track {id}")));
+    }
+    let data = base64::engine::general_purpose::STANDARD.decode(body.data.trim()).map_err(|_| api_error(StatusCode::BAD_REQUEST, "'data' is not base64".into()))?;
+    if data.len() > 8 * 1024 * 1024 {
+        return Err(api_error(StatusCode::PAYLOAD_TOO_LARGE, "that file is larger than 8 MB, far more than the MIDI of any song".into()));
+    }
+    let notes = midi_edit::read(&data).map_err(|error| api_error(StatusCode::BAD_REQUEST, format!("this file could not be read as MIDI: {error}")))?;
+    let file = midi_path(&state, &id);
+    let made_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|since| since.as_secs().to_string()).unwrap_or_default();
+    let sidecar = midi::Sidecar { size: "edited".into(), made_at, instruments: midi_edit::instruments(&notes), notes };
+    let sidecar_bytes = serde_json::to_vec(&sidecar).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    tokio::fs::write(&file, data).await.map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, format!("write {}: {error}", file.display())))?;
+    tokio::fs::write(midi_sidecar(&file), sidecar_bytes).await.map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, format!("write {}: {error}", midi_sidecar(&file).display())))?;
+    Ok(Json(serde_json::json!({
+        "song_id": id,
+        "file": plain_path(&file),
+        "size": sidecar.size,
+        "made_at": sidecar.made_at,
+        "instruments": sidecar.instruments,
+        "notes": sidecar.notes,
+    })))
+}
+
 async fn delete_song_midi(State(state): State<AppState>, Path(id): Path<String>) -> Result<StatusCode, (StatusCode, Json<ApiError>)> {
     let file = midi_path(&state, &id);
     if !file.is_file() {
@@ -6511,10 +6615,11 @@ async fn create_music_job(
         return (StatusCode::BAD_REQUEST, Json(failed_request_job(request, engine_id, error)));
     }
     let max_batch = state.engine_options.read().await.effective_max_batch();
-    let body = match yue_request_from(&request, max_batch) {
+    let mut body = match yue_request_from(&request, max_batch) {
         Ok(value) => value,
         Err(error) => return (StatusCode::BAD_REQUEST, Json(failed_request_job(request, engine_id, error))),
     };
+    let laid = laid_out(&mut body, request.duration_seconds.is_none());
     let derived = match request.cover_of.clone() {
         Some(id) => match state.library.get_song(&id) {
             Ok(Some(original)) => Some(derivation(&original, "cover", serde_json::json!({ "cot": request.cot, "style": request.style }))),
@@ -6544,6 +6649,7 @@ async fn create_music_job(
                 songs: vec![],
                 message: "Submitted to yue-server.".into(),
                 playlist_id: request.playlist_id.clone(),
+                laid,
             };
             state.jobs.write().await.insert(job.id.clone(), job.clone());
             spawn_job_watcher(state.clone(), job.id.clone());
@@ -6610,6 +6716,7 @@ async fn replay_music_job(
         songs: vec![],
         message: "Submitted a re-render: the semantic stream is present, so the autoregressive stage is skipped.".into(),
         playlist_id: None,
+        laid: None,
     };
     if let Some(song_id) = &request.song_id {
         if let Some(original) = state.library.get_song(song_id).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))? {
@@ -7476,7 +7583,7 @@ fn yue_request_from(request: &CreateMusicJobRequest, max_batch: u32) -> Result<V
         "style": request.style,
         "lyrics": request.lyrics.replace("\r\n", "\n"),
     });
-    if let Some(abc) = request.abc.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+    if let Some(abc) = request.abc.as_deref().map(|text| score::edits::read(text).score).filter(|value| !value.is_empty()) {
         body["abc"] = Value::String(format!("{abc}\n"));
     }
     insert_optional(&mut body, "cot", request.cot.clone());
@@ -7501,6 +7608,27 @@ fn yue_request_from(request: &CreateMusicJobRequest, max_batch: u32) -> Result<V
         body["adapters"] = Value::Array(adapter_fields(&request.adapters)?);
     }
     Ok(body)
+}
+
+/// A score that names no section, as a tune from a MIDI file comes, is laid out for the lyrics
+/// before it is sung; at an automatic length the song is stopped a little after the laid-out tune.
+fn laid_out(body: &mut Value, automatic_length: bool) -> Option<Value> {
+    if body.get("cot").and_then(Value::as_str) == Some("off") {
+        return None;
+    }
+    let lyrics = body.get("lyrics").and_then(Value::as_str).unwrap_or_default();
+    let laid = score::phrasing::lay(body.get("abc")?.as_str()?, lyrics)?;
+    let ceiling = score::phrasing::ceiling(laid.seconds).min(360.0);
+    body["abc"] = Value::String(laid.score);
+    if automatic_length {
+        body["duration"] = Value::from(ceiling);
+    }
+    Some(serde_json::json!({
+        "seconds": laid.seconds,
+        "ceiling": ceiling,
+        "crowded": laid.crowded,
+        "notices": laid.notices.iter().map(|(level, text)| serde_json::json!({ "level": level, "text": text })).collect::<Vec<_>>(),
+    }))
 }
 
 /// The engine's own spelling of an adapter list: the folder as `name`, and
@@ -7558,6 +7686,7 @@ fn queued_not_configured_job(request: CreateMusicJobRequest, engine_id: String) 
         songs: vec![],
         message: "The selected local music engine is not configured; this job remains queued and no inference has started.".into(),
         playlist_id: None,
+        laid: None,
     }
 }
 
@@ -7581,6 +7710,7 @@ fn failed_request_job(request: CreateMusicJobRequest, engine_id: String, error: 
         songs: vec![],
         message: error,
         playlist_id: None,
+        laid: None,
     }
 }
 
@@ -7852,6 +7982,38 @@ mod tests {
         assert_eq!(body["peak_clip"], 0);
         assert_eq!(body["abc_sampling"], serde_json::json!({ "temperature": 0.8 }));
         assert!(body.get("semantic_sampling").is_none(), "an empty preset is the checkpoint preset");
+    }
+
+    #[test]
+    fn a_score_from_the_comfyui_node_reaches_the_engine_without_its_edit_mark() {
+        let request = CreateMusicJobRequest {
+            client_ref: None,
+            abc: Some("X:1\n%yue2-words 0123456789abcdef keep\nK:C\nC\n".into()),
+            ..sample_request()
+        };
+        assert_eq!(yue_request_from(&request, 1).unwrap()["abc"], "X:1\nK:C\nC\n");
+        let marked_only = CreateMusicJobRequest { client_ref: None, abc: Some("%yue2-words 0123456789abcdef\n".into()), ..sample_request() };
+        assert!(yue_request_from(&marked_only, 1).unwrap().get("abc").is_none());
+    }
+
+    #[test]
+    fn a_tune_without_sections_is_laid_out_for_the_lyrics_and_stops_after_it() {
+        let tune = "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=120\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\nV: Vocal\nC4D4E4F4|G8z8|C4D4E4F4|G8z8|\nV: Ins\nZ4|\n";
+        let lyrics = "[Verse]\nOne two three four five\nSix seven eight nine ten";
+        let request = CreateMusicJobRequest { client_ref: None, abc: Some(tune.into()), lyrics: lyrics.into(), ..sample_request() };
+        let mut body = yue_request_from(&request, 1).unwrap();
+        let laid = laid_out(&mut body, true).expect("a bare tune is laid out");
+        assert!(body["abc"].as_str().unwrap().contains("% verse"), "{}", body["abc"]);
+        assert_eq!(body["duration"], laid["ceiling"]);
+        assert!(laid["notices"][0]["text"].as_str().unwrap().starts_with("The score came without sections"));
+
+        let mut chosen = yue_request_from(&CreateMusicJobRequest { duration_seconds: Some(90.0), ..request.clone() }, 1).unwrap();
+        laid_out(&mut chosen, false).unwrap();
+        assert_eq!(chosen["duration"], 90.0);
+        let mut off = yue_request_from(&CreateMusicJobRequest { cot: Some("off".into()), ..request.clone() }, 1).unwrap();
+        assert!(laid_out(&mut off, true).is_none());
+        let mut named = yue_request_from(&CreateMusicJobRequest { abc: Some(tune.replace("V: Vocal\nC4", "% verse\nV: Vocal\nC4")), ..request }, 1).unwrap();
+        assert!(laid_out(&mut named, true).is_none());
     }
 
     #[test]
