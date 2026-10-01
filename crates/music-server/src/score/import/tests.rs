@@ -8,6 +8,30 @@ use serde_json::Value;
 
 use super::super::smf;
 use super::{convert, parts::Pick, Mode};
+use super::{convert_with, Options};
+
+#[test]
+fn manual_grid_and_octaves_keep_the_parts_and_move_every_note() {
+    let song = smf::read(FILES[0].1).unwrap();
+    let original = convert_with(&song, Mode::Full, Pick::Auto, Pick::Number(2), Options { grid: Some(32), ..Options::default() }).unwrap();
+    let moved = convert_with(&song, Mode::Full, Pick::Auto, Pick::Number(2), Options { grid: Some(32), vocal_octaves: 1, instrument_octaves: -1 }).unwrap();
+    assert_eq!(moved.facts.grid, 32);
+    let before = super::super::notation::read(&original.abc).unwrap();
+    let after = super::super::notation::read(&moved.abc).unwrap();
+    assert!(!before.notes.Vocal.is_empty());
+    assert!(!before.notes.Ins.is_empty());
+    for (old, new, step) in [(&before.notes.Vocal, &after.notes.Vocal, 12), (&before.notes.Ins, &after.notes.Ins, -12)] {
+        assert_eq!(old.len(), new.len());
+        for (old, new) in old.iter().zip(new) {
+            assert_eq!((old.start, old.length), (new.start, new.length));
+            assert_eq!(new.pitch, old.pitch + step);
+        }
+    }
+    assert_eq!(before.chords, after.chords);
+    for invalid in [Options { grid: Some(64), ..Options::default() }, Options { vocal_octaves: 4, ..Options::default() }] {
+        assert!(convert_with(&song, Mode::Full, Pick::Auto, Pick::Auto, invalid).is_err());
+    }
+}
 
 const FILES: [(&str, &[u8]); 4] = [
     ("band.mid", include_bytes!("fixtures/band.mid")),

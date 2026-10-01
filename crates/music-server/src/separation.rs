@@ -180,6 +180,17 @@ pub fn separate_with(
     overlap: f64,
     mut progress: impl FnMut(f64),
 ) -> Result<Separated> {
+    separate_with_checked(loaded, audio, stem_count, overlap, |fraction| { progress(fraction); Ok(()) })
+}
+
+/// Stops between segments when the caller cancels its work.
+pub fn separate_with_checked(
+    loaded: &mut Loaded,
+    audio: &[f32],
+    stem_count: usize,
+    overlap: f64,
+    mut progress: impl FnMut(f64) -> Result<()>,
+) -> Result<Separated> {
     if audio.is_empty() {
         bail!("nothing to separate: the track decoded to no audio");
     }
@@ -198,6 +209,7 @@ pub fn separate_with(
     let segments = frames.div_ceil(step).max(1);
 
     for (index, start) in (0..frames).step_by(step).enumerate() {
+        progress(index as f64 / segments as f64)?;
         // The tail of the song is shorter than a segment; the model still wants
         // a full one, so the rest is silence and is discarded afterwards.
         let mut planar = vec![0f32; SEGMENT_SAMPLES * CHANNELS];
@@ -232,7 +244,7 @@ pub fn separate_with(
             weights[start + frame] += window[frame];
         }
 
-        progress(((index + 1) as f64 / segments as f64).min(1.0));
+        progress(((index + 1) as f64 / segments as f64).min(1.0))?;
     }
 
     // Undo the crossfade weighting, so a sample covered by two segments is not

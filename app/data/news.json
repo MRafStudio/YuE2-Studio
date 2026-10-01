@@ -1,5 +1,27 @@
 [
   {
+    "id": "yue2-studio-3-4-0",
+    "date": "2026-10-01",
+    "title": {
+      "en": "YuE2 Studio 3.4.0",
+      "ru": "YuE2 Studio 3.4.0",
+      "zh": "YuE2 Studio 3.4.0",
+      "ja": "YuE2 Studio 3.4.0",
+      "ko": "YuE2 Studio 3.4.0"
+    },
+    "body": {
+      "en": "A MIDI editor inside the studio: signal, with a multitrack piano roll, instruments, drums, tempo, MIDI input and recording, and editable chord and section lanes. Open it from Studio tools or Edit MIDI on a track. Save a new song as rendered audio and MIDI in the library; edits to an existing MIDI stay on its track. Everything runs locally, without the editor’s cloud services or analytics.\n\nIn YuE2 the same editor opens the create form’s score. Apply returns the edited MIDI to ABC with its chords and sections. Import MIDI as a score and use your MIDI song as a cover source. The decoder companion and CUDA-only HOT-Step training recipe are included.\n\nBuild the style from musical fields and arrange the lyrics in editable sections. The writing assistant accepts a language, a target of 8–32 lines and additional instructions.\n\nThe song form adds voice and tempo fields, section and line/stanza operations, and text case tools. Keep/Words preserve the lyric text; checkpoint markers use the engine’s exact tokens. Score plans can be selected in batches; repeated sections mirror their chords. MIDI grid and octave controls help edit the score. Generation supports transposition from −24 to +24 semitones, native HT-Demucs vocals-only output as MP3 or 32-bit WAV, and individual LoRA switches with signed weights from −10 to +10.",
+      "ru": "MIDI-редактор прямо в студии: signal с многодорожечным пиано-роллом, инструментами, ударными, темпом, MIDI-вводом и записью, полосами аккордов и секций. Открывается из «Инструментов» или через «Редактировать MIDI» у трека. Новая песня сохраняется в библиотеку со звуком и MIDI; изменения существующего MIDI остаются у его трека. Всё работает локально, без облака и аналитики редактора.\n\nВ YuE2 тот же редактор открывает партитуру формы создания. «Применить» возвращает отредактированный MIDI в ABC с аккордами и секциями. Можно импортировать MIDI как партитуру и взять MIDI-песню основой кавера. Включены компаньон декодера и рецепт обучения HOT-Step только на CUDA.\n\nСобирайте стиль из музыкальных полей и редактируйте текст по секциям. Для помощника можно выбрать язык, объём 8–32 строки и дополнительные указания.\n\nВ форме песни появились поля голоса и темпа, операции с секциями, строками и строфами, а также смена регистра текста. Keep/Words сохраняют текст; маркеры контрольных точек используют точные токены движка. Можно выбрать несколько планов партитуры; повторы секций зеркалят аккорды. Для MIDI доступны сетка и октава. Генерация поддерживает транспонирование от −24 до +24 полутонов, режим только вокала через нативный HT-Demucs с MP3 или 32-битным WAV и отдельные переключатели LoRA с весами от −10 до +10.",
+      "zh": "工作室内置 MIDI 编辑器 signal：多轨钢琴卷帘、乐器、鼓、速度、MIDI 输入与录制，以及可编辑的和弦和段落栏。从工具页或曲目的 MIDI 编辑入口打开。新歌曲以音频和 MIDI 保存到曲库，已有 MIDI 的编辑保留在原曲目上。编辑器本地运行，无云服务或分析。\n\nYuE2 使用同一个编辑器编辑创建表单中的乐谱。应用将 MIDI 转回含和弦与段落的 ABC。支持将 MIDI 导入为乐谱并用于翻唱，包含解码器伴随适配器和仅 CUDA 的 HOT-Step 训练方案。\n\n可使用音乐字段构建风格，并按段落编辑歌词。写作助手支持语言、8–32 行目标及额外说明。\n\n歌曲表单新增声音和速度字段、段落与行/诗节操作以及大小写工具。Keep/Words 保留歌词，检查点标记使用引擎的精确 token。可批量选择乐谱方案，重复段落会同步和弦；MIDI 提供网格和八度控制。生成支持 −24 至 +24 半音移调、通过原生 HT-Demucs 输出纯人声 MP3 或 32 位 WAV，以及每个 LoRA 独立开关和 −10 至 +10 权重。",
+      "ja": "スタジオ内に signal MIDI エディターを統合しました。マルチトラックのピアノロール、楽器、ドラム、テンポ、MIDI 入力と録音、編集可能なコードとセクションのレーンを備えます。ツールまたは曲の MIDI 編集から開き、新しい曲を音声と MIDI としてライブラリに保存できます。既存 MIDI の編集は元の曲に保存されます。クラウドや解析を使わずローカルで動作します。\n\nYuE2 では同じエディターで作成フォームの楽譜も編集できます。適用するとコードとセクションを含む ABC に戻します。MIDI の楽譜への読み込みとカバーへの利用、デコーダーのコンパニオンと CUDA 専用 HOT-Step 学習も含まれます。\n\n音楽の項目からスタイルを組み立て、歌詞をセクションごとに編集できます。文章作成アシスタントには言語、8～32 行の目標、追加の指示を指定できます。\n\n曲のフォームに声とテンポ、セクション・行・連の操作、大文字と小文字の変換を追加しました。Keep/Words は歌詞を保持し、チェックポイントはエンジンの正確なトークンを使います。楽譜案は複数選択でき、反復セクションではコードも同期します。MIDI にはグリッドとオクターブ設定があります。生成は −24～+24 半音の移調、ネイティブ HT-Demucs によるボーカルのみの MP3 または 32 ビット WAV、LoRA ごとのオン・オフと −10～+10 の重みに対応します。",
+      "ko": "스튜디오 안에 signal MIDI 편집기를 통합했습니다. 멀티트랙 피아노롤, 악기, 드럼, 템포, MIDI 입력과 녹음, 편집 가능한 코드 및 섹션 레인을 제공합니다. 도구 페이지나 곡의 MIDI 편집에서 열어 새 곡을 오디오와 MIDI로 라이브러리에 저장하고 기존 MIDI 편집은 원래 곡에 보관합니다. 클라우드와 분석 없이 로컬에서 실행됩니다.\n\nYuE2에서는 같은 편집기로 생성 폼의 악보도 편집합니다. 적용하면 코드와 섹션을 포함한 ABC로 돌아갑니다. MIDI 악보 가져오기와 커버 소스 사용, 디코더 컴패니언 및 CUDA 전용 HOT-Step 학습도 포함합니다.\n\n음악 항목으로 스타일을 만들고 구간별로 가사를 편집하세요. 글쓰기 도우미에 언어, 8–32줄 목표와 추가 지시를 지정할 수 있습니다.\n\n곡 양식에 목소리와 템포, 구간·행·연 작업, 대소문자 도구를 추가했습니다. Keep/Words 는 가사를 유지하고 체크포인트는 엔진의 정확한 토큰을 사용합니다. 악보 계획을 여러 개 선택할 수 있으며 반복 구간의 코드는 동기화됩니다. MIDI 는 그리드와 옥타브 설정을 제공합니다. 생성은 −24~+24 반음 조옮김, 네이티브 HT-Demucs 보컬 전용 MP3 또는 32비트 WAV, 개별 LoRA 스위치와 −10~+10 가중치를 지원합니다."
+    },
+    "tags": [
+      "MIDI",
+      "signal"
+    ]
+  },
+  {
     "id": "yue2-studio-3-3-0",
     "date": "2026-09-30",
     "title": {

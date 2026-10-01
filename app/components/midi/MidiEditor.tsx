@@ -5,7 +5,7 @@ import { useI18n } from '../../context/I18nContext';
 import type { TranslationKey } from '../../i18n/translations';
 import { addMidiTrack, base64Of, keepTrackMidi, MIDI_EDITOR_PAGE, MidiEditorLink, scoreFromMidi, trackMidi, type EditorEvent } from '../../services/midiEditor';
 import { mapNativeLibrarySong } from '../../services/nativeLibrary';
-import { failed, scoreMidi } from '../../services/scoreApi';
+import { failed, markScore, scoreMidi } from '../../services/scoreApi';
 import type { Song } from '../../types';
 import { ConfirmDialog } from '../ConfirmDialog';
 
@@ -18,7 +18,7 @@ import { ConfirmDialog } from '../ConfirmDialog';
 export type MidiEditorSource =
   | { kind: 'new' }
   | { kind: 'track'; songId: string; title: string }
-  | { kind: 'score'; abc: string; title: string; chords: boolean; onApply: (abc: string, lyrics: string | null) => void };
+  | { kind: 'score'; abc: string; title: string; chords: boolean; style?: string; lyrics?: string; cot?: string; onApply: (abc: string, lyrics: string | null) => void };
 
 const theme = (): 'dark' | 'light' => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 
@@ -127,7 +127,13 @@ export const MidiEditor: React.FC<{ source: MidiEditorSource; onClose: () => voi
     const { data } = await editor().midi();
     const answer = await scoreFromMidi(base64Of(data), source.chords);
     if ('error' in answer) throw new Error(answer.error);
-    source.onApply(answer.abc, answer.lyrics);
+    let abc = answer.abc;
+    if (source.style !== undefined) {
+      const marked = await markScore(abc, source.style, source.lyrics?.trim() || answer.lyrics || '', source.cot || (source.chords ? 'full' : 'melody'), /%yue2-words [a-f0-9]{16} keep/.test(source.abc));
+      if (failed(marked)) throw new Error(marked.error);
+      abc = marked.abc;
+    }
+    source.onApply(abc, answer.lyrics);
     editor().saved();
     onClose();
   };

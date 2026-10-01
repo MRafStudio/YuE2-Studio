@@ -82,6 +82,7 @@ export interface AdapterState {
 export interface AdapterUse {
   id: string;
   scales: Record<string, number>;
+  disabled?: boolean;
 }
 
 export function localized(text: AdapterText | undefined, language: Language): string {
@@ -229,7 +230,7 @@ export function usesFromSettings(settings: Record<string, unknown>): AdapterUse[
         : Object.entries(entry).flatMap(([key, value]) => (key.endsWith('_scale') ? [[key.slice(0, -'_scale'.length), value] as const] : []));
     const scales: Record<string, number> = {};
     for (const [slot, value] of source) {
-      if (typeof value === 'number' && Number.isFinite(value) && value !== 0) scales[slot] = value;
+      if (typeof value === 'number' && Number.isFinite(value)) scales[slot] = value;
     }
     uses.push({ id, scales });
   }

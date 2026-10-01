@@ -3,6 +3,7 @@ import { FileMusic, Loader2, X } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
 import { isMidiFile, MIDI_EXTENSIONS, noteName } from '../services/midiFiles';
+import { midiImportOptions } from '../i18n/midiImportOptions';
 
 /** The largest MIDI file the service reads: a long song is tens of kilobytes. */
 const LARGEST = 8 * 1024 * 1024;
@@ -74,6 +75,10 @@ export const MidiImportDialog: React.FC<{
   const [vocal, setVocal] = useState('auto');
   const [instrument, setInstrument] = useState('auto');
   const [sections, setSections] = useState(false);
+  const [grid, setGrid] = useState('auto');
+  const [vocalOctaves, setVocalOctaves] = useState('0');
+  const [instrumentOctaves, setInstrumentOctaves] = useState('0');
+  const optionsText = midiImportOptions[language];
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -97,7 +102,7 @@ export const MidiImportDialog: React.FC<{
     fetch('/v1/score/from-midi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: file.data, mode, vocal, instrument, sections }),
+      body: JSON.stringify({ data: file.data, mode, vocal, instrument, sections, grid: grid === 'auto' ? undefined : Number(grid), vocal_octaves: Number(vocalOctaves), instrument_octaves: Number(instrumentOctaves) }),
     })
       .then(async response => {
         const payload = (await response.json().catch(() => null)) as Answer | null;
@@ -110,7 +115,7 @@ export const MidiImportDialog: React.FC<{
       .finally(() => {
         if (turn === asked.current) setBusy(false);
       });
-  }, [file, mode, vocal, instrument, sections]);
+  }, [file, mode, vocal, instrument, sections, grid, vocalOctaves, instrumentOctaves]);
 
   const choose = async (picked: File) => {
     if (!isMidiFile(picked.name)) {
@@ -126,6 +131,7 @@ export const MidiImportDialog: React.FC<{
     for (let index = 0; index < bytes.length; index += 0x8000) raw += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
     setVocal('auto');
     setInstrument('auto');
+    setGrid('auto'); setVocalOctaves('0'); setInstrumentOctaves('0');
     setAnswer(null);
     setFile({ name: picked.name, data: btoa(raw) });
   };
@@ -248,6 +254,16 @@ export const MidiImportDialog: React.FC<{
           )}
 
           {answer && answer.ok === false && <p className="rounded-lg bg-red-500/10 p-2 text-xs leading-5 text-red-700 dark:text-red-300">{answer.error}</p>}
+          {file && <div className="space-y-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex flex-col gap-1 text-xs text-zinc-500">{optionsText.grid}
+                <select className={SELECT} value={grid} onChange={event => setGrid(event.target.value)}><option value="auto">{optionsText.auto}</option><option value="16">1/16</option><option value="32">1/32</option></select>
+              </label>
+              {([[optionsText.voice, vocalOctaves, setVocalOctaves], [optionsText.instrument, instrumentOctaves, setInstrumentOctaves]] as const).map(([label, value, change]) => <label key={label} className="flex flex-col gap-1 text-xs text-zinc-500">{label}
+                <select className={SELECT} value={value} onChange={event => change(event.target.value)}>{[-3, -2, -1, 0, 1, 2, 3].map(octave => <option key={octave} value={octave}>{octave > 0 ? '+' : ''}{octave}</option>)}</select>
+              </label>)}
+            </div><p className="text-[11px] text-zinc-500">{optionsText.hint}</p>
+          </div>}
           {facts && <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{factLine}</p>}
 
           {parts.length > 0 && (

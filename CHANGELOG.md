@@ -3,9 +3,15 @@
 What changed, newest first. Dates are release dates; the studio is versioned by its
 Windows build.
 
-## Unreleased
+## 2026-10-01 — 3.4.0
 
 ### Added
+
+- **Song and render controls.** Voice and tempo fields; section, line/stanza and case operations; Keep/Words lyric preservation and exact checkpoint tokens. Batch score-plan selection and repeated-section chord mirroring, MIDI grid/octave controls, −24 to +24 semitone transposition, native HT-Demucs vocals-only MP3/32-bit WAV output, and individual LoRA switches with −10 to +10 weights.
+
+- **Structured song writing.** Compose the style from musical fields and lyrics from editable sections, or edit their plain text. The writer accepts a language, a target of 8–32 lines and additional instructions.
+
+- Editable chord and section lanes above the MIDI piano roll; chord timing and section markers survive saving and reopening.
 
 - **The MIDI editor.** A piano roll with tracks, instruments and drums (signal, MIT, played
   through the A320U SoundFont) opens in three places: in Studio tools on a new song, played

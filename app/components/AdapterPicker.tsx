@@ -70,10 +70,13 @@ export const AdapterPicker: React.FC<AdapterPickerProps> = ({ value, onChange, o
       {value.map(use => {
         const adapter = installed.find(entry => entry.id === use.id);
         const touched = adapter ? (adapter.slots.length ? adapter.slots : Object.keys(use.scales)) : Object.keys(use.scales);
-        const range = adapter?.range ?? [0, 1.5];
+        const range = adapter?.range ?? [-10, 10];
         return (
           <div key={use.id} className="rounded-lg border border-zinc-200 p-2.5 dark:border-white/10">
             <div className="flex items-center justify-between gap-2">
+              <input type="checkbox" checked={!use.disabled} aria-label={adapter ? localized(adapter.name, language) : use.id}
+                onChange={event => onChange(value.map(row => row.id === use.id ? { ...row, disabled: !event.target.checked } : row))}
+                className="accent-pink-500" />
               <span className="min-w-0 truncate text-sm font-semibold text-zinc-900 dark:text-white">
                 {adapter ? localized(adapter.name, language) : use.id}
               </span>
@@ -109,6 +112,7 @@ export const AdapterPicker: React.FC<AdapterPickerProps> = ({ value, onChange, o
                     max={range[1]}
                     step={0.05}
                     value={scale}
+                    disabled={use.disabled}
                     aria-label={`${adapter ? localized(adapter.name, language) : use.id} · ${roleOf(slot) ? tt(`adapterRole_${roleOf(slot)}`) : slot}`}
                     onChange={event => setScale(use.id, slot, Number(event.target.value))}
                     className="mt-1.5 h-1 w-full cursor-pointer accent-pink-500"

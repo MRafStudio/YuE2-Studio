@@ -5,17 +5,21 @@
  */
 
 import type { YueCot, YueSampling } from '../types';
+import { failed, markScore } from './scoreApi';
 
 interface ScoreJob {
   id: string;
   status: 'running' | 'done' | 'failed' | 'cancelled';
   abc?: string;
   error?: string;
+  plans?: ScorePlan[];
 }
+
+export interface ScorePlan { abc: string; lm_seed?: number | null }
 
 const POLL_MS = 1000;
 
-async function awaitScore(route: string, submitted: Response, signal?: AbortSignal): Promise<string> {
+async function awaitScore(route: string, submitted: Response, signal?: AbortSignal): Promise<ScoreJob> {
   const job = (await submitted.json().catch(() => ({}))) as Partial<ScoreJob>;
   if (!submitted.ok || !job.id) throw new Error(job.error || `the engine refused the job (${submitted.status})`);
   const url = `${route}/${encodeURIComponent(job.id)}`;
@@ -28,7 +32,7 @@ async function awaitScore(route: string, submitted: Response, signal?: AbortSign
     const response = await fetch(url, { signal });
     const state = (await response.json().catch(() => ({}))) as Partial<ScoreJob>;
     if (!response.ok) throw new Error(state.error || `job status failed (${response.status})`);
-    if (state.status === 'done' && state.abc) return state.abc;
+    if (state.status === 'done' && state.abc) return state as ScoreJob;
     if (state.status === 'failed') throw new Error(state.error || 'the engine could not write this score');
     if (state.status === 'cancelled') throw new DOMException('cancelled', 'AbortError');
   }
@@ -41,7 +45,7 @@ export async function transcribe(source: { file?: File; songId?: string }, melod
   else throw new Error('no audio to transcribe');
   if (melodyOnly) form.append('melody_only', '1');
   const submitted = await fetch('/v1/transcriptions', { method: 'POST', body: form, signal });
-  return awaitScore('/v1/transcriptions', submitted, signal);
+  return (await awaitScore('/v1/transcriptions', submitted, signal)).abc!;
 }
 
 /** The planning stage alone: the score YuE2 would sing this prompt from. */
@@ -55,5 +59,20 @@ export async function composeScore(
     body: JSON.stringify({ style: prompt.style, lyrics: prompt.lyrics, cot: prompt.cot, lm_seed: prompt.lmSeed, abc_sampling: prompt.abcSampling }),
     signal,
   });
-  return awaitScore('/v1/scores', submitted, signal);
+  return (await awaitScore('/v1/scores', submitted, signal)).abc!;
+}
+
+export async function composePlans(prompt: { style: string; lyrics: string; cot: YueCot; lmSeed?: number; abcSampling?: YueSampling; count: number }, signal?: AbortSignal): Promise<ScorePlan[]> {
+  // Keep the submitted words even if the form changes while the engine plans.
+  const words = { style: prompt.style, lyrics: prompt.lyrics, cot: prompt.cot };
+  const submitted = await fetch('/v1/scores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ style: prompt.style, lyrics: prompt.lyrics, cot: prompt.cot, lm_seed: prompt.lmSeed, abc_sampling: prompt.abcSampling, lm_batch_size: prompt.count }), signal });
+  const answer = await awaitScore('/v1/scores', submitted, signal);
+  if (!answer.plans?.length) throw new Error('The composition returned no plans');
+  const marked = await Promise.all(answer.plans.map(async plan => {
+    const result = await markScore(plan.abc, words.style, words.lyrics, words.cot, false);
+    if (failed(result)) throw new Error(result.error);
+    return { ...plan, abc: result.abc };
+  }));
+  if (signal?.aborted) throw new DOMException('cancelled', 'AbortError');
+  return marked;
 }

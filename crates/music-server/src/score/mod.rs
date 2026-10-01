@@ -13,6 +13,7 @@ pub mod rebuild;
 pub mod sections;
 pub mod smf;
 pub mod spelling;
+pub mod transpose;
 
 use std::cmp::Ordering;
 use std::fmt;

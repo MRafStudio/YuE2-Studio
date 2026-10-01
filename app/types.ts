@@ -111,6 +111,9 @@ export interface YueRequest {
   lyrics: string;
   /** ABC score to realise; empty lets the model write one. */
   abc?: string;
+  /** Move a supplied score before singing, in semitones. */
+  transpose?: number;
+  vocals_only?: boolean;
   cot?: YueCot;
   /** Target length; the model may end the song earlier. */
   duration_seconds?: number;

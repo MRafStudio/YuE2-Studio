@@ -33,6 +33,14 @@ describe('prompt files', () => {
     }
   });
 
+  it('keeps studio processing controls and signed adapter strengths in prompt files', () => {
+    const settings = { ...request, transpose: -12, vocals_only: true, adapters: [{ id: 'voice', scales: { ar: -10, nar: 10 } }] };
+    const back = parseRequestFile('voice.json', serializeRequest(settings, 'json'));
+    expect(back.transpose).toBe(-12);
+    expect(back.vocals_only).toBe(true);
+    expect(back.adapters).toEqual(settings.adapters);
+  });
+
   it('names the song from the title, else from the file', () => {
     expect(requestFileTitle('song.yml', { title: ' Named ' })).toBe('Named');
     expect(requestFileTitle('song.yml', {})).toBe('song');

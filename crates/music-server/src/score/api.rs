@@ -33,6 +33,24 @@ pub struct MidiRequest {
     abc: String,
 }
 
+#[derive(Deserialize)]
+pub struct MarkRequest {
+    abc: String,
+    style: String,
+    lyrics: String,
+    cot: String,
+    #[serde(default)]
+    keep: bool,
+}
+
+pub async fn mark(Json(request): Json<MarkRequest>) -> Answer {
+    too_long(&request.abc)?;
+    if !matches!(request.cot.as_str(), "full" | "melody" | "off") { return Err(refused("cot must be full, melody or off")); }
+    let score = edits::read(&request.abc).score;
+    let words = edits::mark(&request.style, &request.lyrics, &request.cot);
+    Ok(Json(json!({ "ok": true, "abc": edits::attach(&score, Some(&words), request.keep) })))
+}
+
 /// The largest MIDI file read: a long song is tens of kilobytes.
 const LARGEST_MIDI: usize = 8 * 1024 * 1024;
 
@@ -49,6 +67,12 @@ pub struct FromMidiRequest {
     /// Keep the sections the file names; without them the lyrics are laid along the tune when it is sung.
     #[serde(default)]
     sections: bool,
+    #[serde(default)]
+    grid: Option<u32>,
+    #[serde(default)]
+    vocal_octaves: i32,
+    #[serde(default)]
+    instrument_octaves: i32,
 }
 
 /// A MIDI file as a score YuE2 sings and its lyrics. A file that reads but whose choice of tracks
@@ -68,7 +92,7 @@ pub async fn from_midi(Json(request): Json<FromMidiRequest>) -> Answer {
         Ok(song) => song,
         Err(reason) => return problem(format!("This file could not be read as a MIDI file: {}.", reason.trim_end_matches('.'))),
     };
-    match import::convert(&song, mode, vocal, instrument) {
+    match import::convert_with(&song, mode, vocal, instrument, import::Options { grid: request.grid, vocal_octaves: request.vocal_octaves, instrument_octaves: request.instrument_octaves }) {
         Ok(made) => {
             let abc = if request.sections { phrasing::labelled(&made.abc, "verse") } else { phrasing::bare(&made.abc) };
             let notices: Vec<Value> = made

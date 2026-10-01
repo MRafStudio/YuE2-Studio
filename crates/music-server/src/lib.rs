@@ -8,6 +8,7 @@ mod cover_art;
 mod cover_prompt;
 mod providers;
 mod assistant;
+mod song_tokenizer;
 mod assistant_runtime;
 mod audio_facts;
 mod beat_dbn;
@@ -218,6 +219,10 @@ struct CreateMusicJobRequest {
     lyrics: String,
     /// ABC score to realise; empty lets the model write one.
     abc: Option<String>,
+    /// Move a supplied score before singing; zero keeps its pitches.
+    transpose: Option<i32>,
+    #[serde(default)]
+    vocals_only: bool,
     /// The playlist the made songs are added to.
     #[serde(default)]
     playlist_id: Option<String>,
@@ -299,6 +304,7 @@ enum MusicJobDispatch {
 enum MusicJobPhase {
     Queued,
     Running,
+    ExtractingVocals,
     Completed,
     Failed,
     Cancelled,
@@ -868,6 +874,8 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/adapters/{id}/comfyui", get(export_adapter_comfyui).post(save_adapter_comfyui))
         .route("/v1/score/midi", post(score::api::midi))
         .route("/v1/score/from-midi", post(score::api::from_midi))
+        .route("/v1/song/tokenize", post(song_tokenizer::tokenize))
+        .route("/v1/score/mark", post(score::api::mark))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -6605,6 +6613,15 @@ async fn create_music_job(
         let error = "a training run has the card; songs can be made once it finishes or is stopped".to_string();
         return (StatusCode::CONFLICT, Json(failed_request_job(request, engine_id, error)));
     }
+    if request.vocals_only {
+        if !state.separator.is_installed() {
+            return (StatusCode::BAD_REQUEST, Json(failed_request_job(request, engine_id, "Install the stem separator in Tools before requesting vocals only.".into())));
+        }
+        let runtime = state.separation_config.read().await.runtime;
+        if let Err(error) = state.lyrics_sync.onnx_card(runtime) {
+            return (StatusCode::BAD_REQUEST, Json(failed_request_job(request, engine_id, format!("The stem separator runtime is unavailable: {error:#}"))));
+        }
+    }
     // an adapter named without strengths starts where the create page starts it
     let slot_ids: Vec<&str> = music_engine::yue_server::ADAPTER_SLOTS.iter().map(|slot| slot.id).collect();
     for adapter in request.adapters.iter_mut().filter(|adapter| adapter.scales.is_empty()) {
@@ -6954,6 +6971,7 @@ fn spawn_job_watcher(state: AppState, job_id: String) {
                 let imported = import_completed_result(&state, &existing, &job_id).await;
                 let mut jobs = state.jobs.write().await;
                 let Some(job) = jobs.get_mut(&job_id) else { return };
+                if matches!(job.status, MusicJobStatus::Cancelled) { return; }
                 match imported {
                     Ok(songs) => {
                         job.status = MusicJobStatus::Completed;
@@ -7021,10 +7039,62 @@ async fn import_completed_result(state: &AppState, job: &MusicJob, job_id: &str)
             }
         }
         settings.remove("semantic_tokens");
+        if let Some(edit) = job.generation_settings.get("score_edit") {
+            if let (Some(abc), Some(words)) = (settings.get("abc").and_then(Value::as_str), edit.get("words").and_then(Value::as_str)) {
+                let marked = score::edits::attach(abc, Some(words), edit.get("keep").and_then(Value::as_bool).unwrap_or(false));
+                settings.insert("abc".into(), Value::String(marked));
+            }
+        }
         settings.insert("lm_batch_size".into(), Value::from(1));
         settings.insert("synth_batch_size".into(), Value::from(1));
         let mut extension = engine_result::audio_extension(&track.audio_content_type)?;
         let mut audio = track.audio;
+        let mut vocals_used_gpu = None;
+        if job.generation_settings.get("vocals_only").and_then(Value::as_bool) == Some(true) {
+            let model = state.separator.model_path();
+            let config = state.separation_config.read().await.clone();
+            let card = state.lyrics_sync.onnx_card(config.runtime)?.filter(|card| separates_on(*card));
+            let progress_state = state.clone();
+            let progress_id = job_id.to_string();
+            {
+                let mut jobs = state.jobs.write().await;
+                let active = jobs.get_mut(job_id).context("the vocals-only job no longer exists")?;
+                if matches!(active.status, MusicJobStatus::Cancelled) { anyhow::bail!("Vocals extraction cancelled"); }
+                active.status = MusicJobStatus::Running;
+                active.phase = MusicJobPhase::ExtractingVocals;
+                active.message = "Loading the vocals separator.".into();
+            }
+            let (voice_audio, used_gpu) = tokio::task::spawn_blocking(move || -> anyhow::Result<(Vec<u8>, bool)> {
+                let temporary = tempfile::tempdir()?;
+                let input = temporary.path().join(format!("mix.{extension}"));
+                std::fs::write(&input, audio)?;
+                let samples = audio_pcm::decode_stereo_44k(&input)?;
+                let mut loaded = separation::load(&model, card)?;
+                if card.is_some() && !loaded.used_gpu { anyhow::bail!("The requested GPU separator could not load its execution provider; vocals extraction was stopped instead of running on CPU"); }
+                let separated = separation::separate_with_checked(&mut loaded, &samples, separation::STEMS.len(), config.sane_overlap(), |fraction| {
+                    let mut jobs = progress_state.jobs.blocking_write();
+                    let active = jobs.get_mut(&progress_id).context("the vocals-only job no longer exists")?;
+                    if matches!(active.status, MusicJobStatus::Cancelled) { anyhow::bail!("Vocals extraction cancelled"); }
+                    active.status = MusicJobStatus::Running;
+                    active.phase = MusicJobPhase::ExtractingVocals;
+                    active.message = format!("Extracting vocals: {:.0}%", fraction * 100.0);
+                    Ok(())
+                })?;
+                let voice = separated.stems.into_iter().find(|stem| stem.name == "vocals").context("the separator returned no vocals")?;
+                let stereo = audio_post::Stereo {
+                    rate: 44_100,
+                    left: voice.samples.iter().step_by(2).copied().collect(),
+                    right: voice.samples.iter().skip(1).step_by(2).copied().collect(),
+                };
+                let output = temporary.path().join("vocals.wav");
+                audio_pcm::write_wav_f32(&output, &stereo)?;
+                Ok((std::fs::read(output).context("read the extracted vocals")?, separated.used_gpu))
+            }).await.context("the vocals separator stopped")??;
+            audio = voice_audio;
+            vocals_used_gpu = Some(used_gpu);
+            extension = "wav";
+            replay["vocals_only"] = Value::Bool(true);
+        }
         if studio_encodes_mp3(&job.generation_settings) && extension == "wav" {
             let kbps = job.generation_settings.get("mp3_bitrate").and_then(Value::as_u64).map_or(DEFAULT_MP3_KBPS, |value| value as u32);
             let peak_clip = job.generation_settings.get("peak_clip").and_then(Value::as_u64).map_or(DEFAULT_PEAK_CLIP, |value| value as u32);
@@ -7062,6 +7132,7 @@ async fn import_completed_result(state: &AppState, job: &MusicJob, job_id: &str)
             "derived": job.derived.clone(),
             // the window showing this job's card hands the card to the song
             "job_id": job_id,
+            "vocals_extraction": vocals_used_gpu.map(|used_gpu| serde_json::json!({ "used_gpu": used_gpu, "model": separation::MODEL.id })),
         });
         // Several tracks from one request share its name; number them so the
         // library can tell the takes apart.
@@ -7069,6 +7140,9 @@ async fn import_completed_result(state: &AppState, job: &MusicJob, job_id: &str)
             (Some(title), count) if count > 1 => Some(format!("{title} ({})", index + 1)),
             (title, _) => title.clone(),
         };
+        if state.jobs.read().await.get(job_id).is_some_and(|active| matches!(active.status, MusicJobStatus::Cancelled)) {
+            anyhow::bail!("The job was cancelled before its audio reached the library");
+        }
         let imported_song = state.library.import_generated_song(library::GeneratedSongInput {
             title,
             metadata,
@@ -7107,6 +7181,14 @@ async fn cancel_music_job(
             StatusCode::NOT_IMPLEMENTED,
             format!("The selected engine '{}' has no cancel adapter.", existing.engine_id),
         ));
+    }
+    if matches!(existing.phase, MusicJobPhase::ExtractingVocals) {
+        let mut jobs = state.jobs.write().await;
+        let job = jobs.get_mut(&job_id).ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Music job was not found.".into()))?;
+        job.status = MusicJobStatus::Cancelled;
+        job.phase = MusicJobPhase::Cancelled;
+        job.message = "Vocals extraction cancelled.".into();
+        return Ok(Json(job.clone()));
     }
     let remote = state.music_server.cancel(&job_id).await.map_err(|error| {
         api_error(StatusCode::SERVICE_UNAVAILABLE, format!("the engine did not accept the cancel: {error}"))
@@ -7152,6 +7234,8 @@ struct ScoreJob {
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     abc: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    plans: Vec<ScorePlan>,
     /// The token seed a composition drew its score with.
     #[serde(skip_serializing_if = "Option::is_none")]
     lm_seed: Option<i64>,
@@ -7161,9 +7245,12 @@ struct ScoreJob {
 
 impl ScoreJob {
     fn running(id: String) -> Self {
-        Self { id, status: "running".into(), abc: None, lm_seed: None, error: None }
+        Self { id, status: "running".into(), abc: None, plans: vec![], lm_seed: None, error: None }
     }
 }
+
+#[derive(Debug, Serialize)]
+struct ScorePlan { abc: String, lm_seed: Option<i64> }
 
 #[derive(Debug, Deserialize)]
 struct ComposeScoreRequest {
@@ -7177,6 +7264,8 @@ struct ComposeScoreRequest {
     lm_seed: Option<i64>,
     #[serde(default)]
     abc_sampling: Option<SamplingPreset>,
+    #[serde(default)]
+    lm_batch_size: Option<u32>,
 }
 
 /// The engine request that runs the planning stage and next to nothing else.
@@ -7185,6 +7274,7 @@ struct ComposeScoreRequest {
 /// step and one track return the same score a full song would have been sung
 /// from, the equivalent of yue2.cpp's `yue-plan`.
 fn compose_request_from(request: &ComposeScoreRequest) -> Result<Value, String> {
+    if request.lm_batch_size.is_some_and(|count| !(1..=8).contains(&count)) { return Err("lm_batch_size must be between 1 and 8".into()); }
     if request.style.trim().is_empty() && request.lyrics.trim().is_empty() {
         return Err("write a style or lyrics: the engine needs at least one of them".into());
     }
@@ -7198,7 +7288,7 @@ fn compose_request_from(request: &ComposeScoreRequest) -> Result<Value, String> 
         "cot": cot,
         "duration": 1.0,
         "steps": 1,
-        "lm_batch_size": 1,
+        "lm_batch_size": request.lm_batch_size.unwrap_or(1),
         "synth_batch_size": 1,
         "output_format": "wav16",
     });
@@ -7216,6 +7306,8 @@ async fn compose_score(
     State(state): State<AppState>,
     Json(request): Json<ComposeScoreRequest>,
 ) -> Result<(StatusCode, Json<ScoreJob>), (StatusCode, Json<ApiError>)> {
+    let maximum = state.engine_options.read().await.effective_max_batch();
+    if request.lm_batch_size.unwrap_or(1) > maximum { return Err(api_error(StatusCode::BAD_REQUEST, format!("lm_batch_size exceeds the configured song limit {maximum}"))); }
     let body = compose_request_from(&request).map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
     let remote = state
         .music_server
@@ -7295,6 +7387,15 @@ fn score_from_result(content_type: &str, body: &[u8]) -> Result<(String, Option<
     Ok((abc.trim_end().to_owned(), lm_seed))
 }
 
+fn plans_from_result(content_type: &str, body: &[u8]) -> Result<Vec<ScorePlan>, String> {
+    if !content_type.starts_with("multipart/") { return Ok(vec![]); }
+    let tracks = engine_result::parse_multipart_result(content_type, body).map_err(|error| error.to_string())?;
+    tracks.into_iter().map(|track| {
+        let abc = track.replay_request.get("abc").and_then(Value::as_str).filter(|abc| !abc.trim().is_empty()).ok_or("A plan returned no score")?.trim_end().to_owned();
+        Ok(ScorePlan { abc, lm_seed: track.replay_request.get("lm_seed").and_then(Value::as_i64) })
+    }).collect()
+}
+
 async fn score_job_status(
     State(state): State<AppState>,
     Path(job_id): Path<String>,
@@ -7307,6 +7408,7 @@ async fn score_job_status(
             let (abc, lm_seed) = score_from_result(&result.content_type, &result.body).map_err(|error| api_error(StatusCode::BAD_GATEWAY, error))?;
             job.abc = Some(abc);
             job.lm_seed = lm_seed;
+            job.plans = plans_from_result(&result.content_type, &result.body).map_err(|error| api_error(StatusCode::BAD_GATEWAY, error))?;
         }
         "failed" => job.error = Some(engine_failure_reason().unwrap_or_else(|| "The engine could not write this score.".into())),
         _ => {}
@@ -7531,6 +7633,7 @@ fn drawn_seed() -> i64 {
 
 fn engine_submission(body: &Value) -> Value {
     let mut engine = body.clone();
+    if let Some(fields) = engine.as_object_mut() { fields.remove("vocals_only"); fields.remove("score_edit"); }
     if studio_encodes_mp3(body) {
         if let Some(fields) = engine.as_object_mut() {
             fields.insert("output_format".into(), Value::from("wav32"));
@@ -7583,8 +7686,29 @@ fn yue_request_from(request: &CreateMusicJobRequest, max_batch: u32) -> Result<V
         "style": request.style,
         "lyrics": request.lyrics.replace("\r\n", "\n"),
     });
+    if request.vocals_only {
+        if request.output_format.as_deref().is_some_and(|format| !matches!(format, "mp3" | "wav32")) {
+            return Err("vocals_only output_format must be mp3 or wav32".into());
+        }
+        body["vocals_only"] = Value::Bool(true);
+    }
+    let step = request.transpose.unwrap_or(0);
+    if let Some(source) = request.abc.as_deref() {
+        let edit = score::edits::read(source);
+        if let Some(words) = &edit.words { body["score_edit"] = serde_json::json!({ "words": words, "keep": edit.keep }); }
+        if score::edits::mismatch(&edit, &request.style, &request.lyrics, request.cot.as_deref().unwrap_or("full")) == Some("other_words") {
+            return Err("This edited score belongs to other words or style. Open the MIDI editor again or enable Keep for new words.".into());
+        }
+    }
+    if !(-24..=24).contains(&step) { return Err("transpose must be between -24 and 24 semitones".into()); }
+    if step != 0 && (semantic_tokens.is_some() || request.cot.as_deref() == Some("off")) {
+        return Err("transpose needs a score sung with full or melody mode, without an existing semantic performance".into());
+    }
     if let Some(abc) = request.abc.as_deref().map(|text| score::edits::read(text).score).filter(|value| !value.is_empty()) {
-        body["abc"] = Value::String(format!("{abc}\n"));
+        let moved = score::transpose::move_score(&abc, step)?;
+        body["abc"] = Value::String(format!("{moved}\n"));
+    } else if step != 0 {
+        return Err("compose or load a score before transposing it".into());
     }
     insert_optional(&mut body, "cot", request.cot.clone());
     insert_optional(&mut body, "duration", request.duration_seconds);
@@ -7650,8 +7774,8 @@ fn adapter_fields(uses: &[AdapterUse]) -> Result<Vec<Value>, String> {
             let mut entry = serde_json::json!({ "name": adapter.id });
             for slot in slots {
                 let scale = adapter.scales.get(slot.id).copied().unwrap_or(0.0);
-                if !scale.is_finite() || !(-4.0..=4.0).contains(&scale) {
-                    return Err(format!("adapter {} strength must be between -4 and 4", adapter.id));
+                if !scale.is_finite() || !(-10.0..=10.0).contains(&scale) {
+                    return Err(format!("adapter {} strength must be between -10 and 10", adapter.id));
                 }
                 entry[format!("{}_scale", slot.id)] = serde_json::json!(scale);
             }
@@ -7903,6 +8027,44 @@ mod tests {
     }
 
     #[test]
+    fn vocals_only_is_studio_processing_and_never_an_engine_flag() {
+        let request = CreateMusicJobRequest { vocals_only: true, output_format: Some("wav32".into()), ..sample_request() };
+        let body = yue_request_from(&request, 1).unwrap();
+        assert_eq!(body["vocals_only"], true);
+        assert!(engine_submission(&body).get("vocals_only").is_none());
+        let unsupported = CreateMusicJobRequest { output_format: Some("wav24".into()), ..request };
+        assert!(yue_request_from(&unsupported, 1).unwrap_err().contains("vocals_only"));
+    }
+
+    #[test]
+    fn score_transposition_reaches_the_engine_once_and_rejects_existing_performances() {
+        let abc = score::notation::blank(4, 120).unwrap().replace("V: Vocal\nZ4|", "V: Vocal\nC4D4E4F4|Z3|");
+        let request = CreateMusicJobRequest { abc: Some(abc.clone()), transpose: Some(2), ..sample_request() };
+        let body = yue_request_from(&request, 1).unwrap();
+        assert!(body.get("transpose").is_none());
+        let moved = score::notation::read(body["abc"].as_str().unwrap()).unwrap();
+        let original = score::notation::read(&abc).unwrap();
+        assert_eq!(moved.notes.Vocal[0].pitch, original.notes.Vocal[0].pitch + 2);
+        for rejected in [
+            CreateMusicJobRequest { semantic_tokens: Some("1,2,3".into()), ..request.clone() },
+            CreateMusicJobRequest { cot: Some("off".into()), ..request.clone() },
+            CreateMusicJobRequest { abc: None, ..request },
+        ] { assert!(yue_request_from(&rejected, 1).is_err()); }
+    }
+
+    #[test]
+    fn signed_adapter_limits_allow_both_boundaries_but_reject_values_beyond() {
+        for strength in [-10.0, 10.0] {
+            let use_ = AdapterUse { id: "adapter".into(), scales: [("ar".into(), strength)].into() };
+            assert_eq!(adapter_fields(&[use_]).unwrap()[0]["ar_scale"], strength);
+        }
+        for strength in [-10.01, 10.01, f64::NAN, f64::INFINITY] {
+            let use_ = AdapterUse { id: "adapter".into(), scales: [("nar".into(), strength)].into() };
+            assert!(adapter_fields(&[use_]).is_err());
+        }
+    }
+
+    #[test]
     fn the_engine_is_asked_for_float_when_the_studio_makes_the_mp3() {
         let mp3 = serde_json::json!({ "style": "x", "output_format": "mp3", "mp3_bitrate": 320 });
         let sent = engine_submission(&mp3);
@@ -7994,6 +8156,19 @@ mod tests {
         assert_eq!(yue_request_from(&request, 1).unwrap()["abc"], "X:1\nK:C\nC\n");
         let marked_only = CreateMusicJobRequest { client_ref: None, abc: Some("%yue2-words 0123456789abcdef\n".into()), ..sample_request() };
         assert!(yue_request_from(&marked_only, 1).unwrap().get("abc").is_none());
+    }
+
+    #[test]
+    fn a_marked_edit_needs_its_words_or_explicit_keep() {
+        let base = sample_request();
+        let mark = score::edits::mark(&base.style, &base.lyrics, "full");
+        let marked = score::edits::attach("X:1\nK:C\nC", Some(&mark), false);
+        let same = CreateMusicJobRequest { abc: Some(marked.clone()), ..base.clone() };
+        assert!(yue_request_from(&same, 1).is_ok());
+        let changed = CreateMusicJobRequest { lyrics: "different words".into(), ..same.clone() };
+        assert!(yue_request_from(&changed, 1).unwrap_err().contains("Keep for new words"));
+        let kept = CreateMusicJobRequest { abc: Some(format!("{marked} keep")), ..changed };
+        assert!(yue_request_from(&kept, 1).is_ok());
     }
 
     #[test]
@@ -8115,7 +8290,7 @@ mod tests {
 
     #[test]
     fn a_composition_runs_the_planning_stage_and_next_to_nothing_else() {
-        let request = ComposeScoreRequest { style: "folk rock".into(), lyrics: "[Verse]\r\nline".into(), cot: Some("melody".into()), lm_seed: Some(7), abc_sampling: None };
+        let request = ComposeScoreRequest { style: "folk rock".into(), lyrics: "[Verse]\r\nline".into(), cot: Some("melody".into()), lm_seed: Some(7), abc_sampling: None, lm_batch_size: None };
         let body = compose_request_from(&request).unwrap();
         assert_eq!(body["cot"], "melody");
         assert_eq!(body["duration"], 1.0);
@@ -8128,9 +8303,9 @@ mod tests {
 
     #[test]
     fn a_composition_needs_a_mode_that_writes_a_score_and_a_prompt() {
-        let off = ComposeScoreRequest { style: "pop".into(), lyrics: String::new(), cot: Some("off".into()), lm_seed: None, abc_sampling: None };
+        let off = ComposeScoreRequest { style: "pop".into(), lyrics: String::new(), cot: Some("off".into()), lm_seed: None, abc_sampling: None, lm_batch_size: None };
         assert!(compose_request_from(&off).is_err());
-        let empty = ComposeScoreRequest { style: " ".into(), lyrics: String::new(), cot: None, lm_seed: None, abc_sampling: None };
+        let empty = ComposeScoreRequest { style: " ".into(), lyrics: String::new(), cot: None, lm_seed: None, abc_sampling: None, lm_batch_size: None };
         assert!(compose_request_from(&empty).is_err());
     }
 
@@ -8140,6 +8315,15 @@ mod tests {
         assert_eq!(abc, "X:1\nK:C\n|C|");
         assert_eq!(seed, None);
         assert!(score_from_result("application/json", br#"{"abc":""}"#).is_err());
+    }
+
+    #[test]
+    fn a_plan_batch_keeps_every_abc_and_its_own_seed() {
+        let packet = "--b\r\nContent-Type: application/json\r\n\r\n{\"abc\":\"first score\",\"lm_seed\":7}\r\n--b\r\nContent-Type: audio/wav\r\n\r\nwave1\r\n--b\r\nContent-Type: application/json\r\n\r\n{\"abc\":\"second score\",\"lm_seed\":8}\r\n--b\r\nContent-Type: audio/wav\r\n\r\nwave2\r\n--b--\r\n";
+        let plans = plans_from_result("multipart/mixed; boundary=b", packet.as_bytes()).unwrap();
+        assert_eq!(plans.len(), 2);
+        assert_eq!(plans[0].abc, "first score"); assert_eq!(plans[0].lm_seed, Some(7));
+        assert_eq!(plans[1].abc, "second score"); assert_eq!(plans[1].lm_seed, Some(8));
     }
 
     fn replay_overrides() -> ReplayMusicJobRequest {

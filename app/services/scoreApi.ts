@@ -23,3 +23,7 @@ export async function scoreMidi(abc: string): Promise<Answer<{ bytes: Uint8Array
   for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
   return { ok: true, bytes };
 }
+
+export async function markScore(abc: string, style: string, lyrics: string, cot: string, keep: boolean): Promise<Answer<{ abc: string }>> {
+  return post('/v1/score/mark', { abc, style, lyrics, cot, keep });
+}

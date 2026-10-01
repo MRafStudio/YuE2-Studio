@@ -83,6 +83,8 @@ Code, save [docs/mcp-skill.md](docs/mcp-skill.md) as `~/.claude/skills/yue2-stud
   audio codes, flow-matching steps, guidance, both seeds, peak normalisation, MP3 or
   16/24/32-bit WAV. Prompts open and save as JSON or YAML in the engine's own request
   format, so they move freely between the studio, the yue2.cpp WebUI and `yue-synth`.
+- **Structured song writing** — build a style from its musical fields and arrange lyrics in editable sections, while keeping the plain text editable. Give the writing assistant a language, a target of 8–32 lines and additional instructions.
+- **Song and render controls** — voice and tempo fields; section, line/stanza and text-case tools; Keep/Words lyric preservation and exact checkpoint tokens; batch score-plan selection and chord mirroring in repeated sections. Edit scores with MIDI grid and octave controls. Transpose generation by −24 to +24 semitones, render vocals only through native HT-Demucs as MP3 or 32-bit WAV, and switch each LoRA on or off with weights from −10 to +10.
 - **A writing assistant** — a local Gemma model or OpenRouter writes the style and lyrics
   from an idea and edits the score on request; or pick your connected agent (MCP) and it
   writes instead. Lyrics you wrote yourself get their section tags with one button, the
@@ -154,7 +156,15 @@ Code, save [docs/mcp-skill.md](docs/mcp-skill.md) as `~/.claude/skills/yue2-stud
 - **Likes, sorting and stems in order** — a like is kept with the song for every window and
   agent, every list sorts by date, title or length, and a song's stems fold under it.
 
+## Compose and edit MIDI
+
+The embedded Signal editor has multiple tracks, instruments, drums, MIDI keyboard recording, tempo changes, editable chord symbols and section markers. Save a new composition as MIDI and rendered audio in the library, or update an existing track’s MIDI. SoundFonts are bundled locally; the editor sends no analytics.
+
+In YuE2, the same editor opens ABC scores and applies notes, chords and sections back to the create form. The visual editor replaces the older separate score editor. Use **Apply** to update the ABC score, or send a library MIDI track to cover mode.
+
 ## Screenshots
+
+![The MIDI editor: chords, sections and notes](docs/screenshots/en-16-midi-editor.png)
 
 | | |
 |---|---|

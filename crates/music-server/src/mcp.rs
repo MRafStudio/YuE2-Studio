@@ -367,7 +367,7 @@ fn annotations(name: &str) -> Value {
     // a verb that changes something outweighs a noun that reads
     const CHANGES: &[&str] = &["install", "import", "remove", "delete", "refresh", "create", "update", "start", "cancel", "select", "download", "apply", "restart"];
     // reads whose names the rules above miss: create_form names the create page
-    const READ_NAMES: &[&str] = &["lyrics_find", "cover_prompt_render", "studio_wait", "engine_presets_get", "assistant_requests_wait", "ui_console", "song_defaults", "create_form_get", "library_liked"];
+    const READ_NAMES: &[&str] = &["lyrics_find", "cover_prompt_render", "studio_wait", "engine_presets_get", "assistant_requests_wait", "ui_console", "song_defaults", "create_form_get", "library_liked", "song_tokenize"];
     // writes over what was stored, so the earlier content is gone: a client asks first
     const OVERWRITES: &[&str] = &["library_song_update", "playlist_update", "dataset_update", "dataset_song_update", "dataset_prepare", "lora_update", "stems_split", "karaoke_make", "midi_transcribe", "cover_draw", "cover_set_from_file", "openrouter_set_key"];
     let changes = CHANGES.iter().any(|verb| name.split('_').any(|word| word == *verb));
@@ -1357,6 +1357,8 @@ fn tools() -> &'static [Tool] {
                     "lyrics": { "type": "string" },
                     "title": { "type": "string" },
                     "abc": { "type": "string" },
+                    "transpose": { "type": "integer", "minimum": -24, "maximum": 24, "description": "move a supplied abc score before singing; requires full or melody cot and no semantic_tokens" },
+                    "vocals_only": { "type": "boolean", "description": "extract vocals after synthesis using the installed separator; output_format must be mp3 or wav32" },
                     "playlist_id": { "type": "string", "description": "a playlist (see playlist_list) the made songs are added to" },
                     "cot": { "type": "string", "enum": ["full", "melody", "off"] },
                     "duration_seconds": { "type": "number" },
@@ -1403,9 +1405,15 @@ fn tools() -> &'static [Tool] {
                 call: |args| post("/v1/music/replay".into(), args.clone()),
             },
             Tool {
+                name: "song_tokenize",
+                description: "Exact checkpoint token IDs, Unicode cut marks and torn characters for style and lyrics in the whole music prompt. Unavailable until a tokenizer-capable music engine is running; never estimates counts.",
+                schema: || object(json!({ "style": { "type": "string" }, "lyrics": { "type": "string" }, "cot": { "type": "string", "enum": ["full", "melody", "off"] } }), &["lyrics"]),
+                call: |args| post("/v1/song/tokenize".into(), args.clone()),
+            },
+            Tool {
                 name: "score_compose",
-                description: "Write only the score (ABC notation) for a style and lyrics, without singing it. Returns a job; poll score_job_get. Read and edit the score, then pass it to song_create as abc.",
-                schema: || object(json!({ "style": { "type": "string" }, "lyrics": { "type": "string" }, "cot": { "type": "string", "enum": ["full", "melody"] }, "lm_seed": { "type": "integer" } }), &["style"]),
+                description: "Write score plans (ABC notation) for a style and lyrics. lm_batch_size chooses the number up to the configured engine song limit. Returns a job; poll score_job_get for plans, each with its abc and lm_seed. Read and choose a plan, then pass its abc to song_create.",
+                schema: || object(json!({ "style": { "type": "string" }, "lyrics": { "type": "string" }, "cot": { "type": "string", "enum": ["full", "melody"] }, "lm_seed": { "type": "integer" }, "lm_batch_size": { "type": "integer", "minimum": 1, "maximum": 8 } }), &["style"]),
                 call: |args| post("/v1/scores".into(), args.clone()),
             },
             Tool {

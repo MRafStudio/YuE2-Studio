@@ -15,13 +15,18 @@ import { ScoreView } from './ScoreView';
 import { MidiEditor } from './midi/MidiEditor';
 import { MidiImportDialog } from './MidiImportDialog';
 import { trackMidiBase64 } from '../services/midiEditor';
-import { composeScore, transcribe } from '../services/transcription';
+import { composePlans, composeScore, transcribe, type ScorePlan } from '../services/transcription';
 import { profileLabel as setLabel } from '../services/modelCatalog';
 import { REQUEST_FILE_ACCEPT, parseRequestFile, requestFileTitle, serializeRequest, type RequestFileFormat } from '../services/requestFile';
 import { AdapterPicker } from './AdapterPicker';
 import { CreatePlaylistModal } from './PlaylistModals';
 import { SlideToEnable } from './SlideToEnable';
 import { usesFromSettings, type AdapterUse } from '../services/adapters';
+import { engineParityLabels, planLabels } from '../i18n/engineParity';
+import { midiImportOptions } from '../i18n/midiImportOptions';
+import { SongTextParts } from './SongTextParts';
+import { writerInstruction } from '../services/songWriting';
+import { songWritingStrings } from '../i18n/songWriting';
 
 /**
  * The YuE2 request form.
@@ -268,7 +273,8 @@ const SamplingGrid: React.FC<{ value: SamplingText; defaults?: YueSampling; onCh
 const NO_ACTIVITY: ActivityEntry[] = [];
 
 export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, activeJobCount = 0, initialData, request, playlists, onCreatePlaylist, playlistId, onChoosePlaylist }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const writingText = songWritingStrings[language];
   const tt = t as unknown as (key: string) => string;
 
   const [name, setName] = useState('');
@@ -304,6 +310,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [abcSampling, setAbcSampling] = useState<SamplingText>(emptySampling);
   const [semanticSampling, setSemanticSampling] = useState<SamplingText>(emptySampling);
   const [peakClip, setPeakClip] = useState('');
+  const [transpose, setTranspose] = useState('0');
+  const [vocalsOnly, setVocalsOnly] = useState(false);
   // The engine default of 128 kbps throws away what the VAE produced.
   const [mp3Bitrate, setMp3Bitrate] = useState('320');
   const [format, setFormat] = useState<YueOutputFormat>('mp3');
@@ -337,11 +345,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [mode, setMode] = useState<'studio' | 'simple' | 'cover'>('studio');
   const [assistInstruction, setAssistInstruction] = useState('');
+  const [writerLanguage, setWriterLanguage] = useState('');
+  const [writerLines, setWriterLines] = useState('');
+  const [writerExtra, setWriterExtra] = useState('');
   const [scoreInstruction, setScoreInstruction] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [transcribing, setTranscribing] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [planCount, setPlanCount] = useState('1');
+  const [plans, setPlans] = useState<ScorePlan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState(0);
   const composeRun = useRef<AbortController | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [coverSource, setCoverSource] = useState<string>('');
@@ -425,6 +439,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     if (typeof request.style === 'string') setStyle(request.style);
     if (typeof request.lyrics === 'string') setLyrics(request.lyrics);
     setAbc(typeof request.abc === 'string' ? request.abc.trimEnd() : '');
+    setPlans([]); setSelectedPlan(0);
     setCot(request.cot === 'full' || request.cot === 'melody' || request.cot === 'off' ? request.cot : '');
     setDuration(asText(request.duration ?? request.duration_seconds));
     setLmBatch('');
@@ -441,6 +456,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     setAbcSampling(samplingText(request.abc_sampling));
     setSemanticSampling(samplingText(request.semantic_sampling));
     setPeakClip(asText(request.peak_clip));
+    setTranspose(asText(request.transpose) || '0');
+    setVocalsOnly(request.vocals_only === true);
     if (request.mp3_bitrate !== undefined) setMp3Bitrate(asText(request.mp3_bitrate));
     if (typeof request.output_format === 'string') setFormat(request.output_format as YueOutputFormat);
     if (Array.isArray(request.adapters)) setAdapters(usesFromSettings(request));
@@ -508,6 +525,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
   const reset = () => {
     setName(''); setStyle(''); setLyrics(''); setAbc(''); setCot('');
+    setPlans([]); setSelectedPlan(0);
     resetParameters();
     setCoverPrompt('');
     setAdapters([]);
@@ -519,6 +537,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     setRandomizeSeed(true); setLmSeed(''); setSeed(''); setSemanticTokens('');
     setAbcSampling(emptySampling()); setSemanticSampling(emptySampling());
     setPeakClip(''); setMp3Bitrate('320'); setFormat('mp3');
+    setTranspose('0'); setVocalsOnly(false);
   };
 
   const loadExample = (id?: string) => {
@@ -536,6 +555,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       output_format: format,
     };
     if (abc.trim() && effectiveCot !== 'off') request.abc = abc.trim();
+    if (abc.trim() && effectiveCot !== 'off' && !semanticTokens.trim() && Number(transpose) !== 0) request.transpose = Number(transpose);
+    if (vocalsOnly) {
+      request.vocals_only = true;
+      if (format !== 'mp3') request.output_format = 'wav32';
+    }
     if (cot) request.cot = cot;
     const durationValue = numberOrUndefined(duration);
     if (durationValue !== undefined) request.duration_seconds = Math.min(Math.max(durationValue, 1), MAX_DURATION_SECONDS);
@@ -568,7 +592,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     if (bitrate !== undefined && format === 'mp3') request.mp3_bitrate = bitrate;
     if (name.trim()) request.title = name.trim();
     if (coverPrompt.trim()) request.cover_prompt = coverPrompt.trim();
-    if (adapters.length > 0) request.adapters = adapters;
+    if (adapters.length > 0) request.adapters = adapters.filter(row => !row.disabled).map(({ id, scales }) => ({ id, scales }));
     if (!forFile && chosenPlaylist) request.playlist_id = chosenPlaylist;
     return request;
   };
@@ -655,8 +679,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     const controller = new AbortController();
     composeRun.current = controller;
     try {
-      const score = await writeScoreAlone(controller.signal);
-      setAbc(score);
+      const pinned = randomizeSeed ? undefined : numberOrUndefined(lmSeed);
+      const choices = await composePlans({ style: finishedStyle(style), lyrics: lyrics.replace(/\r\n?/g, '\n').trim(), cot: effectiveCot, lmSeed: pinned, abcSampling: samplingFrom(abcSampling), count: Math.max(1, Math.min(Number(planCount), maxBatch, 9)) }, controller.signal);
+      setPlans(choices); setSelectedPlan(0);
+      setAbc(choices[0].abc);
       setSemanticTokens('');
       setShowNotation(true);
     } catch (reason) {
@@ -699,7 +725,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       const payload = JSON.stringify({
         target,
         description: freshSong ? '' : name.trim(),
-        instruction: (target === 'score' ? scoreInstruction : assistInstruction).trim(),
+        instruction: target === 'score' ? scoreInstruction.trim() : freshSong ? writerInstruction(assistInstruction, writerLanguage, writerLines, writerExtra) : assistInstruction.trim(),
         lyrics: freshSong ? '' : lyrics.trim(),
         style: freshSong ? '' : finishedStyle(style),
         abc: freshSong ? '' : abc.trim(),
@@ -883,6 +909,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     output_format: [format, (value) => setFormat(value as YueOutputFormat)],
     mp3_bitrate: [mp3Bitrate, setMp3Bitrate],
     peak_clip: [peakClip, setPeakClip],
+    transpose: [transpose, setTranspose],
+    vocals_only: [vocalsOnly, value => setVocalsOnly(value === 'true')],
   };
   useBridgeCommand('create_get', () => ({
     mode,
@@ -997,6 +1025,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 className={`${CONTROL} resize-none`}
               />
               <p className="mt-2 text-[11px] leading-4 text-zinc-500">{t('songIdeaHint')}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Field label={writingText.language}><input className={CONTROL} value={writerLanguage} onChange={event => setWriterLanguage(event.target.value)} placeholder={writingText.auto} /></Field>
+                <Field label={writingText.lines}><select className={CONTROL} value={writerLines} onChange={event => setWriterLines(event.target.value)}><option value="">{writingText.auto}</option>{[8, 16, 24, 32].map(lines => <option key={lines} value={lines}>{lines}</option>)}</select></Field>
+              </div>
+              <div className="mt-3"><Field label={writingText.instructions}><AutoTextarea className={`${CONTROL} resize-none`} minRows={2} value={writerExtra} onChange={event => setWriterExtra(event.target.value)} /></Field></div>
               <button
                 type="button"
                 onClick={() => void askAssistant('all')}
@@ -1206,6 +1239,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               className={`${CONTROL} mt-3 resize-none overflow-y-auto leading-5 custom-scrollbar`}
             />
             <p className="mt-2 text-[11px] leading-4 text-zinc-500">{tt('styleHint')}</p>
+            <SongTextParts kind="style" value={style} onChange={setStyle} />
             {mode === 'cover' && coverSongId && (
               <button type="button" onClick={() => void describeByEar()} disabled={describing} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-medium text-zinc-600 transition-colors hover:border-pink-400 hover:text-pink-600 disabled:opacity-50 dark:border-white/10 dark:text-zinc-300" title={tt('describeByEarHint')}>
                 {describing ? <Loader2 size={12} className="animate-spin" /> : <Ear size={12} />}{tt('describeByEar')}
@@ -1243,6 +1277,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               className={`${CONTROL} resize-none overflow-y-auto font-mono text-xs leading-5 custom-scrollbar`}
             />
             <p className="mt-2 text-[11px] leading-4 text-zinc-500">{tt('lyricsHintYue')}</p>
+            <SongTextParts kind="lyrics" value={lyrics} onChange={setLyrics} style={style} cot={effectiveCot} />
           </Card>
 
           <Card
@@ -1301,7 +1336,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   className={`${CONTROL} mt-3 resize-none overflow-y-auto font-mono text-[11px] leading-4 custom-scrollbar`}
                 />
                 <p className="mt-2 text-[11px] leading-4 text-zinc-500">{tt('scoreHint')}</p>
+                {/%yue2-words [a-f0-9]{16}/.test(abc) && <label className="mt-2 flex items-start gap-2 text-xs text-zinc-500" title={midiImportOptions[language].keepHint}>
+                  <input type="checkbox" className="mt-0.5 accent-pink-500" checked={/%yue2-words [a-f0-9]{16} keep/.test(abc)} onChange={event => setAbc(current => current.replace(/(%yue2-words [a-f0-9]{16})(?: keep)?/g, `$1${event.target.checked ? ' keep' : ''}`))} />
+                  {midiImportOptions[language].keep}
+                </label>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <select className={CONTROL + ' max-w-24'} value={planCount} aria-label={planLabels[language]} onChange={event => setPlanCount(event.target.value)} disabled={composing}>
+                    {Array.from({ length: Math.min(maxBatch, 9) }, (_, index) => index + 1).map(count => <option key={count} value={count}>{count}</option>)}
+                  </select>
                   <button
                     type="button"
                     onClick={() => (composing ? composeRun.current?.abort() : void runComposition())}
@@ -1323,6 +1365,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   </button>
                   <span className="text-[11px] leading-4 text-zinc-500">{composing ? tt('composeScoreCancel') : tt('composeScoreHint')}</span>
                 </div>
+                {plans.length > 1 && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-zinc-500">{planLabels[language]}</span>
+                  {plans.map((plan, index) => <button key={index} type="button" aria-pressed={index === selectedPlan} className={`${CHIP} ${index === selectedPlan ? 'border-pink-500 text-pink-500' : ''}`} onClick={() => { setSelectedPlan(index); setAbc(plan.abc); setSemanticTokens(''); }}>
+                    {index + 1}{plan.lm_seed !== undefined && plan.lm_seed !== null ? ` · ${plan.lm_seed}` : ''}
+                  </button>)}
+                </div>}
                 {melodyWithChords && (
                   <div className="mt-2 flex items-start gap-2 rounded-lg bg-amber-500/10 p-2 text-[11px] leading-4 text-amber-700 dark:text-amber-300">
                     <AlertTriangle size={13} className="mt-0.5 shrink-0" />
@@ -1447,6 +1495,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {showAdvanced && (
               <div className="space-y-4 border-t border-zinc-100 p-3 dark:border-white/5">
                 <Stage title={tt('stageScoreSampling')} hint={tt('stageScoreSamplingHint')}>
+                  <div className="mb-3">
+                    <SliderRow label={engineParityLabels[language].transpose} value={transpose} fallback={0} min={-24} max={24} step={1}
+                      disabled={!abc.trim() || effectiveCot === 'off' || Boolean(semanticTokens.trim())} onChange={setTranspose} />
+                    <p className="mt-1 text-[11px] leading-4 text-zinc-500">{engineParityLabels[language].transposeHint}</p>
+                  </div>
                   <SamplingGrid value={abcSampling} defaults={defaults.abc_sampling} onChange={setAbcSampling} t={t as never} />
                 </Stage>
 
@@ -1478,6 +1531,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
                 <div className="border-t border-zinc-100 pt-4 dark:border-white/5">
                   <Stage title={t('stageOutput')} hint={t('stageOutputHint')}>
+                    <div className="mb-3"><Switch checked={vocalsOnly} onChange={enabled => { setVocalsOnly(enabled); if (enabled && format !== 'mp3') setFormat('wav32'); }} label={engineParityLabels[language].vocals} hint={engineParityLabels[language].vocalsHint} /></div>
                     <SliderRow
                       label={t('peakClipLabel')}
                       value={peakClip}
@@ -1496,8 +1550,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                       <Field label={t('outputFormat')}>
                         <select value={format} onChange={event => setFormat(event.target.value as YueOutputFormat)} className={CONTROL}>
                           <option value="mp3">MP3</option>
-                          <option value="wav16">WAV 16-bit</option>
-                          <option value="wav24">WAV 24-bit</option>
+                          <option value="wav16" disabled={vocalsOnly}>WAV 16-bit</option>
+                          <option value="wav24" disabled={vocalsOnly}>WAV 24-bit</option>
                           <option value="wav32">WAV 32-bit float</option>
                         </select>
                       </Field>
@@ -1582,6 +1636,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             abc,
             title: name,
             chords: effectiveCot === 'full',
+            style: finishedStyle(style),
+            lyrics: lyrics.trim(),
+            cot: effectiveCot,
             onApply: (value, words) => {
               setAbc(value);
               if (words !== null) setLyrics(current => (current.trim() ? current : words));

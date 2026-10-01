@@ -130,6 +130,14 @@ pub struct Converted {
     pub notices: Vec<Notice>,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Options {
+    pub grid: Option<u32>,
+    /// Additional octaves after fitting the line to the singing window.
+    pub vocal_octaves: i32,
+    pub instrument_octaves: i32,
+}
+
 /// Seconds from the start of the song to `tick`, through its tempo map.
 fn seconds_at(song: &smf::Song, tick: Q) -> f64 {
     let division = song.division as f64;
@@ -403,6 +411,12 @@ fn section_starts(song: &smf::Song, words: Option<&karaoke::Words>, bars: &[(Q, 
 
 /// The score and lyrics a MIDI file makes for one mode and one choice of parts, or why it makes none.
 pub fn convert(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: parts::Pick) -> Result<Converted, String> {
+    convert_with(song, mode, vocal, instrument, Options::default())
+}
+
+pub fn convert_with(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: parts::Pick, options: Options) -> Result<Converted, String> {
+    if options.grid.is_some_and(|grid| !matches!(grid, 16 | 32)) { return Err("The MIDI grid must be 16 or 32".into()); }
+    if !(-3..=3).contains(&options.vocal_octaves) || !(-3..=3).contains(&options.instrument_octaves) { return Err("Additional octave shifts must be between -3 and 3".into()); }
     let found = parts::parts(song);
     if found.is_empty() {
         return Err("the file has no notes".into());
@@ -417,7 +431,7 @@ pub fn convert(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: par
         lines.push((instrument, INSTRUMENT_WINDOW, "instrument"));
     }
     let line_notes: Vec<smf::Note> = lines.iter().flat_map(|(index, _, _)| found[*index].notes.iter().copied()).collect();
-    let grid = grid_of(&line_notes, song.division);
+    let grid = options.grid.unwrap_or_else(|| grid_of(&line_notes, song.division));
     let subbeats = (grid as i64 / rows.iter().map(|row| row.3).min().expect("a song has beats")).max(1);
     let points = points_of(&rows, subbeats);
     let last = rows[rows.len() - 1].0;
@@ -443,7 +457,13 @@ pub fn convert(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: par
     let (mut voice_shift, mut instrument_shift) = (0, 0);
     for (voice, (index, window, name)) in lines.iter().enumerate() {
         let part = &found[*index];
-        let (kept, shift, struck) = line(part, &points, *window);
+        let (mut kept, mut shift, struck) = line(part, &points, *window);
+        let additional = 12 * if voice == 0 { options.vocal_octaves } else { options.instrument_octaves };
+        shift += additional;
+        for note in &mut kept {
+            note.2 += additional;
+            if !(0..=127).contains(&note.2) { return Err(format!("The {name} octave shift would move notes outside MIDI pitches 0–127")); }
+        }
         if voice == 0 { voice_shift = shift } else { instrument_shift = shift }
         notes.extend(kept.iter().map(|(start, stop, pitch)| (at(points[*start]), at(points[*stop]), *pitch, voice)));
         if shift != 0 {
