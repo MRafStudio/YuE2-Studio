@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FileMusic, Loader2, X } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
-import { isMidiFile, MIDI_EXTENSIONS, noteName } from '../services/scoreRoll';
+import { isMidiFile, MIDI_EXTENSIONS, noteName } from '../services/midiFiles';
 
 /** The largest MIDI file the service reads: a long song is tens of kilobytes. */
 const LARGEST = 8 * 1024 * 1024;
@@ -44,6 +44,7 @@ export interface MidiImported {
   abc: string;
   lyrics: string | null;
   summary: string;
+  mode: 'melody' | 'full';
 }
 
 const SELECT = 'h-8 rounded-lg border border-zinc-200 bg-white px-2 text-xs text-zinc-700 outline-hidden focus:border-pink-500 dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-200';
@@ -57,12 +58,18 @@ const SEGMENT_OFF = 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
  * write it. Every change of a choice reads the file again; nothing reaches the
  * editor until "Open in the editor".
  */
-export const MidiImportDialog: React.FC<{ chordsWanted: boolean; onCancel: () => void; onOpen: (imported: MidiImported) => void }> = ({ chordsWanted, onCancel, onOpen }) => {
+export const MidiImportDialog: React.FC<{
+  chordsWanted: boolean;
+  /** A file to read at once, as a library track's MIDI sent to a cover is: its name and base64 data. */
+  initial?: { name: string; data: string };
+  onCancel: () => void;
+  onOpen: (imported: MidiImported) => void;
+}> = ({ chordsWanted, initial, onCancel, onOpen }) => {
   const { t, language } = useI18n();
   const say = useCallback((key: string, values: Record<string, string | number> = {}) => Object.entries(values).reduce((text, [name, value]) => text.split(`{${name}}`).join(String(value)), t(key as TranslationKey)), [t]);
   const count = useCallback((base: string, value: number) => say(`${base}_${new Intl.PluralRules(language).select(value)}`, { count: value }), [say, language]);
   const picker = useRef<HTMLInputElement | null>(null);
-  const [file, setFile] = useState<{ name: string; data: string } | null>(null);
+  const [file, setFile] = useState<{ name: string; data: string } | null>(initial ?? null);
   const [mode, setMode] = useState<'melody' | 'full'>(chordsWanted ? 'full' : 'melody');
   const [vocal, setVocal] = useState('auto');
   const [instrument, setInstrument] = useState('auto');
@@ -157,7 +164,7 @@ export const MidiImportDialog: React.FC<{ chordsWanted: boolean; onCancel: () =>
 
   const open = () => {
     if (!answer?.ok) return;
-    onOpen({ abc: answer.abc, lyrics: answer.facts.karaoke ? answer.lyrics : null, summary: [factLine, ...answer.notices.map(notice)].join(' ') });
+    onOpen({ abc: answer.abc, lyrics: answer.facts.karaoke ? answer.lyrics : null, summary: [factLine, ...answer.notices.map(notice)].join(' '), mode });
   };
 
   return (
@@ -293,10 +300,10 @@ export const MidiImportDialog: React.FC<{ chordsWanted: boolean; onCancel: () =>
             type="button"
             onClick={open}
             disabled={!answer?.ok || busy}
-            title={say('midiInOpenHint')}
+            title={say('midiInUseHint')}
             className="rounded-lg bg-pink-600 px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
           >
-            {say('midiInOpen')}
+            {say('midiInUse')}
           </button>
         </div>
       </div>

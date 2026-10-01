@@ -12,7 +12,9 @@ import { saveFile } from '../services/saveFile';
 import { useBridgeCommand } from '../services/mcpBridge';
 import { EXAMPLES, randomExample } from '../services/examples';
 import { ScoreView } from './ScoreView';
-import { ScoreEditor } from './ScoreEditor';
+import { MidiEditor } from './midi/MidiEditor';
+import { MidiImportDialog } from './MidiImportDialog';
+import { trackMidiBase64 } from '../services/midiEditor';
 import { composeScore, transcribe } from '../services/transcription';
 import { profileLabel as setLabel } from '../services/modelCatalog';
 import { REQUEST_FILE_ACCEPT, parseRequestFile, requestFileTitle, serializeRequest, type RequestFileFormat } from '../services/requestFile';
@@ -31,11 +33,13 @@ import { usesFromSettings, type AdapterUse } from '../services/adapters';
  * request stays sparse exactly like the engine's reference client sends it.
  */
 
-/** Something another page sends to the form: a library track to cover, or a
- * score to sing. It lives in the app's state, not in a window event, so it
- * still arrives when the form was hidden at the moment it was sent. */
+/** Something another page sends to the form: a library track to cover (its
+ * recording transcribed, or its MIDI read), or a score to sing. It lives in
+ * the app's state, not in a window event, so it still arrives when the form
+ * was hidden at the moment it was sent. */
 export type CreateRequest =
   | { id: number; kind: 'transcribe'; song: Song; melodyOnly: boolean }
+  | { id: number; kind: 'midi'; song: Song }
   | { id: number; kind: 'score'; abc: string; cot?: YueCot; lyrics?: string; title?: string };
 
 interface CreatePanelProps {
@@ -350,6 +354,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [coverTime, setCoverTime] = useState(0);
   const [coverDuration, setCoverDuration] = useState(0);
   const [coverMelodyOnly, setCoverMelodyOnly] = useState(true);
+  // a track's MIDI sent to a cover, waiting in the MIDI import for its parts to be chosen
+  const [midiCover, setMidiCover] = useState<{ name: string; data: string } | null>(null);
   const promptFile = useRef<HTMLInputElement | null>(null);
   const scoreFile = useRef<HTMLInputElement | null>(null);
   const audioFile = useRef<HTMLInputElement | null>(null);
@@ -474,6 +480,19 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       if (song.lyrics?.trim()) setLyrics(current => (current.trim() ? current : song.lyrics));
       setMode('cover');
       void runTranscription({ songId: song.id }, melodyOnly);
+    } else if (request.kind === 'midi') {
+      // a track made or edited in the MIDI editor: its MIDI becomes the score,
+      // through the MIDI import, where the voice's part is chosen
+      const { song } = request;
+      setCoverSource(song.title);
+      setCoverSongId(song.id);
+      setCoverAudio(song.audioUrl ?? null);
+      if (song.lyrics?.trim()) setLyrics(current => (current.trim() ? current : song.lyrics));
+      setMode('cover');
+      setError(null);
+      trackMidiBase64(song.id)
+        .then(data => setMidiCover({ name: `${song.title}.mid`, data }))
+        .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
     } else {
       // a score from elsewhere: a transcribed library track, an edited plan
       setAbc(request.abc.trimEnd());
@@ -1557,21 +1576,35 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         </button>
       </footer>
       {editorOpen && (
-        <ScoreEditor
-          abc={abc}
-          title={name}
-          lyrics={lyrics}
-          durationSeconds={numberOrUndefined(duration) ?? null}
-          cot={effectiveCot}
-          onCompose={writeScoreAlone}
-          onApply={(value, words) => {
-            setAbc(value);
-            if (words !== null) setLyrics(words);
-            setSemanticTokens('');
-            setShowNotation(true);
-            setEditorOpen(false);
+        <MidiEditor
+          source={{
+            kind: 'score',
+            abc,
+            title: name,
+            chords: effectiveCot === 'full',
+            onApply: (value, words) => {
+              setAbc(value);
+              if (words !== null) setLyrics(current => (current.trim() ? current : words));
+              setSemanticTokens('');
+              setShowNotation(true);
+            },
           }}
           onClose={() => setEditorOpen(false)}
+        />
+      )}
+      {midiCover && (
+        <MidiImportDialog
+          chordsWanted={!coverMelodyOnly}
+          initial={midiCover}
+          onCancel={() => setMidiCover(null)}
+          onOpen={imported => {
+            setMidiCover(null);
+            setAbc(imported.abc.trimEnd());
+            setCot(imported.mode);
+            if (imported.lyrics) setLyrics(current => (current.trim() ? current : imported.lyrics ?? ''));
+            setSemanticTokens('');
+            setShowNotation(true);
+          }}
         />
       )}
     </section>
