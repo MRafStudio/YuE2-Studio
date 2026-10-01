@@ -94,6 +94,11 @@ Code, save [docs/mcp-skill.md](docs/mcp-skill.md) as `~/.claude/skills/yue2-stud
   (34 instrument groups and drums) with MuScriptor on the GPU, through HOT-Step's native
   port. A piano roll fills in while it listens; play it against the original, mute or solo
   an instrument, save the .mid. Downloaded the first time it is used.
+- **A MIDI editor** — a piano roll with tracks, instruments and drums: play a song in from a
+  MIDI keyboard or the computer's keys, record or draw it, edit a track's MIDI, save it to the
+  library as a track and send it to a cover, or open the create form's score in it. A .mid
+  file becomes the score: the voice and instrument chosen, chords read or guessed, karaoke
+  words offered for the lyrics.
 - **Every result is a track** — stems, a processed take, a re-render and a cover land in the
   library as tracks of their own, each marked with the one it was made from and keeping the
   settings it was made with.
@@ -512,8 +517,8 @@ Windows build with CUDA, Vulkan and CPU backends for now.
 - [Wikimedia Commons](https://commons.wikimedia.org) and the photographers and filmmakers who give their work to it under CC0 or into the public domain, many of them through [Unsplash](https://unsplash.com): the pictures and clips a track and its video can wear. A chosen picture keeps a link to its page.
 - [Florian Körner](https://github.com/FlorianKoerner) for [DiceBear](https://www.dicebear.com) (MIT) and the authors of its CC0 styles, the patterns a track without a cover wears, and the [resvg](https://github.com/linebender/resvg) authors, whose renderer writes them into the track as PNG.
 - [MRafStudio](https://github.com/MRafStudio) for the ideas of [pull request #34](https://github.com/timoncool/YuE2-Studio/pull/34): the Activity log, sorting, likes kept in the library and stems under their song.
-- [pytraveler](https://github.com/pytraveler) for [YuE2-ComfyUI](https://github.com/pytraveler/YuE2-ComfyUI) (Apache-2.0): the score editor is ported from its own, with the piano roll, the chords and sections, the key and tempo changes, the MIDI file and the reader and writer of YuE2's score behind them.
-- Alexander Holm for [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html) (CC BY 3.0, published by FreePats): the score editor plays thirty of its recordings, one every three semitones from A0 to C8, as YuE2-ComfyUI cut them.
+- [pytraveler](https://github.com/pytraveler) for [YuE2-ComfyUI](https://github.com/pytraveler/YuE2-ComfyUI) (Apache-2.0): the reader and writer of YuE2's score, the score as a MIDI file and a MIDI file read back into a score are ported from it.
+- [ryohey](https://github.com/ryohey) for [signal](https://github.com/ryohey/signal) (MIT), the MIDI editor, and Milton Paredes for the A320U SoundFonts it plays (GPL-2.0).
 
 ## Support the Author
 
@@ -550,9 +555,11 @@ One bundled component is under a different licence: the visualiser's spectrum lo
 [audioMotion-analyzer](https://github.com/hvianna/audioMotion-analyzer), which is **AGPL-3.0**;
 its source, like the studio's, is public.
 
-The score editor and the score reader and writer behind it are ported from
+The score reader and writer and the MIDI import are ported from
 [YuE2-ComfyUI](https://github.com/pytraveler/YuE2-ComfyUI), which is **Apache-2.0**; its licence is
-kept in [licenses/YuE2-ComfyUI-Apache-2.0.txt](licenses/YuE2-ComfyUI-Apache-2.0.txt). The piano the
-editor plays is thirty recordings from Salamander Grand Piano V3 by Alexander Holm, **CC BY 3.0**.
+kept in [licenses/YuE2-ComfyUI-Apache-2.0.txt](licenses/YuE2-ComfyUI-Apache-2.0.txt). The MIDI
+editor is [signal](https://github.com/ryohey/signal), **MIT**, built from
+[our fork](https://github.com/timoncool/signal/tree/studio); the A320U SoundFonts it plays are
+**GPL-2.0**, their licence in [licenses/A320U-soundfont-GPL-2.0.txt](licenses/A320U-soundfont-GPL-2.0.txt).
 
 What changed and when is in [CHANGELOG.md](CHANGELOG.md).
