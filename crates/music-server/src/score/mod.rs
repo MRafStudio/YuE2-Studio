@@ -1,7 +1,6 @@
-//! Scores in YuE2's two-voice ABC dialect: read into notes a piano roll draws,
-//! edited notes written back, moved to another key, and carried to and from
-//! MIDI. Ported from pytraveler/YuE2-ComfyUI (Apache-2.0), whose notation
-//! module reads everything back with m-a-p's own reader of the dialect.
+//! Scores in YuE2's two-voice ABC dialect: read into notes, carried to and from
+//! MIDI and laid along lyrics. Ported from pytraveler/YuE2-ComfyUI (Apache-2.0),
+//! whose notation module reads everything back with m-a-p's own reader of the dialect.
 
 pub mod abc;
 pub mod api;
@@ -14,7 +13,6 @@ pub mod rebuild;
 pub mod sections;
 pub mod smf;
 pub mod spelling;
-pub mod transpose;
 
 use std::cmp::Ordering;
 use std::fmt;
