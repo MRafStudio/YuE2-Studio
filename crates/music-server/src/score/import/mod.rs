@@ -78,6 +78,48 @@ pub struct Facts {
     pub karaoke: bool,
 }
 
+/// Something to say about a score written from a file, with the values a translation fills in.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "code", rename_all = "snake_case")]
+pub enum Notice {
+    TempoChanges { low: f64, high: f64, bpm: f64 },
+    PlayedIn,
+    Moved { line: &'static str, track: usize, semitones: i32 },
+    Struck { track: usize, count: usize },
+    ChordsRead { track: usize, name: String },
+    Unnamed { track: usize, bars: Vec<usize> },
+    ChordsGuessed,
+}
+
+impl Notice {
+    pub fn text(&self) -> String {
+        match self {
+            Notice::TempoChanges { low, high, bpm } => format!(
+                "The file's tempo moves between {low:.0} and {high:.0} BPM. A score keeps one tempo, so it is written at the average, {bpm:.0} BPM, and the song will not speed up or slow down where the file does."
+            ),
+            Notice::PlayedIn => "The notes of the file do not sit on a grid of sixteenths or thirty-seconds -- it was probably played in by hand -- so they were rounded to the nearest sixteenth.".into(),
+            Notice::Moved { line, track, semitones } => {
+                let octaves = semitones.abs() / 12;
+                format!(
+                    "The {line} line (track {track}) sat {} for YuE2's scores, so it was moved {} {}.",
+                    if *semitones > 0 { "low" } else { "high" },
+                    if *semitones > 0 { "up" } else { "down" },
+                    if octaves == 1 { "an octave".to_string() } else { format!("{octaves} octaves") }
+                )
+            }
+            Notice::Struck { track, count } => {
+                format!("Track {track} strikes {count} notes together with a higher one. A line of the score holds one note at a time, so the top note of each chord was kept.")
+            }
+            Notice::ChordsRead { track, name } => format!("The chord symbols were read from track {track}, '{name}', chord by chord."),
+            Notice::Unnamed { track, bars } => format!(
+                "Track {track} sounds notes that make no chord the score can name at {}, so the nearest chord was written there, or the one before it kept.",
+                bar_list(bars)
+            ),
+            Notice::ChordsGuessed => "The chord symbols were guessed from what the file's parts play together: a harmony to follow, not a transcription of it.".into(),
+        }
+    }
+}
+
 /// A file's score and lyrics for one mode and one choice of parts, with what to say about them.
 #[derive(Clone, Debug, Serialize)]
 pub struct Converted {
@@ -85,7 +127,7 @@ pub struct Converted {
     pub lyrics: String,
     pub parts: Vec<parts::Row>,
     pub facts: Facts,
-    pub notices: Vec<String>,
+    pub notices: Vec<Notice>,
 }
 
 /// Seconds from the start of the song to `tick`, through its tempo map.
@@ -391,13 +433,11 @@ pub fn convert(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: par
     }
     let (low, high) = tempos.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), value| (low.min(*value), high.max(*value)));
     if high > low * (1.0 + TEMPO_SLACK) {
-        notices.push(format!(
-            "The file's tempo moves between {low:.0} and {high:.0} BPM. A score keeps one tempo, so it is written at the average, {bpm:.0} BPM, and the song will not speed up or slow down where the file does."
-        ));
+        notices.push(Notice::TempoChanges { low, high, bpm });
     }
     let edges: Vec<u64> = line_notes.iter().flat_map(|note| [note.start, note.end]).collect();
     if grid == 16 && !edges.is_empty() && (edges.iter().filter(|tick| on_grid(**tick, song.division, 4)).count() as f64) < ON_GRID * edges.len() as f64 {
-        notices.push("The notes of the file do not sit on a grid of sixteenths or thirty-seconds -- it was probably played in by hand -- so they were rounded to the nearest sixteenth.".into());
+        notices.push(Notice::PlayedIn);
     }
     let mut notes: Vec<(f64, f64, i32, usize)> = Vec::new();
     let (mut voice_shift, mut instrument_shift) = (0, 0);
@@ -407,20 +447,10 @@ pub fn convert(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: par
         if voice == 0 { voice_shift = shift } else { instrument_shift = shift }
         notes.extend(kept.iter().map(|(start, stop, pitch)| (at(points[*start]), at(points[*stop]), *pitch, voice)));
         if shift != 0 {
-            let octaves = shift.abs() / 12;
-            notices.push(format!(
-                "The {name} line (track {}) sat {} for YuE2's scores, so it was moved {} {}.",
-                part.number,
-                if shift > 0 { "low" } else { "high" },
-                if shift > 0 { "up" } else { "down" },
-                if octaves == 1 { "an octave".to_string() } else { format!("{octaves} octaves") }
-            ));
+            notices.push(Notice::Moved { line: name, track: part.number, semitones: shift });
         }
         if struck > 0 {
-            notices.push(format!(
-                "Track {} strikes {struck} notes together with a higher one. A line of the score holds one note at a time, so the top note of each chord was kept.",
-                part.number
-            ));
+            notices.push(Notice::Struck { track: part.number, count: struck });
         }
     }
     let mut weights = [0.0; 12];
@@ -444,15 +474,11 @@ pub fn convert(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: par
             let part = &found[written];
             let (read, unnamed) = harmony::read(&held(&part.notes, &points), points.len() - 1, Some(&scale));
             harmony = read.into_iter().map(|(start, stop, chord)| (points[start], points[stop], chord)).collect();
-            notices.push(format!("The chord symbols were read from track {}, '{}', chord by chord.", part.number, part.name));
+            notices.push(Notice::ChordsRead { track: part.number, name: part.name.clone() });
             if !unnamed.is_empty() {
                 let downbeats: Vec<Q> = bars.iter().map(|bar| bar.0).collect();
                 let numbers: Vec<usize> = unnamed.iter().map(|start| downbeats.partition_point(|tick| *tick <= points[*start]).max(1)).collect::<BTreeSet<usize>>().into_iter().collect();
-                notices.push(format!(
-                    "Track {} sounds notes that make no chord the score can name at {}, so the nearest chord was written there, or the one before it kept.",
-                    part.number,
-                    bar_list(&numbers)
-                ));
+                notices.push(Notice::Unnamed { track: part.number, bars: numbers });
             }
             if let Some(row) = rows_of_parts.iter_mut().find(|row| row.number == part.number && row.role.is_empty()) {
                 row.role = "chords";
@@ -468,7 +494,7 @@ pub fn convert(song: &smf::Song, mode: Mode, vocal: parts::Pick, instrument: par
                 })
                 .collect();
             harmony = harmony::guess(&heard, &harmony::spans(&bars), signature < 0, Some(&scale));
-            notices.push("The chord symbols were guessed from what the file's parts play together: a harmony to follow, not a transcription of it.".into());
+            notices.push(Notice::ChordsGuessed);
         }
         let labelled: Vec<(Q, Q, String)> = key_rows.iter().map(|(start, stop, name)| (*start, *stop, key_label(name))).collect();
         harmony = spelling::respelled(&harmony, &labelled);

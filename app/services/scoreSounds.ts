@@ -291,8 +291,8 @@ export class ScorePlayer {
 
   private tone(ctx: AudioContext, master: AudioNode, start: number, length: number, pitch: number, part: SoundPart): Voice[] {
     const kind = this.soundOf(part);
-    if (kind !== 'piano') return synthesized(ctx, master, start, length, pitch, kind, WAVE_LEVEL[part]);
-    return [struck(ctx, master, start, length, pitch, part)];
+    if (kind === 'piano' && piano.size === PIANO_PITCHES.length) return [struck(ctx, master, start, length, pitch, part)];
+    return synthesized(ctx, master, start, length, pitch, kind === 'piano' ? 'synth' : kind, WAVE_LEVEL[part]);
   }
 
   play(list: SoundEvent[]): void {

@@ -236,6 +236,11 @@ export function useGenerations({ enabled, notify, onFinished }: GenerationOption
         throw new Error(job?.message || job?.error || `The engine rejected this request (${response.status})`);
       }
       follow(id, job);
+      if (job.laid) {
+        notify(t('scoreLaidToast').replace('{seconds}', String(Math.round(job.laid.seconds))), 'info');
+        const crowded = job.laid.crowded;
+        if (crowded) notify(crowded.ratio > 1 ? t('scoreCrowdedNotes').replace('{ratio}', crowded.ratio.toFixed(1)) : t('scoreCrowdedWords'), 'info');
+      }
     } catch (error) {
       remove(id);
       notify(error instanceof Error ? error.message : t('generationFailed'), 'error');

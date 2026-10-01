@@ -223,7 +223,7 @@ export const AUTO_INSTRUMENTAL_SECONDS = 180;
 export const MAX_SECONDS = 360;
 export const AUTO_WORDS_PER_LINE = 8;
 
-const LINE_BREAKS = /\r\n|[\n\r\v\f\x1c-\x1e\x85  ]/;
+const LINE_BREAKS = /\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/;
 const DIRECTION = /\[[^\]]*\]/g;
 const LETTER = /[\p{L}\p{N}]/u;
 

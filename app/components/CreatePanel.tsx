@@ -3,7 +3,7 @@ import { libraryChanged, useActivity, useAssistantStatus, useSetupStatus, type A
 import { karaokeReason } from '../services/karaoke';
 import {
   AlertTriangle, AudioLines, ChevronDown, CircleAlert, Dices, Ear, Eye, EyeOff, FileMusic, FolderOpen, Loader2,
-  Music2, Pause, Play, RotateCcw, Save, Sparkles, Square, Tags, Upload, Wand2, Settings2, X,
+  Music2, Pause, Piano, Play, RotateCcw, Save, Sparkles, Square, Tags, Upload, Wand2, Settings2, X,
 } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
 import type { Playlist, Song, YueCot, YueOutputFormat, YueRequest, YueSampling } from '../types';
@@ -12,6 +12,7 @@ import { saveFile } from '../services/saveFile';
 import { useBridgeCommand } from '../services/mcpBridge';
 import { EXAMPLES, randomExample } from '../services/examples';
 import { ScoreView } from './ScoreView';
+import { ScoreEditor } from './ScoreEditor';
 import { composeScore, transcribe } from '../services/transcription';
 import { profileLabel as setLabel } from '../services/modelCatalog';
 import { REQUEST_FILE_ACCEPT, parseRequestFile, requestFileTitle, serializeRequest, type RequestFileFormat } from '../services/requestFile';
@@ -338,6 +339,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [transcribing, setTranscribing] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const composeRun = useRef<AbortController | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [coverSource, setCoverSource] = useState<string>('');
   // the library song a cover's melody was taken from, which the new song names
   const [coverSongId, setCoverSongId] = useState<string | null>(null);
@@ -611,6 +613,20 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     }
   };
 
+  /** The score the model writes from the form's style and lyrics, nothing sung. */
+  const writeScoreAlone = (signal: AbortSignal) => {
+    if (!ready) throw new Error(t('downloadProfileFirst'));
+    if (!style.trim() && !lyrics.trim()) throw new Error(tt('styleOrLyricsRequired'));
+    const pinned = randomizeSeed ? undefined : numberOrUndefined(lmSeed);
+    return composeScore({
+      style: finishedStyle(style),
+      lyrics: lyrics.replace(/\r\n?/g, '\n').trim(),
+      cot: effectiveCot,
+      lmSeed: pinned !== undefined && pinned >= 0 ? pinned : undefined,
+      abcSampling: samplingFrom(abcSampling),
+    }, signal);
+  };
+
   /** Writes the score alone, so it can be read and edited before a song is sung from it. */
   const runComposition = async () => {
     if (!ready) { setError(t('downloadProfileFirst')); return; }
@@ -620,14 +636,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     const controller = new AbortController();
     composeRun.current = controller;
     try {
-      const pinned = randomizeSeed ? undefined : numberOrUndefined(lmSeed);
-      const score = await composeScore({
-        style: finishedStyle(style),
-        lyrics: lyrics.replace(/\r\n?/g, '\n').trim(),
-        cot: effectiveCot,
-        lmSeed: pinned !== undefined && pinned >= 0 ? pinned : undefined,
-        abcSampling: samplingFrom(abcSampling),
-      }, controller.signal);
+      const score = await writeScoreAlone(controller.signal);
       setAbc(score);
       setSemanticTokens('');
       setShowNotation(true);
@@ -1273,7 +1282,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   className={`${CONTROL} mt-3 resize-none overflow-y-auto font-mono text-[11px] leading-4 custom-scrollbar`}
                 />
                 <p className="mt-2 text-[11px] leading-4 text-zinc-500">{tt('scoreHint')}</p>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => (composing ? composeRun.current?.abort() : void runComposition())}
@@ -1282,6 +1291,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   >
                     {composing ? <Loader2 size={13} className="animate-spin" /> : <FileMusic size={13} />}
                     {composing ? tt('composingScore') : abc.trim() ? tt('composeScoreAgain') : tt('composeScore')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorOpen(true)}
+                    disabled={composing}
+                    title={tt('scoreEditorHint')}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-pink-500/40 px-3 py-1.5 text-xs font-semibold text-pink-600 transition hover:bg-pink-500/10 disabled:opacity-50 dark:text-pink-300"
+                  >
+                    <Piano size={13} />
+                    {tt('scoreEditor')}
                   </button>
                   <span className="text-[11px] leading-4 text-zinc-500">{composing ? tt('composeScoreCancel') : tt('composeScoreHint')}</span>
                 </div>
@@ -1537,6 +1556,24 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
           {activeJobCount > 0 && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{activeJobCount}</span>}
         </button>
       </footer>
+      {editorOpen && (
+        <ScoreEditor
+          abc={abc}
+          title={name}
+          lyrics={lyrics}
+          durationSeconds={numberOrUndefined(duration) ?? null}
+          cot={effectiveCot}
+          onCompose={writeScoreAlone}
+          onApply={(value, words) => {
+            setAbc(value);
+            if (words !== null) setLyrics(words);
+            setSemanticTokens('');
+            setShowNotation(true);
+            setEditorOpen(false);
+          }}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
     </section>
   );
 };

@@ -336,6 +336,9 @@ struct MusicJob {
     /// The playlist the made songs go into, a project the user works in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     playlist_id: Option<String>,
+    /// How the lyrics were laid along a score that came without sections.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    laid: Option<Value>,
 }
 
 fn unix_millis() -> u64 {
@@ -867,6 +870,7 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/score/length", post(score::api::length))
         .route("/v1/score/transpose", post(score::api::transpose))
         .route("/v1/score/midi", post(score::api::midi))
+        .route("/v1/score/from-midi", post(score::api::from_midi))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -6582,10 +6586,11 @@ async fn create_music_job(
         return (StatusCode::BAD_REQUEST, Json(failed_request_job(request, engine_id, error)));
     }
     let max_batch = state.engine_options.read().await.effective_max_batch();
-    let body = match yue_request_from(&request, max_batch) {
+    let mut body = match yue_request_from(&request, max_batch) {
         Ok(value) => value,
         Err(error) => return (StatusCode::BAD_REQUEST, Json(failed_request_job(request, engine_id, error))),
     };
+    let laid = laid_out(&mut body, request.duration_seconds.is_none());
     let derived = match request.cover_of.clone() {
         Some(id) => match state.library.get_song(&id) {
             Ok(Some(original)) => Some(derivation(&original, "cover", serde_json::json!({ "cot": request.cot, "style": request.style }))),
@@ -6615,6 +6620,7 @@ async fn create_music_job(
                 songs: vec![],
                 message: "Submitted to yue-server.".into(),
                 playlist_id: request.playlist_id.clone(),
+                laid,
             };
             state.jobs.write().await.insert(job.id.clone(), job.clone());
             spawn_job_watcher(state.clone(), job.id.clone());
@@ -6681,6 +6687,7 @@ async fn replay_music_job(
         songs: vec![],
         message: "Submitted a re-render: the semantic stream is present, so the autoregressive stage is skipped.".into(),
         playlist_id: None,
+        laid: None,
     };
     if let Some(song_id) = &request.song_id {
         if let Some(original) = state.library.get_song(song_id).map_err(|error| api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))? {
@@ -7574,6 +7581,27 @@ fn yue_request_from(request: &CreateMusicJobRequest, max_batch: u32) -> Result<V
     Ok(body)
 }
 
+/// A score that names no section, as a tune from a MIDI file comes, is laid out for the lyrics
+/// before it is sung; at an automatic length the song is stopped a little after the laid-out tune.
+fn laid_out(body: &mut Value, automatic_length: bool) -> Option<Value> {
+    if body.get("cot").and_then(Value::as_str) == Some("off") {
+        return None;
+    }
+    let lyrics = body.get("lyrics").and_then(Value::as_str).unwrap_or_default();
+    let laid = score::phrasing::lay(body.get("abc")?.as_str()?, lyrics)?;
+    let ceiling = score::phrasing::ceiling(laid.seconds).min(360.0);
+    body["abc"] = Value::String(laid.score);
+    if automatic_length {
+        body["duration"] = Value::from(ceiling);
+    }
+    Some(serde_json::json!({
+        "seconds": laid.seconds,
+        "ceiling": ceiling,
+        "crowded": laid.crowded,
+        "notices": laid.notices.iter().map(|(level, text)| serde_json::json!({ "level": level, "text": text })).collect::<Vec<_>>(),
+    }))
+}
+
 /// The engine's own spelling of an adapter list: the folder as `name`, and
 /// `<slot>_scale` for every slot, zero where the request leaves one out.
 fn adapter_fields(uses: &[AdapterUse]) -> Result<Vec<Value>, String> {
@@ -7629,6 +7657,7 @@ fn queued_not_configured_job(request: CreateMusicJobRequest, engine_id: String) 
         songs: vec![],
         message: "The selected local music engine is not configured; this job remains queued and no inference has started.".into(),
         playlist_id: None,
+        laid: None,
     }
 }
 
@@ -7652,6 +7681,7 @@ fn failed_request_job(request: CreateMusicJobRequest, engine_id: String, error: 
         songs: vec![],
         message: error,
         playlist_id: None,
+        laid: None,
     }
 }
 
@@ -7935,6 +7965,26 @@ mod tests {
         assert_eq!(yue_request_from(&request, 1).unwrap()["abc"], "X:1\nK:C\nC\n");
         let marked_only = CreateMusicJobRequest { client_ref: None, abc: Some("%yue2-words 0123456789abcdef\n".into()), ..sample_request() };
         assert!(yue_request_from(&marked_only, 1).unwrap().get("abc").is_none());
+    }
+
+    #[test]
+    fn a_tune_without_sections_is_laid_out_for_the_lyrics_and_stops_after_it() {
+        let tune = "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=120\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\nV: Vocal\nC4D4E4F4|G8z8|C4D4E4F4|G8z8|\nV: Ins\nZ4|\n";
+        let lyrics = "[Verse]\nOne two three four five\nSix seven eight nine ten";
+        let request = CreateMusicJobRequest { client_ref: None, abc: Some(tune.into()), lyrics: lyrics.into(), ..sample_request() };
+        let mut body = yue_request_from(&request, 1).unwrap();
+        let laid = laid_out(&mut body, true).expect("a bare tune is laid out");
+        assert!(body["abc"].as_str().unwrap().contains("% verse"), "{}", body["abc"]);
+        assert_eq!(body["duration"], laid["ceiling"]);
+        assert!(laid["notices"][0]["text"].as_str().unwrap().starts_with("The score came without sections"));
+
+        let mut chosen = yue_request_from(&CreateMusicJobRequest { duration_seconds: Some(90.0), ..request.clone() }, 1).unwrap();
+        laid_out(&mut chosen, false).unwrap();
+        assert_eq!(chosen["duration"], 90.0);
+        let mut off = yue_request_from(&CreateMusicJobRequest { cot: Some("off".into()), ..request.clone() }, 1).unwrap();
+        assert!(laid_out(&mut off, true).is_none());
+        let mut named = yue_request_from(&CreateMusicJobRequest { abc: Some(tune.replace("V: Vocal\nC4", "% verse\nV: Vocal\nC4")), ..request }, 1).unwrap();
+        assert!(laid_out(&mut named, true).is_none());
     }
 
     #[test]

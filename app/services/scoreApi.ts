@@ -5,7 +5,7 @@ type Failure = { ok: false; error: string };
 /** What a score route answers: a problem with the score is `ok: false` and the reason, to show as it is. */
 type Answer<T> = ({ ok: true } & T) | Failure;
 
-function failed<T>(answer: Answer<T>): answer is Failure {
+export function failed<T>(answer: Answer<T>): answer is Failure {
   return !answer.ok;
 }
 

@@ -30,7 +30,8 @@ fn every_file_makes_the_score_the_reference_makes() {
             let made = convert(&song, mode, Pick::Auto, Pick::Auto).unwrap_or_else(|error| panic!("{name} {key}: {error}"));
             assert_eq!(made.abc, wanted["abc"].as_str().unwrap(), "{name} {key}: the score");
             assert_eq!(made.lyrics, wanted["lyrics"].as_str().unwrap(), "{name} {key}: the lyrics");
-            assert_eq!(serde_json::to_value(&made.notices).unwrap(), wanted["notices"], "{name} {key}: the notices");
+            let texts: Vec<String> = made.notices.iter().map(|notice| notice.text()).collect();
+            assert_eq!(serde_json::to_value(&texts).unwrap(), wanted["notices"], "{name} {key}: the notices");
             assert_eq!(serde_json::to_value(&made.parts).unwrap(), wanted["parts"], "{name} {key}: the parts");
             let mut facts = serde_json::to_value(&made.facts).unwrap();
             let mut wanted_facts = wanted["facts"].clone();

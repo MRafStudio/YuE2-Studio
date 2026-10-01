@@ -70,6 +70,16 @@ pub struct Laid {
     pub score: String,
     pub notices: Vec<(&'static str, String)>,
     pub seconds: f64,
+    pub crowded: Option<Crowded>,
+}
+
+/// Notes and syllables parted by more than half again on average over the lines: `ratio` notes a
+/// syllable on the middle line, the middle phrase's notes and the middle line's syllables.
+#[derive(Clone, Copy, Debug, serde::Serialize)]
+pub struct Crowded {
+    pub ratio: f64,
+    pub notes: usize,
+    pub syllables: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -88,6 +98,20 @@ pub fn named(score: &str) -> bool {
 /// The score with its section comments taken out.
 pub fn bare(score: &str) -> String {
     score.split('\n').filter(|line| !line.starts_with("% ")).collect::<Vec<_>>().join("\n")
+}
+
+/// The score naming at least one section: one that names none is one `label` from its first bar.
+/// Text with no `V: Vocal` line of music is given back as it is.
+pub fn labelled(score: &str, label: &str) -> String {
+    if named(score) {
+        return score.to_string();
+    }
+    let lines: Vec<&str> = score.split('\n').collect();
+    let Some(at) = lines.iter().position(|line| *line == "V: Vocal") else {
+        return score.to_string();
+    };
+    let comment = format!("% {label}");
+    lines[..at].iter().copied().chain([comment.as_str()]).chain(lines[at..].iter().copied()).collect::<Vec<_>>().join("\n")
 }
 
 /// The most seconds a song laid out on a tune this long is let sing: the tune, and a little over.
@@ -611,6 +635,7 @@ pub fn lay(score: &str, lyrics: &str) -> Option<Laid> {
             ratios.push(found[k..k + m].iter().map(|piece| piece.notes).sum::<usize>() as f64 / *count as f64);
         }
     }
+    let mut crowded = None;
     if ratios.iter().map(|ratio| ratio.ln().abs()).sum::<f64>() / ratios.len() as f64 > 1.5f64.ln() {
         let mut sorted = ratios.clone();
         sorted.sort_by(f64::total_cmp);
@@ -620,6 +645,7 @@ pub fn lay(score: &str, lyrics: &str) -> Option<Laid> {
         let mut line_syllables: Vec<usize> = sung.iter().flat_map(|(_, counts, _)| counts.iter().copied()).collect();
         line_syllables.sort_unstable();
         let (notes, syllables) = (phrase_notes[phrase_notes.len() / 2], line_syllables[line_syllables.len() / 2]);
+        crowded = Some(Crowded { ratio: middle, notes, syllables });
         notices.push((
             "warn",
             if middle > 1.0 {
@@ -629,7 +655,7 @@ pub fn lay(score: &str, lyrics: &str) -> Option<Laid> {
             },
         ));
     }
-    Some(Laid { score: written, notices, seconds })
+    Some(Laid { score: written, notices, seconds, crowded })
 }
 
 #[cfg(test)]
