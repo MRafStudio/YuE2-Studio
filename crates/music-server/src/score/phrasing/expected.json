@@ -1,0 +1,90 @@
+{
+ "laid": {
+  "band": {
+   "input": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=120\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|c4e2^f2g4c'2z2|B4A2B2G4F2z2|\nV: Ins\nZ4|\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|c4e2^f2g4c'2z2|B4A2B2G4F2z2|\nV: Ins\nZ4|\n",
+   "lyrics": "[Verse 1]\nEvery evening by the river\nI can hear the water singing\nDifferent voices, piano playing\nRadio is on the ceiling\n\n[Chorus]\nHold me now, hold me close\nNever let me go\n\n[Verse 2]\nWalking slowly down the avenue\nBusiness people, cameras flashing\n\n[Chorus]\nHold me now, hold me close\nNever let me go",
+   "score": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=120\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\n% verse\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|c4e2^f2g4c'2z2|B4A2B2G4F2z2|\nV: Ins\nZ4|\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|c4e2^f2g4c'2z2|B4A2B2G4F2z2|\nV: Ins\nZ4|\n% chorus\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|\nV: Ins\nZ2|\n% verse\nV: Vocal\nc4e2^f2g4c'2z2|B4A2B2G4F2z2|c4d2e2e4f2z2|G4F2G2E4D2z2|\nV: Ins\nZ4|\n% chorus\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|Z|\nV: Ins\nZ3|\n",
+   "notices": [
+    [
+     "notice",
+     "The score came without sections, so the lyrics were laid along its tune before it was sung: [Verse 1] on bars 1-8; [Chorus] on bars 1-2; [Verse 2] on bars 3-6; [Chorus] on bars 1-2. The song ends one empty bar after the last line, 34 seconds in; with 'max_seconds' at 0 the singing is stopped at 39 seconds should it run on."
+    ]
+   ],
+   "seconds": 34.0
+  },
+  "karaoke": {
+   "input": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=100\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\nV: Vocal\nZ2|\nV: Ins\nZ2|\nV: Vocal\nE4A4F4_B4|^F4B4G4z4|\nV: Ins\nZ2|\nV: Vocal\nz4c4^G4E4|\nV: Ins\nZ|\nV: Vocal\nA4F4_B4^F4|z8B4G4|c4^G4E4A4|Z|\nV: Ins\nZ4|\nV: Vocal\nZ3|\nV: Ins\nZ3|\n",
+   "lyrics": "[Intro]\n\n[Куплет]\nПривет, мой друг, пой со мной\nНочь опустилась над рекой\n\n[Hook]\nЛа-ла-ла, ла-ла-ла\nТы моя звезда",
+   "score": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=100\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\n% intro\nV: Vocal\nZ2|\nV: Ins\nZ2|\n% verse\nV: Vocal\nE4A4F4_B4|^F4B4G4z4|z4c4^G4E4|A4F4_B4^F4|\nV: Ins\nZ4|\n% chorus\nV: Vocal\nz4c4^G4E4|A4F4_B4^F4|z8B4G4|c4^G4E4A4|\nV: Ins\nZ4|\nV: Vocal\nZ|\nV: Ins\nZ|\n",
+   "notices": [
+    [
+     "notice",
+     "The score came without sections, so the lyrics were laid along its tune before it was sung: bars 1-2 as the intro; [Куплет] on bars 3-6; [Hook] on bars 5-8. The song ends one empty bar after the last line, 26 seconds in; with 'max_seconds' at 0 the singing is stopped at 31 seconds should it run on."
+    ]
+   ],
+   "seconds": 26.4
+  },
+  "roundtrip": {
+   "input": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=96\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Bb\nV: Vocal\n\"Bb\"z16|\"Gm\"z16|\nV: Ins\nB,4D4F8|G4B4d8|\nV: Vocal\n\"Eb\"G4F4E4D4|\"F7\"C8z8|\"Bb\"D4F4B4d4|\"Cm7/Bb\"c16|\nV: Ins\nZ|A,8C8|Z2|\nV: Vocal\n\"Eb/G\"e4d4c4B4|\"F\"A8F8|\"Bb\"B16|\"Bb\"z16|\nV: Ins\nG,16|F,16|B,,16|Z|\n",
+   "lyrics": "[Verse 1]\nEvery evening by the river\nI can hear the water singing\nDifferent voices, piano playing\nRadio is on the ceiling\n\n[Chorus]\nHold me now, hold me close\nNever let me go\n\n[Verse 2]\nWalking slowly down the avenue\nBusiness people, cameras flashing\n\n[Chorus]\nHold me now, hold me close\nNever let me go",
+   "score": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=96\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Bb\n% intro\nV: Vocal\n\"Bb\"z16|\"Gm\"z16|\nV: Ins\nB,4D4F8|G4B4d8|\n% verse\nV: Vocal\n\"Eb\"G4F4E4D4|\"F7\"C8z8|\"Bb\"D4F4B4d4|\"Cm7/Bb\"c16|\nV: Ins\nZ|A,8C8|Z2|\nV: Vocal\n\"Eb/G\"e4d4c4B4|\"F\"A8F8|\"Bb\"B16|\"Eb\"G4F4E4D4|\nV: Ins\nG,16|F,16|B,,16|Z|\nV: Vocal\n\"F7\"C8z8|\"Bb\"D4F4B4d4|\"Cm7/Bb\"c16|\"Eb/G\"e4d4c4B4|\nV: Ins\nA,8C8|Z2|G,16|\nV: Vocal\n\"F\"A8F8|\"Bb\"B16|\nV: Ins\nF,16|B,,16|\n% chorus\nV: Vocal\n\"F7\"C8z8|\"Bb\"D4F4B4d4|\"Cm7/Bb\"c16|\"Eb/G\"e4d4c4B4|\nV: Ins\nA,8C8|Z2|G,16|\nV: Vocal\n\"F\"A8z8|\nV: Ins\nF,16|\n% verse\nV: Vocal\n\"Eb\"G4F4E4D4|\"F7\"C8z8|\"Bb\"D4F4B4d4|\"Cm7/Bb\"c16|\nV: Ins\nZ|A,8C8|Z2|\nV: Vocal\n\"Eb/G\"e4d4c4B4|\"F\"A8z8|\nV: Ins\nG,16|F,16|\n% chorus\nV: Vocal\n\"F7\"C8z8|\"Bb\"D4F4B4d4|\"Cm7/Bb\"c16|\"Eb/G\"e4d4c4B4|\nV: Ins\nA,8C8|Z2|G,16|\nV: Vocal\n\"F\"A8z8|Z|\nV: Ins\nF,16|Z|\n",
+   "notices": [
+    [
+     "notice",
+     "The score came without sections, so the lyrics were laid along its tune before it was sung: bars 1-2 as the intro; [Verse 1] on bars 3-9; [Chorus] on bars 4-8; [Verse 2] on bars 3-8; [Chorus] on bars 4-8. The song ends one empty bar after the last line, 82 seconds in; with 'max_seconds' at 0 the singing is stopped at 93 seconds should it run on."
+    ]
+   ],
+   "seconds": 82.5
+  },
+  "crowded": {
+   "input": "X:1\nT:\nM:4/4\nL:1/32\nQ:1/4=105\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Gm\nV: Vocal\nG4d4A4=e4=B4^f4^c4_A4|e4B4f4c4G4d4A4=e4|=B4^f4^c4_A4e4_B4=f4=c4|G4d4A4=e4=B4^f4^c4_A4|\nV: Ins\nZ4|\nV: Vocal\nM:3/4\ne4B4f4c4G4d4|A4=e4=B4^f4^c4_A4|\nV: Ins\nM:3/4\nZ2|\nV: Vocal\nM:6/8\ne4B4f4c4z8|Z|\nV: Ins\nM:6/8\nZ2|\n",
+   "lyrics": "Line number 1 goes on and on with many many words to sing\nLine number 2 goes on and on with many many words to sing\nLine number 3 goes on and on with many many words to sing\nLine number 4 goes on and on with many many words to sing\nLine number 5 goes on and on with many many words to sing\nLine number 6 goes on and on with many many words to sing\nLine number 7 goes on and on with many many words to sing\nLine number 8 goes on and on with many many words to sing",
+   "score": "X:1\nT:\nM:4/4\nL:1/64\nQ:1/4=105\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Gm\n% verse\nV: Vocal\nG8d8A8=e8=B8^f8^c8_A8|e8B8f8c8G8d8A8=e8|=B8^f8^c8_A8e8_B8=f8=c8|G8d8A8=e8=B8^f8^c8_A8|\nV: Ins\nZ4|\nV: Vocal\nM:3/4\ne8B8f8c8G8d8|A8=e8=B8^f8^c8_A8|\nV: Ins\nM:3/4\nZ2|\nV: Vocal\nM:6/8\ne8B8f8c8z16|\nV: Ins\nM:6/8\nZ|\nV: Vocal\nM:4/4\n=B8^f8^c8_A8e8_B8=f8=c8|G8d8A8=e8=B8^f8^c8_A8|\nV: Ins\nM:4/4\nZ2|\nV: Vocal\nM:3/4\ne8B8f8c8G8d8|A8=e8=B8^f8^c8_A8|\nV: Ins\nM:3/4\nZ2|\nV: Vocal\nM:6/8\ne8B8f8c8z16|\nV: Ins\nM:6/8\nZ|\nV: Vocal\nM:4/4\nG8d8A8=e8=B8^f8^c8_A8|e8B8f8c8G8d8A8=e8|=B8^f8^c8_A8e8_B8=f8=c8|G8d8A8=e8=B8^f8^c8_A8|\nV: Ins\nM:4/4\nZ4|\nV: Vocal\nM:3/4\ne8B8f8c8G8d8|A8=e8=B8^f8^c8_A8|\nV: Ins\nM:3/4\nZ2|\nV: Vocal\nM:6/8\ne8B8f8c8z16|Z|\nV: Ins\nM:6/8\nZ2|\n",
+   "notices": [
+    [
+     "notice",
+     "The score came without sections, so the lyrics were laid along its tune before it was sung: [Verse] on bars 1-7. The song ends one empty bar after the last line, 40 seconds in; with 'max_seconds' at 0 the singing is stopped at 46 seconds should it run on."
+    ]
+   ],
+   "seconds": 40.0
+  }
+ },
+ "syllables": {
+  "every": 2,
+  "evening": 2,
+  "piano": 3,
+  "radio": 3,
+  "naïve": 2,
+  "café": 2,
+  "make": 1,
+  "table": 2,
+  "wanted": 2,
+  "boxes": 2,
+  "singing": 2,
+  "million": 2,
+  "nation": 2,
+  "spécial": 2,
+  "Привет": 2,
+  "звезда": 2,
+  "Ελλάδα": 3,
+  "東京": 2,
+  "사랑해": 3,
+  "don't": 1,
+  "temperature": 3,
+  "ceiling": 2,
+  "people": 2,
+  "love": 1,
+  "loved": 1,
+  "being": 2,
+  "Zoë": 2
+ },
+ "labels": {
+  "Verse 2": "verse",
+  "Hook": "chorus",
+  "Pre Chorus": "pre-chorus",
+  "PRE-CHORUS 1": "pre-chorus",
+  "Bridge:": "bridge",
+  "Куплет": "verse",
+  "Outro #2": "outro"
+ }
+}

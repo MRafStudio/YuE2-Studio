@@ -1,0 +1,484 @@
+{
+ "band.mid": {
+  "melody": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=120\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\n% verse\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|c4e2^f2g4c'2z2|B4A2B2G4F2z2|\nV: Ins\nZ4|\n% chorus\nV: Vocal\nc4d2e2e4f2z2|G4F2G2E4D2z2|c4e2^f2g4c'2z2|B4A2B2G4F2z2|\nV: Ins\nZ4|\n",
+   "lyrics": "[Verse]\n\n[Chorus]",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Lead Vocal",
+     "family": "Ensemble",
+     "notes": 40,
+     "low": 62,
+     "high": 84,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "name"
+    },
+    {
+     "number": 2,
+     "name": "Piano",
+     "family": "Piano",
+     "notes": 48,
+     "low": 53,
+     "high": 67,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    },
+    {
+     "number": 3,
+     "name": "Bass",
+     "family": "Bass",
+     "notes": 8,
+     "low": 29,
+     "high": 36,
+     "drums": false,
+     "polyphony": 1,
+     "role": "",
+     "why": ""
+    },
+    {
+     "number": 4,
+     "name": "Drums",
+     "family": "Drums",
+     "notes": 32,
+     "low": 36,
+     "high": 38,
+     "drums": true,
+     "polyphony": 1,
+     "role": "",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 120,
+    "meter": "4/4",
+    "bars": 8,
+    "seconds": 16.0,
+    "key": "C",
+    "key_source": "file",
+    "grid": 16,
+    "voice": 1,
+    "instrument": null,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": false
+   },
+   "notices": []
+  },
+  "full": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=120\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\n% verse\nV: Vocal\n\"C\"c4d2e2e4f2z2|\"Am\"G4F2G2E4D2z2|\"F\"c4e2^f2g4c'2z2|\"G\"B4A2B2G4F2z2|\nV: Ins\nZ4|\n% chorus\nV: Vocal\n\"C\"c4d2e2e4f2z2|\"Am\"G4F2G2E4D2z2|\"F\"c4e2^f2g4c'2z2|\"G\"B4A2B2G4F2z2|\nV: Ins\nZ4|\n",
+   "lyrics": "[Verse]\n\n[Chorus]",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Lead Vocal",
+     "family": "Ensemble",
+     "notes": 40,
+     "low": 62,
+     "high": 84,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "name"
+    },
+    {
+     "number": 2,
+     "name": "Piano",
+     "family": "Piano",
+     "notes": 48,
+     "low": 53,
+     "high": 67,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    },
+    {
+     "number": 3,
+     "name": "Bass",
+     "family": "Bass",
+     "notes": 8,
+     "low": 29,
+     "high": 36,
+     "drums": false,
+     "polyphony": 1,
+     "role": "",
+     "why": ""
+    },
+    {
+     "number": 4,
+     "name": "Drums",
+     "family": "Drums",
+     "notes": 32,
+     "low": 36,
+     "high": 38,
+     "drums": true,
+     "polyphony": 1,
+     "role": "",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 120,
+    "meter": "4/4",
+    "bars": 8,
+    "seconds": 16.0,
+    "key": "C",
+    "key_source": "file",
+    "grid": 16,
+    "voice": 1,
+    "instrument": null,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": false
+   },
+   "notices": [
+    "The chord symbols were guessed from what the file's parts play together: a harmony to follow, not a transcription of it."
+   ]
+  },
+  "same_track": "'vocal_track' is track 4, which is drums: drums have no tune to sing. The file's tracks: 1 Lead Vocal (Ensemble), 2 Piano (Piano), 3 Bass (Bass), 4 Drums (Drums)"
+ },
+ "karaoke.kar": {
+  "melody": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=100\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\n% intro\nV: Vocal\nZ2|\nV: Ins\nZ2|\n% chorus\nV: Vocal\nE4A4F4_B4|^F4B4G4z4|\nV: Ins\nZ2|\n% verse\nV: Vocal\nz4c4^G4E4|\nV: Ins\nZ|\n% chorus\nV: Vocal\nA4F4_B4^F4|z8B4G4|c4^G4E4A4|Z|\nV: Ins\nZ4|\nV: Vocal\nZ3|\nV: Ins\nZ3|\n",
+   "lyrics": "[Chorus]\nПривет мой друг\nПой со мной\n\n[Verse]\nЛа ла ла\nла ла ла\n\n[Chorus]\nПривет мой друг\nПой со мной",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Melody",
+     "family": "Pipe",
+     "notes": 20,
+     "low": 64,
+     "high": 72,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "karaoke"
+    },
+    {
+     "number": 2,
+     "name": "Strings",
+     "family": "Ensemble",
+     "notes": 36,
+     "low": 48,
+     "high": 55,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 100,
+    "meter": "4/4",
+    "bars": 12,
+    "seconds": 28.8,
+    "key": "C",
+    "key_source": "estimated",
+    "grid": 16,
+    "voice": 1,
+    "instrument": null,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": true
+   },
+   "notices": [
+    "The notes of the file do not sit on a grid of sixteenths or thirty-seconds -- it was probably played in by hand -- so they were rounded to the nearest sixteenth."
+   ]
+  },
+  "full": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=100\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:C\n% intro\nV: Vocal\n\"C\"z16|\"C\"z16|\nV: Ins\nZ2|\n% chorus\nV: Vocal\n\"C\"E4A4F4_B4|\"C\"^F4B4G4z4|\nV: Ins\nZ2|\n% verse\nV: Vocal\n\"C\"z4c4^G4E4|\nV: Ins\nZ|\n% chorus\nV: Vocal\n\"C\"A4F4_B4^F4|\"C\"z8B4G4|\"C\"c4^G4E4A4|\"C\"z16|\nV: Ins\nZ4|\nV: Vocal\n\"C\"z16|\"C\"z16|\"C\"z16|\nV: Ins\nZ3|\n",
+   "lyrics": "[Chorus]\nПривет мой друг\nПой со мной\n\n[Verse]\nЛа ла ла\nла ла ла\n\n[Chorus]\nПривет мой друг\nПой со мной",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Melody",
+     "family": "Pipe",
+     "notes": 20,
+     "low": 64,
+     "high": 72,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "karaoke"
+    },
+    {
+     "number": 2,
+     "name": "Strings",
+     "family": "Ensemble",
+     "notes": 36,
+     "low": 48,
+     "high": 55,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 100,
+    "meter": "4/4",
+    "bars": 12,
+    "seconds": 28.8,
+    "key": "C",
+    "key_source": "estimated",
+    "grid": 16,
+    "voice": 1,
+    "instrument": null,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": true
+   },
+   "notices": [
+    "The notes of the file do not sit on a grid of sixteenths or thirty-seconds -- it was probably played in by hand -- so they were rounded to the nearest sixteenth.",
+    "The chord symbols were guessed from what the file's parts play together: a harmony to follow, not a transcription of it."
+   ]
+  },
+  "same_track": "'vocal_track' is track 4, but this file has 2 tracks with notes: 1 Melody (Pipe), 2 Strings (Ensemble)"
+ },
+ "roundtrip.mid": {
+  "melody": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=96\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Bb\n% intro\nV: Vocal\nZ2|\nV: Ins\nB,4D4F8|G4B4d8|\n% verse\nV: Vocal\nG4F4E4D4|C8z8|D4F4B4d4|c16|\nV: Ins\nZ|A,8C8|Z2|\n% chorus\nV: Vocal\ne4d4c4B4|A8F8|B16|Z|\nV: Ins\nG,16|F,16|B,,16|Z|\n",
+   "lyrics": "[Verse]\n\n[Chorus]",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Vocal",
+     "family": "Ensemble",
+     "notes": 17,
+     "low": 60,
+     "high": 75,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "name"
+    },
+    {
+     "number": 2,
+     "name": "Ins",
+     "family": "Piano",
+     "notes": 11,
+     "low": 46,
+     "high": 74,
+     "drums": false,
+     "polyphony": 1,
+     "role": "instrument",
+     "why": "name"
+    },
+    {
+     "number": 3,
+     "name": "Chords",
+     "family": "Ensemble",
+     "notes": 31,
+     "low": 43,
+     "high": 65,
+     "drums": false,
+     "polyphony": 5,
+     "role": "",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 96,
+    "meter": "4/4",
+    "bars": 10,
+    "seconds": 25.0,
+    "key": "Bb",
+    "key_source": "file",
+    "grid": 16,
+    "voice": 1,
+    "instrument": 2,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": false
+   },
+   "notices": []
+  },
+  "full": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/16\nQ:1/4=96\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Bb\n% intro\nV: Vocal\n\"Bb\"z16|\"Gm\"z16|\nV: Ins\nB,4D4F8|G4B4d8|\n% verse\nV: Vocal\n\"Eb\"G4F4E4D4|\"F7\"C8z8|\"Bb\"D4F4B4d4|\"Cm7/Bb\"c16|\nV: Ins\nZ|A,8C8|Z2|\n% chorus\nV: Vocal\n\"Eb/G\"e4d4c4B4|\"F\"A8F8|\"Bb\"B16|\"Bb\"z16|\nV: Ins\nG,16|F,16|B,,16|Z|\n",
+   "lyrics": "[Verse]\n\n[Chorus]",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Vocal",
+     "family": "Ensemble",
+     "notes": 17,
+     "low": 60,
+     "high": 75,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "name"
+    },
+    {
+     "number": 2,
+     "name": "Ins",
+     "family": "Piano",
+     "notes": 11,
+     "low": 46,
+     "high": 74,
+     "drums": false,
+     "polyphony": 1,
+     "role": "instrument",
+     "why": "name"
+    },
+    {
+     "number": 3,
+     "name": "Chords",
+     "family": "Ensemble",
+     "notes": 31,
+     "low": 43,
+     "high": 65,
+     "drums": false,
+     "polyphony": 5,
+     "role": "chords",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 96,
+    "meter": "4/4",
+    "bars": 10,
+    "seconds": 25.0,
+    "key": "Bb",
+    "key_source": "file",
+    "grid": 16,
+    "voice": 1,
+    "instrument": 2,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": false
+   },
+   "notices": [
+    "The chord symbols were read from track 3, 'Chords', chord by chord."
+   ]
+  },
+  "same_track": "'vocal_track' is track 4, but this file has 3 tracks with notes: 1 Vocal (Ensemble), 2 Ins (Piano), 3 Chords (Ensemble)"
+ },
+ "tempo.mid": {
+  "melody": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/32\nQ:1/4=105\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Gm\nV: Vocal\nG4d4A4=e4=B4^f4^c4_A4|e4B4f4c4G4d4A4=e4|=B4^f4^c4_A4e4_B4=f4=c4|G4d4A4=e4=B4^f4^c4_A4|\nV: Ins\nZ4|\nV: Vocal\nM:3/4\ne4B4f4c4G4d4|A4=e4=B4^f4^c4_A4|\nV: Ins\nM:3/4\nZ2|\nV: Vocal\nM:6/8\ne4B4f4c4z8|Z|\nV: Ins\nM:6/8\nZ2|\n",
+   "lyrics": "[Verse]",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Track 1",
+     "family": "Piano",
+     "notes": 34,
+     "low": 38,
+     "high": 52,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    },
+    {
+     "number": 2,
+     "name": "Guitar",
+     "family": "Guitar",
+     "notes": 48,
+     "low": 67,
+     "high": 78,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "highest"
+    },
+    {
+     "number": 3,
+     "name": "Keys",
+     "family": "Piano",
+     "notes": 42,
+     "low": 53,
+     "high": 62,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 105,
+    "meter": "4/4",
+    "bars": 8,
+    "seconds": 16.0,
+    "key": "Gm",
+    "key_source": "file",
+    "grid": 16,
+    "voice": 2,
+    "instrument": null,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": false
+   },
+   "notices": [
+    "The file's tempo moves between 90 and 120 BPM. A score keeps one tempo, so it is written at the average, 105 BPM, and the song will not speed up or slow down where the file does."
+   ]
+  },
+  "full": {
+   "abc": "X:1\nT:\nM:4/4\nL:1/32\nQ:1/4=105\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Gm\nV: Vocal\n\"Dm7\"G4d4A4=e4\"Dsus4\"=B4^f4^c4_A4|\"Csus4\"e4B4f4c4\"Bb7\"G4d4A4=e4|\"Bdim\"=B4^f4^c4_A4\"Gm\"e4_B4=f4=c4|\"F\"G4d4A4=e4\"Gm\"=B4^f4^c4_A4|\nV: Ins\nZ4|\nV: Vocal\nM:3/4\n\"Fm\"e4B4f4c4G4d4|\"Dm\"A4=e4=B4^f4^c4_A4|\nV: Ins\nM:3/4\nZ2|\nV: Vocal\nM:6/8\n\"Gdim\"e4B4f4\"Am7\"c4z8|\"Csus4\"z12\"Bb7\"z12|\nV: Ins\nM:6/8\nZ2|\n",
+   "lyrics": "[Verse]",
+   "parts": [
+    {
+     "number": 1,
+     "name": "Track 1",
+     "family": "Piano",
+     "notes": 34,
+     "low": 38,
+     "high": 52,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    },
+    {
+     "number": 2,
+     "name": "Guitar",
+     "family": "Guitar",
+     "notes": 48,
+     "low": 67,
+     "high": 78,
+     "drums": false,
+     "polyphony": 1,
+     "role": "voice",
+     "why": "highest"
+    },
+    {
+     "number": 3,
+     "name": "Keys",
+     "family": "Piano",
+     "notes": 42,
+     "low": 53,
+     "high": 62,
+     "drums": false,
+     "polyphony": 3,
+     "role": "",
+     "why": ""
+    }
+   ],
+   "facts": {
+    "bpm": 105,
+    "meter": "4/4",
+    "bars": 8,
+    "seconds": 16.0,
+    "key": "Gm",
+    "key_source": "file",
+    "grid": 16,
+    "voice": 2,
+    "instrument": null,
+    "voice_shift": 0,
+    "instrument_shift": 0,
+    "karaoke": false
+   },
+   "notices": [
+    "The file's tempo moves between 90 and 120 BPM. A score keeps one tempo, so it is written at the average, 105 BPM, and the song will not speed up or slow down where the file does.",
+    "The chord symbols were guessed from what the file's parts play together: a harmony to follow, not a transcription of it."
+   ]
+  },
+  "same_track": "'vocal_track' is track 4, but this file has 3 tracks with notes: 1 Track 1 (Piano), 2 Guitar (Guitar), 3 Keys (Piano)"
+ }
+}

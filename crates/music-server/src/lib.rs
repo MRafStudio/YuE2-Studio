@@ -31,6 +31,7 @@ mod resources;
 mod chunked;
 mod separation;
 mod midi;
+mod score;
 mod sizes;
 pub mod net;
 mod saving;
@@ -861,6 +862,11 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/v1/system/gpus", get(system_gpus))
         .route("/v1/network", get(remote::status).put(remote::change))
         .route("/v1/adapters/{id}/comfyui", get(export_adapter_comfyui).post(save_adapter_comfyui))
+        .route("/v1/score/read", post(score::api::read))
+        .route("/v1/score/write", post(score::api::write))
+        .route("/v1/score/length", post(score::api::length))
+        .route("/v1/score/transpose", post(score::api::transpose))
+        .route("/v1/score/midi", post(score::api::midi))
         .route("/v1/training/prepare/train-after", post(prepare::set_train_after))
         .route("/v1/training/listen/install", post(install_listen_pack))
         .route("/v1/training/runs", post(start_training))
@@ -7541,7 +7547,7 @@ fn yue_request_from(request: &CreateMusicJobRequest, max_batch: u32) -> Result<V
         "style": request.style,
         "lyrics": request.lyrics.replace("\r\n", "\n"),
     });
-    if let Some(abc) = request.abc.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+    if let Some(abc) = request.abc.as_deref().map(|text| score::edits::read(text).score).filter(|value| !value.is_empty()) {
         body["abc"] = Value::String(format!("{abc}\n"));
     }
     insert_optional(&mut body, "cot", request.cot.clone());
@@ -7917,6 +7923,18 @@ mod tests {
         assert_eq!(body["peak_clip"], 0);
         assert_eq!(body["abc_sampling"], serde_json::json!({ "temperature": 0.8 }));
         assert!(body.get("semantic_sampling").is_none(), "an empty preset is the checkpoint preset");
+    }
+
+    #[test]
+    fn a_score_from_the_comfyui_node_reaches_the_engine_without_its_edit_mark() {
+        let request = CreateMusicJobRequest {
+            client_ref: None,
+            abc: Some("X:1\n%yue2-words 0123456789abcdef keep\nK:C\nC\n".into()),
+            ..sample_request()
+        };
+        assert_eq!(yue_request_from(&request, 1).unwrap()["abc"], "X:1\nK:C\nC\n");
+        let marked_only = CreateMusicJobRequest { client_ref: None, abc: Some("%yue2-words 0123456789abcdef\n".into()), ..sample_request() };
+        assert!(yue_request_from(&marked_only, 1).unwrap().get("abc").is_none());
     }
 
     #[test]
