@@ -233,6 +233,11 @@ tar -x` перетирает свежие untracked-файлы (`IDEA.md`, `HAND
   `origin/main` = `feat/top-control-panel-journal` = `upstream/main` = **`a7028f4`**;
   `git diff upstream/main..HEAD` пусто. Наши труды - в архиве (тег `archive/rafstudio-pr34`, bundle в
   `D:\NEURO\YuE2-Studio-backup`, патч в `.rafstudio/patches`).
+- ✅ **Студия обновлена до авторского релиза 3.4.0 (02.10):** portable-архив распакован в
+  `D:\NEURO\YuE2-Studio`, `FileVersion: 3.4.0`; в папке один exe (авторский). Наши прежние exe - в
+  `D:\NEURO\YuE2-Studio-backup` (наша сборка с правками + авторский 3.1.0). Данные не тронуты.
+- ✅ **Автору отправлено спасибо** в закрытом PR №34 (комментарий от `MRafStudio`, 02.10):
+  https://github.com/timoncool/YuE2-Studio/pull/34#issuecomment-5954401752
 
 **E. Куда агент складывает треки (🔴 не сделано, решение принято 29.09):**
 
